@@ -1,0 +1,742 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Health {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  status    String
+}
+
+model Tenant {
+  id                   String                @id @default(uuid())
+  name                 String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  stripeCustomerId     String?               @unique
+  serviceBlocked       Boolean               @default(false)
+  customerCode         String?               @unique
+  subBillingCustomerId String?               @unique
+  audioFiles           AudioFile[]
+  didForwards          DIDForward[]
+  dids                 DID[]
+  extensions           Extension[]
+  ivrs                 IVR[]
+  monitoringAddOn      MonitoringAddOn?
+  notifications        Notification[]
+  operationalSchedules OperationalSchedule[]
+  paymentMethods       PaymentMethod[]
+  ringGroups           RingGroup[]
+  subscriptions        Subscription[]
+  tfns                 TFN[]
+  usageRecords         UsageRecord[]
+  users                User[]
+  wallet               Wallet?
+  tenantFeatures       TenantFeature?
+  partnerId            String?
+  partner              Partner?              @relation(fields: [partnerId], references: [id])
+  outboundEndpointId   Int?
+  outboundEndpoint     OutboundEndpoint?     @relation(fields: [outboundEndpointId], references: [id], onDelete: SetNull)
+
+  @@map("tenants")
+}
+
+model TFN {
+  id             String    @id @default(uuid())
+  number         String    @unique
+  status         TFNStatus @default(AVAILABLE)
+  isDemo         Boolean   @default(false)
+  price          Decimal   @default(2.00)
+  tenantId       String?
+  purchasedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  forwardEnabled Boolean   @default(false)
+  forwardNumber  String?
+  heldBy         String?
+  heldUntil      DateTime?
+  routeTargetId  String?
+  routeType      String?
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id])
+
+  @@index([status, routeType])
+  @@map("tfns")
+}
+
+model Extension {
+  id                         String            @id @default(uuid())
+  tenantId                   String
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+  extensionNumber            String
+  forwardAllDestination      String?
+  forwardAllEnabled          Boolean           @default(false)
+  forwardAllType             String?
+  forwardBusyDestination     String?
+  forwardBusyEnabled         Boolean           @default(false)
+  forwardBusyType            String?
+  forwardNoAnswerDestination String?
+  forwardNoAnswerEnabled     Boolean           @default(false)
+  forwardNoAnswerTimeout     Int               @default(20)
+  forwardNoAnswerType        String?
+  name                       String
+  outboundCallerIdNumber     String?
+  sipAuthRealm               String?
+  sipPassword                String
+  sipUsername                String            @unique
+  password                   String?
+  sequenceId                 Int               @default(0)
+  recordingEnabled           Boolean           @default(false)
+  tenant                     Tenant            @relation(fields: [tenantId], references: [id])
+  ringGroupMembers           RingGroupMember[]
+
+  @@unique([tenantId, extensionNumber])
+  @@index([tenantId])
+  @@map("extensions")
+}
+
+model MonitoringAddOn {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  isActive  Boolean  @default(true)
+  price     Decimal  @default(5.00)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@map("monitoring_addons")
+}
+
+model AddonCatalog {
+  id           String   @id @default(uuid())
+  addonId      String   @unique @map("addon_id")
+  name         String
+  resourceType String   @map("resource_type")
+  unitsCount   Int      @default(1) @map("units_count")
+  unitPrice    Decimal  @map("unit_price")
+  currency     String   @default("USD")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("subscription_addons_catalog")
+}
+
+model UsageRecord {
+  id             String        @id @default(uuid())
+  tenantId       String
+  minutes        Int
+  cost           Decimal       @default(0.00)
+  subscriptionId String?
+  createdAt      DateTime      @default(now())
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@map("usage_records")
+}
+
+model PaymentMethod {
+  id        String    @id
+  tenantId  String
+  brand     String
+  last4     String
+  isDefault Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@map("payment_methods")
+}
+
+model Wallet {
+  id                  String              @id @default(uuid())
+  tenantId            String              @unique
+  balance             Decimal             @default(0.00)
+  currency            String              @default("USD")
+  autoRechargeEnabled Boolean             @default(false)
+  rechargeThreshold   Decimal             @default(10.00)
+  rechargeAmount      Decimal             @default(50.00)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  transactions        WalletTransaction[]
+  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id          String            @id @default(uuid())
+  walletId    String
+  amount      Decimal
+  type        TransactionType
+  status      TransactionStatus @default(SUCCESS)
+  description String
+  referenceId String?
+  paymentId   String?
+  createdAt   DateTime          @default(now())
+  wallet      Wallet            @relation(fields: [walletId], references: [id])
+
+  @@map("wallet_transactions")
+}
+
+model User {
+  id                  String           @id @default(uuid())
+  email               String           @unique
+  password            String?
+  name                String?
+  role                Role             @default(ADMIN)
+  status              UserStatus       @default(ACTIVE)
+  tenantId            String?
+  refreshToken        String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  inviteToken         String?          @unique
+  inviteTokenExpiry   DateTime?
+  monitoringEnabled   Boolean          @default(false)
+  monitoringExtension String?
+  monitoringSecret    String?
+  forcePasswordChange Boolean          @default(false)
+  resetToken          String?          @unique
+  resetTokenExpiry    DateTime?
+  notifications       Notification[]
+  managedSupportUsers SupportProfile[] @relation("AdminUser")
+  supportProfile      SupportProfile?  @relation("SupportUser")
+  actorAuditLogs      UserAuditLog[]   @relation("Actor")
+  targetAuditLogs     UserAuditLog[]   @relation("Target")
+  tenant              Tenant?          @relation(fields: [tenantId], references: [id])
+  partnerId           String?
+  partner             Partner?         @relation(fields: [partnerId], references: [id])
+
+  @@index([tenantId])
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model Plan {
+  id                  String         @id @default(uuid())
+  name                String
+  description         String?
+  stripePriceId       String?
+  billingCycle        BillingCycle
+  tier                Tier
+  price               Decimal
+  freeMinutes         Int
+  overagePrice        Decimal        @default(0.10)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  allowCallRecording  Boolean        @default(false)
+  allowDIDForwards    Boolean        @default(false)
+  allowSchedules      Boolean        @default(false)
+  allowVoicemail      Boolean        @default(true)
+  maxDIDs             Int            @default(10)
+  maxExtensions       Int            @default(50)
+  maxIVRs             Int            @default(5)
+  maxRingGroups       Int            @default(10)
+  createdBy           String?
+  initialCredit       Decimal        @default(0.00)
+  isCustom            Boolean        @default(false)
+  maxDIDForwards      Int            @default(10)
+  maxTFNs             Int            @default(0)
+  extraDidPrice       Decimal        @default(1.00)
+  extraExtensionPrice Decimal        @default(5.00)
+  extraTfnPrice       Decimal        @default(2.00)
+  subscriptions       Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                       String             @id @default(uuid())
+  tenantId                 String
+  planId                   String
+  status                   SubscriptionStatus @default(ACTIVE)
+  startDate                DateTime           @default(now())
+  endDate                  DateTime
+  remainingFreeMinutes     Int
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  subBillingSubscriptionId String?            @unique
+  plan                     Plan               @relation(fields: [planId], references: [id])
+  tenant                   Tenant             @relation(fields: [tenantId], references: [id])
+  usageRecords             UsageRecord[]
+
+  @@map("subscriptions")
+}
+
+model SupportProfile {
+  id                String   @id @default(uuid())
+  adminUserId       String
+  supportUserId     String   @unique
+  monitoringEnabled Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  adminUser         User     @relation("AdminUser", fields: [adminUserId], references: [id])
+  supportUser       User     @relation("SupportUser", fields: [supportUserId], references: [id])
+
+  @@index([adminUserId])
+  @@map("support_profiles")
+}
+
+model UserAuditLog {
+  id        String          @id @default(uuid())
+  actorId   String
+  targetId  String?
+  action    UserAuditAction
+  metadata  Json?
+  timestamp DateTime        @default(now())
+  actor     User            @relation("Actor", fields: [actorId], references: [id])
+  target    User?           @relation("Target", fields: [targetId], references: [id])
+
+  @@index([actorId])
+  @@index([targetId])
+  @@index([timestamp])
+  @@index([action])
+  @@map("user_audit_logs")
+}
+
+model RingGroup {
+  id                  String            @id @default(uuid())
+  tenantId            String
+  name                String
+  strategy            String            @default("simultaneous")
+  ringTimeout         Int               @default(30)
+  noAnswerAction      String?
+  noAnswerDestination String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  sequenceId          Int               @default(0)
+  members             RingGroupMember[]
+  tenant              Tenant            @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("ring_groups")
+}
+
+model RingGroupMember {
+  id          String    @id @default(uuid())
+  ringGroupId String
+  extensionId String
+  priority    Int       @default(1)
+  position    Int       @default(1)
+  extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  ringGroup   RingGroup @relation(fields: [ringGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([ringGroupId, extensionId])
+  @@map("ring_group_members")
+}
+
+model IVR {
+  id                String   @id @default(uuid())
+  tenantId          String
+  name              String
+  greetingAudioPath String?
+  invalidAudioPath  String?
+  timeoutMs         Int      @default(5000)
+  maxAttempts       Int      @default(3)
+  menu              Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  sequenceId        Int      @default(0)
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("ivrs")
+}
+
+model DID {
+  id             String   @id @default(uuid())
+  tenantId       String?
+  number         String   @unique
+  provider       String   @default("telnyx")
+  monthlyFee     Decimal  @default(2.00)
+  routeType      String?
+  routeTargetId  String?
+  forwardEnabled Boolean  @default(false)
+  forwardNumber  String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  sequenceId     Int      @default(0)
+  tenant         Tenant?  @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([number])
+  @@map("dids")
+}
+
+model DIDForward {
+  id                String   @id @default(uuid())
+  tenantId          String
+  sequenceId        Int      @default(0)
+  name              String
+  destinationNumber String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("did_forwards")
+}
+
+model OperationalSchedule {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  name                  String
+  timezone              String
+  startTime             String
+  endTime               String
+  daysMask              Int      @default(31)
+  primaryRouteType      String
+  primaryRouteTarget    String
+  afterHoursRouteType   String
+  afterHoursRouteTarget String
+  weekendRouteType      String
+  weekendRouteTarget    String
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  sequenceId            Int      @default(0)
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("operational_schedules")
+}
+
+model AudioFile {
+  id              String   @id @default(uuid())
+  tenantId        String
+  filename        String
+  originalName    String
+  mimeType        String
+  size            Int
+  storageUrl      String
+  durationSeconds Decimal?
+  createdAt       DateTime @default(now())
+  name            String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("audio_files")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  actorEmail String?
+  actorId    String?
+  actorType  String
+  category   String
+  targetId   String?
+  targetType String?
+
+  @@index([category])
+  @@index([actorId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+
+
+model IdempotencyKey {
+  key      String   @id
+  method   String
+  path     String
+  params   Json
+  response Json
+  lockedAt DateTime @default(now())
+
+  @@map("idempotency_keys")
+}
+
+
+
+model Invoice {
+  id             String              @id @default(uuid())
+  tenantId       String?
+  status         InvoiceStatus       @default(DRAFT)
+  total          Decimal
+  balanceDue     Decimal
+  stripeId       String?             @unique
+  idempotencyKey String?             @unique
+  createdAt      DateTime            @default(now())
+  paidAt         DateTime?
+  adjustments    InvoiceAdjustment[]
+
+  @@map("invoices")
+}
+
+model InvoiceAdjustment {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  reason       String
+  amount       Decimal
+  authorizedBy String
+  createdAt    DateTime @default(now())
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id])
+
+  @@map("invoice_adjustments")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String?
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@map("notifications")
+}
+
+model tenant_config_versions {
+  id             String    @id
+  tenantId       String
+  version        Int
+  configSnapshot Json
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  serviceOrderId String?
+
+  @@index([tenantId, effectiveFrom, effectiveTo], map: "idx_tenant_config_versions_active")
+  @@index([tenantId], map: "idx_tenant_config_versions_tenant")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+  INVITED
+}
+
+enum TFNStatus {
+  AVAILABLE
+  ASSIGNED
+  HELD
+  QUARANTINE
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum Tier {
+  BASIC
+  STANDARD
+  PREMIUM
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  ARCHIVED
+}
+
+enum UserAuditAction {
+  CREATE_USER
+  UPDATE_USER
+  SUSPEND_USER
+  ACTIVATE_USER
+  DELETE_USER
+  ASSIGN_SUPPORT
+  REMOVE_SUPPORT
+  CHANGE_ROLE
+  RESET_PASSWORD
+  INVITE_USER
+  ACCEPT_INVITE
+  REINVITE_USER
+  IMPERSONATE_USER
+  END_IMPERSONATION
+}
+
+
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PAID
+  VOID
+  REFUNDED
+  DISPUTED
+}
+
+model TenantFeature {
+  id                String   @id @default(uuid())
+  tenantId          String   @unique
+  ivrEnabled        Boolean  @default(true)
+  ivrLimit          Int      @default(10)
+  ringGroupEnabled  Boolean  @default(true)
+  ringGroupLimit    Int      @default(10)
+  schedulerEnabled  Boolean  @default(true)
+  schedulerLimit    Int      @default(10)
+  didForwardEnabled Boolean  @default(true)
+  didForwardLimit   Int      @default(10)
+  monitorEnabled    Boolean  @default(true)
+  monitorLimit      Int      @default(10)
+  recordingEnabled  Boolean  @default(false)
+  recordingAllowed  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  updatedAt         DateTime @updatedAt
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_features")
+}
+
+model Partner {
+  id           String   @id @default(uuid())
+  name         String
+  domain       String   @unique
+  logoMain     String?
+  logoSidebar  String?
+  favicon      String?
+  primaryColor String?
+  accentColor  String?
+  supportEmail  String?
+  supportPhone  String?
+  smtpHost      String?
+  smtpPort      Int?
+  smtpSecure    Boolean? @default(false)
+  smtpUser      String?
+  smtpPass      String?
+  smtpFromName  String?
+  smtpFromEmail String?
+  createdAt     DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenants      Tenant[]
+  users        User[]
+
+  @@map("partners")
+}
+
+model OutboundCarrier {
+  id        Int                @id @default(autoincrement())
+  name      String             @unique // e.g., "Telnyx", "Twilio"
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  endpoints OutboundEndpoint[]
+
+  @@map("outbound_carriers")
+}
+
+model OutboundEndpoint {
+  id              Int              @id @default(autoincrement())
+  carrierId       Int
+  name            String           // e.g., "US-East Gateway", "Backup Gateway"
+  sipHost         String           // e.g., "sip.telnyx.com" or "64.227.10.111"
+  sipPort         Int              @default(5060)
+  transport       String           @default("udp") // udp, tcp, tls
+  prefix          String           @default("")    // e.g. "011"
+  stripPlus       Boolean          @default(false) // strip leading + from dialed number
+  callerIdMode    String           @default("extension") // 'extension' or 'override'
+  callerIdNumber  String?          // Override caller ID number if mode is 'override'
+  isActive        Boolean          @default(true)
+  isSystemDefault Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  carrier         OutboundCarrier  @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  tenants         Tenant[]
+
+  @@unique([carrierId, name])
+  @@map("outbound_endpoints")
+}
+
+model InboundWhitelist {
+  id        Int      @id @default(autoincrement())
+  ipAddress String   @unique // The carrier source IP to whitelist
+  port      Int      @default(5060)
+  tag       String   // Description/Label (e.g., "Telnyx Inbound")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("inbound_whitelist")
+}
+
+model RateCard {
+  ratecardId            Int                @id @default(autoincrement()) @map("ratecard_id")
+  name                  String
+  currency              String             @default("USD") @db.Char(3)
+  country               String?
+  inRatePerMin          Decimal            @default(0.000000) @map("in_rate_per_min") @db.Decimal(14, 6)
+  inRatePerSec          Decimal?           @map("in_rate_per_sec") @db.Decimal(14, 8)
+  inInitialIncrementSec Int                @default(60) @map("in_initial_increment_sec")
+  inIncrementSec        Int                @default(60) @map("in_increment_sec")
+  obRatePerMin          Decimal            @default(0.000000) @map("ob_rate_per_min") @db.Decimal(14, 6)
+  obRatePerSec          Decimal?           @map("ob_rate_per_sec") @db.Decimal(14, 8)
+  obInitialIncrementSec Int                @default(60) @map("ob_initial_increment_sec")
+  obIncrementSec        Int                @default(60) @map("ob_increment_sec")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  customerMappings      CustomerRatecard[]
+
+  @@map("rate_cards")
+}
+
+model CustomerRatecard {
+  customerId    String    @id @map("customer_id")
+  ratecardId    Int       @map("ratecard_id")
+  effectiveFrom DateTime  @default(now()) @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @map("updated_at")
+  rateCard      RateCard  @relation(fields: [ratecardId], references: [ratecardId], onDelete: Cascade)
+
+  @@map("customer_ratecard")
+}
+
+model RecRateCard {
+  id               Int             @id @default(autoincrement())
+  name             String
+  currency         String          @default("USD") @db.Char(3)
+  ratePerMin       Decimal         @default(0.000000) @map("rate_per_min") @db.Decimal(14, 6)
+  retentionPeriod  Int             @default(7) @map("retention_period")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  customerMappings CustomerRecRc[]
+
+  @@map("rec_rate_card")
+}
+
+model CustomerRecRc {
+  custId      String      @id @map("cust_id")
+  recRcId     Int         @map("rec_rc_id")
+  updatedAt   DateTime    @default(now()) @map("updated_at")
+  recRateCard RecRateCard @relation(fields: [recRcId], references: [id], onDelete: Cascade)
+
+  @@map("customer_rec_rc")
+}
+

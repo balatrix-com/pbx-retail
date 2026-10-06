@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Call Monitoring - Local Test Utility</title>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #f1f5f9;
+            margin: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #38bdf8;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+        .panel {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #94a3b8;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            background-color: #0f172a;
+            border: 1px solid #475569;
+            color: #f1f5f9;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #0284c7;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #0369a1;
+        }
+        .status {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .connected { color: #22c55e; }
+        .disconnected { color: #ef4444; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-val {
+            font-size: 24px;
+            font-weight: bold;
+            color: #38bdf8;
+            margin-top: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid #334155;
+        }
+        th {
+            background-color: #0f172a;
+            color: #94a3b8;
+        }
+        
+        .logs {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            padding: 15px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: scroll;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px dashed #1e293b;
+            padding-bottom: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Super Admin Global Call Monitoring Test Tool</h1>
+        
+        <!-- Connection Setup -->
+        <div class="panel">
+            <h2>1. Connection Settings</h2>
+            <div class="form-group">
+                <label for="wsUrl">Socket.IO Host URL</label>
+                <input type="text" id="wsUrl" value="http://localhost:3000">
+            </div>
+            <div class="form-group">
+                <label for="wsPath">Socket.IO Connection Path</label>
+                <select id="wsPath">
+                    <option value="/socket.io">/socket.io (Localhost default)</option>
+                    <option value="/api/socket.io">/api/socket.io (Production / Proxy)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="token">Super Admin JWT Access Token</label>
+                <input type="text" id="token" placeholder="Paste your Super Admin JWT bearer token here...">
+            </div>
+            <button id="connectBtn">Connect WebSockets</button>
+            <span id="connStatus" class="status disconnected">Disconnected</span>
+        </div>
+
+        <!-- Analytics Snapshot Panel -->
+        <div class="panel">
+            <h2>2. Global Analytics Snapshot</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div>Active Calls</div>
+                    <div id="statActive" class="stat-val">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>Ringing</div>
+                    <div id="statRinging" class="stat-val">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>Answered</div>
+                    <div id="statAnswered" class="stat-val">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>Inbound</div>
+                    <div id="statInbound" class="stat-val">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>Outbound</div>
+                    <div id="statOutbound" class="stat-val">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Calls List -->
+        <div class="panel">
+            <h2>3. Live Active Calls Stream</h2>
+            <table id="callsTable">
+                <thead>
+                    <tr>
+                        <th>UUID</th>
+                        <th>Tenant ID</th>
+                        <th>Caller</th>
+                        <th>Callee</th>
+                        <th>Status</th>
+                        <th>Direction</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr id="noCallsRow"><td colspan="7" style="text-align: center; color: #64748b;">No active calls detected. Simulating a call will populate this list.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Event Logs -->
+        <div class="panel">
+            <h2>4. Live Socket.IO Logs</h2>
+            <div id="logArea" class="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        const wsUrlInput = document.getElementById('wsUrl');
+        const tokenInput = document.getElementById('token');
+        const connectBtn = document.getElementById('connectBtn');
+        const connStatus = document.getElementById('connStatus');
+        const logArea = document.getElementById('logArea');
+        const callsTableBody = document.querySelector('#callsTable tbody');
+        
+        let socket = null;
+        let activeCallsMap = new Map();
+
+        function addLog(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `[${time}] <span style="color: ${type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : '#38bdf8'}">${message}</span>`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        connectBtn.addEventListener('click', () => {
+            if (socket && socket.connected) {
+                socket.disconnect();
+                return;
+            }
+
+            const host = wsUrlInput.value.trim();
+            const token = tokenInput.value.trim();
+
+            if (!token) {
+                alert('Please paste a valid JWT token first!');
+                return;
+            }
+
+            const wsPathSelect = document.getElementById('wsPath');
+            const path = wsPathSelect.value;
+            addLog(`Attempting connection to namespace '/monitor' on path '${path}'...`);
+            
+            // Connect to namespace /monitor with JWT in query param and path option
+            socket = io(`${host}/monitor`, {
+                path: path,
+                transports: ['polling', 'websocket'], // Allow polling fallback to bypass local file WebSocket blocks
+                auth: { token: token },
+                query: { token: token }
+            });
+
+            socket.on('connect', () => {
+                connStatus.textContent = 'Connected';
+                connStatus.className = 'status connected';
+                connectBtn.textContent = 'Disconnect';
+                addLog('Socket connected successfully!', 'success');
+
+                // Join the global superadmin room
+                addLog('Joining Super Admin global room: "all"...');
+                socket.emit('join_room', 'all');
+            });
+
+            socket.on('disconnect', (reason) => {
+                connStatus.textContent = 'Disconnected';
+                connStatus.className = 'status disconnected';
+                connectBtn.textContent = 'Connect WebSockets';
+                addLog(`Socket disconnected. Reason: ${reason}`, 'error');
+                activeCallsMap.clear();
+                updateCallsTable();
+            });
+
+            socket.on('connect_error', (err) => {
+                addLog(`Connection Error: ${err.message}`, 'error');
+            });
+
+            socket.on('room_joined', (data) => {
+                addLog(`Joined room: ${data.room}`, 'success');
+            });
+
+            socket.on('analytics_snapshot', (snapshot) => {
+                addLog(`Received analytics snapshot: ${JSON.stringify(snapshot)}`);
+                document.getElementById('statActive').textContent = snapshot.activeCalls;
+                document.getElementById('statRinging').textContent = snapshot.ringing;
+                document.getElementById('statAnswered').textContent = snapshot.answered;
+                document.getElementById('statInbound').textContent = snapshot.inbound;
+                document.getElementById('statOutbound').textContent = snapshot.outbound;
+            });
+
+            socket.on('call_update', (call) => {
+                addLog(`Call status update: [${call.status}] Caller: ${call.caller} -> Callee: ${call.callee}`);
+                
+                if (call.status === 'hangup') {
+                    activeCallsMap.delete(call.uuid);
+                } else {
+                    activeCallsMap.set(call.uuid, call);
+                }
+                
+                updateCallsTable();
+            });
+        });
+
+        function updateCallsTable() {
+            // Clear current list
+            callsTableBody.innerHTML = '';
+            
+            if (activeCallsMap.size === 0) {
+                callsTableBody.innerHTML = `<tr id="noCallsRow"><td colspan="7" style="text-align: center; color: #64748b;">No active calls detected. Simulating a call will populate this list.</td></tr>`;
+                return;
+            }
+
+            for (const [uuid, call] of activeCallsMap.entries()) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family: monospace; font-size: 12px; color: #38bdf8;">${uuid.substring(0, 8)}...</td>
+                    <td style="font-size: 12px;">${call.tenantId ? call.tenantId.substring(0, 8) : 'Global'}...</td>
+                    <td>${call.caller}</td>
+                    <td>${call.callee}</td>
+                    <td><span style="background-color: ${call.status === 'answered' ? '#166534' : '#854d0e'}; padding: 3px 8px; border-radius: 4px; font-size: 12px;">${call.status}</span></td>
+                    <td>${call.direction}</td>
+                    <td>${call.duration}s</td>
+                `;
+                callsTableBody.appendChild(tr);
+            }
+        }
+    </script>
+</body>
+</html>

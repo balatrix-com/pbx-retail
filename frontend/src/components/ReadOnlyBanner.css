@@ -1,0 +1,25 @@
+.read-only-banner {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border: 1px solid #ffb74d;
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(255, 152, 0, 0.1);
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.banner-icon {
+    color: #f57c00;
+    flex-shrink: 0;
+}
+
+.banner-text {
+    color: #e65100;
+    font-size: 0.9rem;
+    font-weight: 500;
+}

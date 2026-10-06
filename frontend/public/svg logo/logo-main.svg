@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80">
+  <defs>
+    <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3d52a0" />
+      <stop offset="100%" stop-color="#708ae6" />
+    </linearGradient>
+  </defs>
+  <!-- Icon Group -->
+  <g transform="translate(10, 10)">
+    <!-- Squircle Background -->
+    <rect x="0" y="0" width="60" height="60" rx="18" fill="url(#logo-grad)" />
+    <!-- Modern Cloud / Signal Handset Graphic -->
+    <path d="M22,38 C22,30 28,24 35,24 C40,24 44,27 46,31 C48,30 50,30 51,31 C54,32 56,35 56,38 C56,41 53,44 50,44 L26,44 C24,44 22,42 22,38 Z" fill="#ffffff" />
+    <path d="M26,38 A4,4 0 0,1 34,38 L34,41 A4,4 0 0,1 26,41 Z" fill="#ffffff" opacity="0.8" />
+  </g>
+  <!-- Text Group -->
+  <text x="85" y="47" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="28" font-weight="800" letter-spacing="-1px" fill="#0f172a">
+    Cloud<tspan fill="#3d52a0">PBX</tspan>
+  </text>
+  <text x="87" y="62" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" letter-spacing="2px" fill="#64748b" text-transform="uppercase">
+    Command Center
+  </text>
+</svg>

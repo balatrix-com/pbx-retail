@@ -1,0 +1,40 @@
+# Build and configuration
+node_modules/
+dist/
+.vite/
+.env
+.env.*
+!.env.example
+*.log
+
+# IDE and OS
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Testing
+coverage/
+
+# Specific project files
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+frontend/.env.production
+!frontend/.env.example
+backend/dist/
+frontend/dist/
+backend/node_modules/
+frontend/node_modules/
+
+# Prisma
+/prisma/migrations/
+*.db
+# GitHub Actions Runner
+actions-runner/
