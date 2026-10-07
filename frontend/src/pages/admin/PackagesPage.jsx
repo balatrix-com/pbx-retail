@@ -194,14 +194,14 @@ const PackagesPage = () => {
                                             <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 ring-1 ring-inset ring-blue-500/10">
                                                 <Users size={10} /> Exts: {pkg.extensions}
                                             </span>
-                                            <span className="inline-flex items-center gap-1 rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700 ring-1 ring-inset ring-orange-500/10">
-                                                <Activity size={10} /> Mins: {pkg.free_mins}
-                                            </span>
-                                            {(pkg.dids > 0 || pkg.tfns > 0) && (
+                                            {pkg.numbers > 0 && (
                                                 <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 ring-1 ring-inset ring-purple-500/10">
-                                                    <Phone size={10} /> DIDs: {pkg.dids} | TFNs: {pkg.tfns}
+                                                    <Phone size={10} /> Numbers: {pkg.numbers}
                                                 </span>
                                             )}
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700 ring-1 ring-inset ring-orange-500/10">
+                                                <Activity size={10} /> Monitors: {pkg.monitoring_extensions || 0}
+                                            </span>
                                         </div>
                                     </td>
                                     <td className="hidden lg:table-cell px-4 py-4">
@@ -263,11 +263,9 @@ const AddEditPackageModal = ({ pkg, onClose, onSave, loading }) => {
         amount: pkg?.amount || 0.00,
         currency: pkg?.currency || 'usd',
         validity_months: pkg?.validity_months || 1,
-        tfns: pkg?.tfns || 0,
-        dids: pkg?.dids || 0,
-        free_mins: pkg?.free_mins || 0,
+        numbers: pkg?.numbers || 0,
         extensions: pkg?.extensions || 0,
-        monitoring_per_user: pkg?.monitoring_per_user || 0,
+        monitoring_extensions: pkg?.monitoring_extensions || 0,
         system_plan_id: pkg?.system_plan_id || '',
         setup_fees: pkg?.setup_fees || 0.00,
         metadata: pkg?.metadata || {}
@@ -379,35 +377,13 @@ const AddEditPackageModal = ({ pkg, onClose, onSave, loading }) => {
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-black text-gray-600 uppercase tracking-wider flex items-center gap-1">
-                                    <Activity size={14} className="text-orange-500" /> Free Minutes
+                                    <Phone size={14} className="text-purple-500" /> Numbers (TFN + DID)
                                 </label>
                                 <input
                                     type="number" min="0" step="1"
                                     className="w-full rounded-2xl border-gray-200 bg-gray-50/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent py-2.5 px-4 font-bold text-gray-900"
-                                    value={formData.free_mins}
-                                    onChange={e => setFormData({ ...formData, free_mins: parseInt(e.target.value) || 0 })}
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-black text-gray-600 uppercase tracking-wider flex items-center gap-1">
-                                    <Phone size={14} className="text-purple-500" /> Included DIDs
-                                </label>
-                                <input
-                                    type="number" min="0" step="1"
-                                    className="w-full rounded-2xl border-gray-200 bg-gray-50/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent py-2.5 px-4 font-bold text-gray-900"
-                                    value={formData.dids}
-                                    onChange={e => setFormData({ ...formData, dids: parseInt(e.target.value) || 0 })}
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-black text-gray-600 uppercase tracking-wider flex items-center gap-1">
-                                    <Phone size={14} className="text-purple-500" /> Included TFNs
-                                </label>
-                                <input
-                                    type="number" min="0" step="1"
-                                    className="w-full rounded-2xl border-gray-200 bg-gray-50/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent py-2.5 px-4 font-bold text-gray-900"
-                                    value={formData.tfns}
-                                    onChange={e => setFormData({ ...formData, tfns: parseInt(e.target.value) || 0 })}
+                                    value={formData.numbers}
+                                    onChange={e => setFormData({ ...formData, numbers: parseInt(e.target.value) || 0 })}
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -417,8 +393,8 @@ const AddEditPackageModal = ({ pkg, onClose, onSave, loading }) => {
                                 <input
                                     type="number" min="0" step="1"
                                     className="w-full rounded-2xl border-gray-200 bg-gray-50/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent py-2.5 px-4 font-bold text-gray-900"
-                                    value={formData.monitoring_per_user}
-                                    onChange={e => setFormData({ ...formData, monitoring_per_user: parseInt(e.target.value) || 0 })}
+                                    value={formData.monitoring_extensions}
+                                    onChange={e => setFormData({ ...formData, monitoring_extensions: parseInt(e.target.value) || 0 })}
                                 />
                             </div>
                         </div>

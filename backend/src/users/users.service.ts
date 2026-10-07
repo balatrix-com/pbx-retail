@@ -307,6 +307,40 @@ export class UsersService {
             throw new ForbiddenException('You do not have permission to manage this user');
         }
 
+        const targetUser = await this.prisma.user.findUnique({
+            where: { id: targetUserId },
+            select: { id: true, tenantId: true, role: true, monitoringEnabled: true },
+        });
+        if (!targetUser) throw new NotFoundException('User not found');
+        if (targetUser.role !== Role.ADMIN && targetUser.role !== Role.SUPPORT) {
+            throw new BadRequestException('Monitoring extensions can be assigned only to Admin or Support users');
+        }
+        if (!targetUser.tenantId) {
+            throw new BadRequestException('The target user must belong to a tenant');
+        }
+
+        if (monitoringEnabled && !targetUser.monitoringEnabled) {
+            const subscription = await this.prisma.subscription.findFirst({
+                where: { tenantId: targetUser.tenantId, status: 'ACTIVE' },
+                include: { plan: { select: { maxMonitoringExtensions: true } } },
+                orderBy: { createdAt: 'desc' },
+            });
+            if (!subscription) {
+                throw new BadRequestException('An active package is required before assigning monitoring extensions');
+            }
+            const assigned = await this.prisma.user.count({
+                where: {
+                    tenantId: targetUser.tenantId,
+                    monitoringEnabled: true,
+                    id: { not: targetUserId },
+                },
+            });
+            const limit = subscription.plan.maxMonitoringExtensions;
+            if (assigned >= limit) {
+                throw new BadRequestException(`Monitoring extension quota reached (${assigned}/${limit})`);
+            }
+        }
+
         // Validate extension uniqueness if provided
         if (monitoringEnabled && monitoringExtension) {
             const existing = await this.prisma.user.findFirst({

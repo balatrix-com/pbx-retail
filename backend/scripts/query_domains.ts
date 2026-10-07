@@ -29,7 +29,7 @@ async function main() {
     loadEnv();
     
     const client = new Client({
-        host: process.env.FS_DB_HOST || '10.30.0.61',
+        host: process.env.FS_DB_HOST || '10.30.0.60',
         port: parseInt(process.env.FS_DB_PORT || '5432', 10),
         database: process.env.KAMAILIO_DB_NAME || 'kamailio',
         user: process.env.FS_DB_USER || 'freeswitch',

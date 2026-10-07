@@ -112,21 +112,6 @@ export class TenantsController {
         return this.tenantsService.deleteTenant(id);
     }
 
-    @Put(':id/outbound-endpoint')
-    @Roles(Role.SUPER_ADMIN)
-    assignOutboundEndpoint(
-        @Param('id') id: string,
-        @Body() body: { endpointId: number }
-    ) {
-        return this.tenantsService.assignOutboundEndpoint(id, body.endpointId);
-    }
-
-    @Delete(':id/outbound-endpoint')
-    @Roles(Role.SUPER_ADMIN)
-    removeOutboundEndpoint(@Param('id') id: string) {
-        return this.tenantsService.removeOutboundEndpoint(id);
-    }
-
     @Post()
     @Roles(Role.SUPER_ADMIN)
     @Audit('TENANT_CREATED', 'USER_MANAGEMENT')

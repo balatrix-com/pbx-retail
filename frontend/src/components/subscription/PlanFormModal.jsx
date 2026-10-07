@@ -14,12 +14,9 @@ const PlanFormModal = ({ isOpen, onClose, onSuccess }) => {
         amount: 49.99,
         currency: 'usd',
         validity_months: 1,
-        rate_card_id: '8',
-        free_mins: 1000,
-        tfns: 2,
-        dids: 1,
+        numbers: 3,
         extensions: 5,
-        monitoring_per_user: 1,
+        monitoring_extensions: 1,
         setup_fees: 10.00
     });
 
@@ -79,7 +76,7 @@ const PlanFormModal = ({ isOpen, onClose, onSuccess }) => {
                                     Create New Subscription Plan
                                 </Dialog.Title>
                                 <p className="text-xs font-medium text-gray-500 dark:text-slate-400">
-                                    Add new billing tier with rate card mapping & resource limits
+                                    Add a billing tier with pooled resource limits
                                 </p>
                             </div>
                         </div>
@@ -168,58 +165,32 @@ const PlanFormModal = ({ isOpen, onClose, onSuccess }) => {
 
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1">
-                                    Free Minutes
-                                </label>
-                                <input
-                                    type="number"
-                                    name="free_mins"
-                                    value={formData.free_mins}
-                                    onChange={handleChange}
-                                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-sm font-mono font-bold text-gray-900 dark:text-white"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1">
-                                    Rate Card ID
-                                </label>
-                                <input
-                                    type="text"
-                                    name="rate_card_id"
-                                    value={formData.rate_card_id}
-                                    onChange={handleChange}
-                                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-sm font-mono font-bold text-gray-900 dark:text-white"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1">
-                                    Toll-Free Numbers (TFN)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="tfns"
-                                    value={formData.tfns}
-                                    onChange={handleChange}
-                                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-sm font-mono font-bold text-gray-900 dark:text-white"
-                                />
-                            </div>
-
-                            {/* Direct Inward Dialing (DID) */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1">
-                                    Direct Inward Dialing (DID)
+                                    Included Numbers
                                 </label>
                                 <input
                                     type="number"
                                     min="0"
-                                    name="dids"
-                                    value={formData.dids}
+                                    name="numbers"
+                                    value={formData.numbers}
                                     onChange={handleChange}
-                                    placeholder="1"
-                                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-sm font-mono font-bold text-gray-900 dark:text-white"
                                 />
                             </div>
+
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1">
+                                    Monitoring Extensions
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    name="monitoring_extensions"
+                                    value={formData.monitoring_extensions}
+                                    onChange={handleChange}
+                                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-sm font-mono font-bold text-gray-900 dark:text-white"
+                                />
+                            </div>
+
                         </div>
 
                         {/* Actions */}

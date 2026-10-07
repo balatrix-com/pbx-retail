@@ -7,11 +7,9 @@ import {
     ArrowLeft,
     ShieldCheck,
     DollarSign,
-    Clock,
     CreditCard,
     Users,
     Phone,
-    Hash,
     Activity,
     CheckCircle2,
     Loader2
@@ -28,12 +26,9 @@ const CreatePlanPage = () => {
         amount: 49.99,
         currency: 'usd',
         validity_months: 1,
-        rate_card_id: '8',
-        free_mins: 1000,
-        tfns: 2,
-        dids: 1,
+        numbers: 3,
         extensions: 5,
-        monitoring_per_user: 1,
+        monitoring_extensions: 1,
         setup_fees: 10.00
     });
 
@@ -245,63 +240,17 @@ const CreatePlanPage = () => {
                             />
                         </div>
 
-                        {/* Free Mins */}
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                <Clock className="h-3.5 w-3.5 text-amber-500" />
-                                Included Free Mins
-                            </label>
-                            <input
-                                type="number"
-                                min="0"
-                                name="free_mins"
-                                value={formData.free_mins}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                            />
-                        </div>
-
-                        {/* Rate Card Mapping */}
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5">
-                                Bound Rate Card ID
-                            </label>
-                            <input
-                                type="text"
-                                name="rate_card_id"
-                                value={formData.rate_card_id}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                            />
-                        </div>
-
-                        {/* TFNs */}
+                        {/* Pooled Numbers */}
                         <div>
                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                                 <Phone className="h-3.5 w-3.5 text-emerald-500" />
-                                Toll-Free Numbers (TFN)
+                                Numbers (TFN + DID pooled)
                             </label>
                             <input
                                 type="number"
                                 min="0"
-                                name="tfns"
-                                value={formData.tfns}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                            />
-                        </div>
-
-                        {/* DIDs */}
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                <Hash className="h-3.5 w-3.5 text-blue-500" />
-                                Direct Inward Dialing (DID)
-                            </label>
-                            <input
-                                type="number"
-                                min="0"
-                                name="dids"
-                                value={formData.dids}
+                                name="numbers"
+                                value={formData.numbers}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                             />
@@ -311,13 +260,13 @@ const CreatePlanPage = () => {
                         <div>
                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                                 <Activity className="h-3.5 w-3.5 text-amber-500" />
-                                Monitoring Seats / User
+                                Monitoring Extensions
                             </label>
                             <input
                                 type="number"
                                 min="0"
-                                name="monitoring_per_user"
-                                value={formData.monitoring_per_user}
+                                name="monitoring_extensions"
+                                value={formData.monitoring_extensions}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                             />

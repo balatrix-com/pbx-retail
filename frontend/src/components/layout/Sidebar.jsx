@@ -88,7 +88,6 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     { name: 'Call Records', href: '/cdrs', icon: History },
                     { name: 'Manage Numbers', href: '/super-admin/numbers', icon: Phone },
                     { name: 'Plans/Add-ons', href: '/super-admin/subscriptions', icon: CreditCard },
-                    { name: 'Carriers & Gateways', href: '/super-admin/carriers', icon: Server },
                     { name: 'User Management', href: '/super-admin/users', icon: Users },
                     { name: 'System Settings', href: '/settings', icon: Settings },
                 ];
@@ -111,6 +110,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     { name: 'IVR Menus', href: '/telecom/ivrs', icon: ListTree },
                     { name: 'Audio Library', href: '/telecom/audio', icon: Music },
                     { name: 'DID Forwards', href: '/telecom/did-forwards', icon: PhoneForwarded },
+                    { name: 'Trunks & Carriers', href: '/telecom/trunks', icon: Server },
                     { name: 'Operational Time', href: '/telecom/schedules', icon: Clock },
                     { name: 'Call Monitoring', href: '/monitoring', icon: Activity },
                     { name: 'Call Records', href: '/cdrs', icon: History },

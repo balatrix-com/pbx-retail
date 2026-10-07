@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Wallet, Phone, Users, Info, Building2, Plus, Trash2, Loader, CreditCard, RefreshCw, User, LogIn, Sliders, ShieldAlert, Clock, Server, Mic, Zap, Loader2, Radio, HardDrive, Activity, Package, Palette, Edit3, Save, Check, CheckCircle2, Globe, MapPin, Mail, Lock, Eye, EyeOff, Search, Pencil } from 'lucide-react';
+import { X, Wallet, Phone, Users, Info, Building2, Plus, Trash2, Loader, CreditCard, RefreshCw, User, LogIn, Sliders, ShieldAlert, Clock, Mic, Zap, Loader2, Radio, HardDrive, Activity, Package, Palette, Edit3, Save, Check, CheckCircle2, Globe, MapPin, Mail, Lock, Eye, EyeOff, Search, Pencil } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
@@ -15,7 +15,6 @@ const TABS = [
     { id: 'extensions', label: 'Extensions', icon: Users },
     { id: 'users', label: 'Users', icon: User },
     { id: 'features', label: 'Feature Controller', icon: Sliders },
-    { id: 'carrier', label: 'Outbound Carrier', icon: Server },
     { id: 'addons', label: 'Add-ons', icon: CreditCard },
     { id: 'customize', label: 'Customize', icon: Palette }
 ];
@@ -117,7 +116,6 @@ const TenantManager = ({ tenantId, onClose }) => {
                         {activeTab === 'extensions' && <ExtensionsTab tenant={tenant} onUpdate={handleRefresh} />}
                         {activeTab === 'users' && <UsersTab tenant={tenant} />}
                         {activeTab === 'features' && <FeaturesTab tenant={tenant} onUpdate={handleRefresh} />}
-                        {activeTab === 'carrier' && <CarrierTab tenant={tenant} onUpdate={handleRefresh} />}
                         {activeTab === 'addons' && <AddonsTab tenant={tenant} onUpdate={handleRefresh} />}
                         {activeTab === 'customize' && <CustomizeTab tenant={tenant} onUpdate={handleRefresh} />}
                     </div>
@@ -1767,83 +1765,6 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                     initialUserId={adminUser.id}
                 />
             )}
-        </div>
-    );
-};
-
-const CarrierTab = ({ tenant, onUpdate }) => {
-    const [carriers, setCarriers] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedEndpointId, setSelectedEndpointId] = useState(tenant.outboundEndpointId || '');
-    const [saving, setSaving] = useState(false);
-
-    useEffect(() => {
-        api.get('/carriers').then(res => {
-            setCarriers(res.data);
-            setLoading(false);
-        }).catch(err => {
-            console.error(err);
-            setLoading(false);
-        });
-    }, []);
-
-    const handleSave = async () => {
-        setSaving(true);
-        try {
-            if (selectedEndpointId) {
-                await api.put(`/tenants/${tenant.id}/outbound-endpoint`, { endpointId: Number(selectedEndpointId) });
-            } else {
-                await api.delete(`/tenants/${tenant.id}/outbound-endpoint`);
-            }
-            onUpdate();
-            alert('Carrier routing updated successfully.');
-        } catch (error) {
-            alert('Failed to update carrier routing');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    if (loading) return <div>Loading carriers...</div>;
-
-    return (
-        <div className="space-y-8 w-full">
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                <div className="text-left">
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Outbound Carrier Routing</h3>
-                    <p className="text-sm font-medium text-gray-500 mt-1">Select the default outbound carrier endpoint for this tenant's calls.</p>
-                </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <label className="block text-sm font-bold text-gray-700 mb-2">Select Endpoint</label>
-                <select
-                    className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm p-3 border"
-                    value={selectedEndpointId}
-                    onChange={(e) => setSelectedEndpointId(e.target.value)}
-                >
-                    <option value="">-- No Carrier Assigned (Uses Default/Local) --</option>
-                    {carriers.map(c => (
-                        <optgroup key={c.id} label={c.name}>
-                            {c.endpoints.map(ep => (
-                                <option key={ep.id} value={ep.id}>
-                                    {ep.name} ({ep.sipHost}:{ep.sipPort})
-                                </option>
-                            ))}
-                        </optgroup>
-                    ))}
-                </select>
-
-                <div className="mt-6">
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="bg-primary-600 text-white px-4 py-2 rounded-xl font-bold disabled:opacity-50"
-                    >
-                        {saving ? 'Saving...' : 'Save Configuration'}
-                    </button>
-                </div>
-            </div>
         </div>
     );
 };

@@ -30,21 +30,28 @@ async function main() {
   let didModified = false;
 
   try {
+    const testTenant = await prisma.tenant.findFirst({
+      where: { customerCode: { not: null } },
+      select: { id: true, customerCode: true },
+    });
+    if (!testTenant) throw new Error('Test aborted: no tenant with customerCode exists');
+
     // 1. Create a Test Carrier
     console.log('STEP 1: Creating a test outbound carrier...');
     const carrier = await prisma.outboundCarrier.create({
-      data: { name: `Test Carrier ${Date.now()}` }
+      data: { name: `Test Carrier ${Date.now()}`, tenantId: testTenant.id }
     });
     testCarrierId = carrier.id;
     console.log(`✅ Test Carrier created with ID: ${testCarrierId}`);
 
-    // 2. Create a System Default Endpoint pointing to 99.99.99.99:5091
-    console.log('STEP 2: Creating system default endpoint...');
-    const endpoint = await carriersService.createEndpoint(testCarrierId, {
+    // 2. Create a tenant-owned endpoint pointing to 99.99.99.99:5091
+    console.log('STEP 2: Creating tenant endpoint...');
+    const endpoint = await carriersService.createEndpoint(testTenant.id, testCarrierId, {
       name: `Test Default Endpoint ${Date.now()}`,
       sipHost: '99.99.99.99',
       sipPort: 5091,
-      isSystemDefault: true,
+      transport: 'udp',
+      callerIdMode: 'extension',
       isActive: true,
     });
     testEndpointId = endpoint.id;
@@ -53,7 +60,7 @@ async function main() {
     // 3. Find any DID in the database to use as a test target
     console.log('STEP 3: Finding a DID to configure for forwarding...');
     const did = await prisma.dID.findFirst({
-      where: { tenantId: { not: null } },
+      where: { tenantId: testTenant.id },
       include: { tenant: true }
     });
 
@@ -106,9 +113,9 @@ async function main() {
       throw new Error('❌ Failed: XML does not contain 99.99.99.99:5091');
     }
 
-    // 6. Update the system default endpoint's port to 5092 (which should trigger resync)
-    console.log('STEP 6: Modifying system default endpoint SIP port (5091 -> 5092)...');
-    await carriersService.updateEndpoint(testEndpointId, {
+    // 6. Update the tenant endpoint's port to 5092 (which should trigger resync)
+    console.log('STEP 6: Modifying tenant endpoint SIP port (5091 -> 5092)...');
+    await carriersService.updateEndpoint(testTenant.id, testCarrierId, testEndpointId, {
       sipPort: 5092
     });
     console.log('✅ Endpoint updated');

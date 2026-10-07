@@ -468,56 +468,6 @@ export class TenantsService {
 
 
 
-    async assignOutboundEndpoint(tenantId: string, endpointId: number) {
-        const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-        if (!tenant) throw new NotFoundException('Tenant not found');
-
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: { outboundEndpointId: endpointId }
-        });
-
-        await this.freeSwitchSync.syncTenantForwards(tenantId);
-        await this.invalidateT2002Cache(tenant.customerCode);
-        return updated;
-    }
-
-    async removeOutboundEndpoint(tenantId: string) {
-        const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-        if (!tenant) throw new NotFoundException('Tenant not found');
-
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: { outboundEndpointId: null }
-        });
-
-        await this.freeSwitchSync.syncTenantForwards(tenantId);
-        await this.invalidateT2002Cache(tenant.customerCode);
-        return updated;
-    }
-
-    private async invalidateT2002Cache(customerCode: string | null) {
-        if (!customerCode) return;
-        const baseUrl = process.env.CACHE_FLUSH_URL || 'http://localhost:8000';
-        const token = process.env.CACHE_FLUSH_TOKEN || 'PBX_FLUSH_2026_acaJOOAJjasojoa';
-        const url = `${baseUrl}/admin/cache/flush/carrier?customer=${customerCode}`;
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-Cache-Token': token
-                }
-            });
-            if (!response.ok) {
-                console.error(`Failed to flush t_2002 cache for ${customerCode}: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error(`Error flushing t_2002 cache for ${customerCode}:`, error);
-        }
-    }
-
-
     async createTenant(data: {
         customerType: 'individual' | 'company';
         firstName: string;

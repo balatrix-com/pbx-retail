@@ -72,4 +72,39 @@ export class CacheFlushService {
             this.logger.error(`Failed to flush Customer cache for ${customerCode}: ${error.message}`, error.response?.data);
         }
     }
+
+    async flushCarrier(customerCode: string): Promise<void> {
+        await this.postFlush('/admin/cache/flush/carrier', 'customer', customerCode, 'carrier');
+    }
+
+    async flushDIDForCustomer(customerCode: string): Promise<void> {
+        await this.postFlush('/admin/cache/flush/customer', 'customer', customerCode, 'DID normalization');
+    }
+
+    private async postFlush(
+        path: string,
+        field: string,
+        value: string,
+        label: string,
+    ): Promise<void> {
+        if (!this.apiToken) {
+            this.logger.warn(`CACHE_FLUSH_TOKEN is empty. ${label} cache flush skipped.`);
+            return;
+        }
+        const data = new URLSearchParams();
+        data.append(field, value);
+        try {
+            const response = await lastValueFrom(
+                this.httpService.post(`${this.apiUrl}${path}`, data.toString(), {
+                    headers: {
+                        'X-Cache-Token': this.apiToken,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                }),
+            );
+            this.logger.log(`Flushed ${label} cache for ${value}: ${JSON.stringify(response.data)}`);
+        } catch (error: any) {
+            this.logger.error(`Failed to flush ${label} cache for ${value}: ${error.message}`, error.response?.data);
+        }
+    }
 }

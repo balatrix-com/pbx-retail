@@ -1,40 +1,42 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
-import { InboundWhitelistService } from './inbound-whitelist.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Audit } from '../audit/audit.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { CreateInboundWhitelistDto, UpdateInboundWhitelistDto } from './dto/inbound-whitelist.dto';
+import { InboundWhitelistService } from './inbound-whitelist.service';
 
-@Controller('inbound-whitelist')
+@Controller('tenant/inbound-whitelist')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.SUPER_ADMIN)
+@Roles(Role.ADMIN)
 export class InboundWhitelistController {
   constructor(private readonly inboundWhitelistService: InboundWhitelistService) {}
 
   @Get()
-  async findAll() {
-    return this.inboundWhitelistService.findAll();
+  findAll(@Req() req: any) {
+    return this.inboundWhitelistService.findAll(req.user.tenantId);
   }
 
   @Post()
   @Audit('INBOUND_GATEWAY_CREATED', 'CARRIER_GATEWAY')
-  async create(@Body() data: { ipAddress: string; port?: number; tag: string }) {
-    return this.inboundWhitelistService.create(data);
+  create(@Req() req: any, @Body() data: CreateInboundWhitelistDto) {
+    return this.inboundWhitelistService.create(req.user.tenantId, data);
   }
 
   @Put(':id')
   @Audit('INBOUND_GATEWAY_UPDATED', 'CARRIER_GATEWAY')
-  async update(
-    @Param('id') id: string,
-    @Body() data: { ipAddress?: string; port?: number; tag?: string },
+  update(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: UpdateInboundWhitelistDto,
   ) {
-    return this.inboundWhitelistService.update(parseInt(id, 10), data);
+    return this.inboundWhitelistService.update(req.user.tenantId, id, data);
   }
 
   @Delete(':id')
   @Audit('INBOUND_GATEWAY_DELETED', 'CARRIER_GATEWAY')
-  async remove(@Param('id') id: string) {
-    return this.inboundWhitelistService.remove(parseInt(id, 10));
+  remove(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
+    return this.inboundWhitelistService.remove(req.user.tenantId, id);
   }
 }

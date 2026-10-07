@@ -183,10 +183,10 @@ const PlansPage = () => {
                                     <CheckCircle2 className="h-3.5 w-3.5" /> Active Subscription
                                 </div>
                                 <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-                                    {subscription?.plan_name || 'Tier 1 Starter Plan'}
+                                    {subscription?.plan_name || 'No active plan'}
                                 </h2>
                                 <p className="text-xs font-medium text-gray-500 dark:text-slate-400">
-                                    Status: <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase">{subscription?.status || 'ACTIVE'}</span>
+                                    Status: <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase">{subscription?.status || 'NONE'}</span>
                                     {subscription?.next_billing && (
                                         <span className="ml-3">Next Billing: <span className="font-bold text-gray-900 dark:text-white">{new Date(subscription.next_billing).toLocaleDateString()}</span></span>
                                     )}
@@ -197,13 +197,19 @@ const PlansPage = () => {
                                 <div className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-800 min-w-[120px]">
                                     <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider block">Extensions</span>
                                     <span className="text-lg font-extrabold text-gray-900 dark:text-white font-mono">
-                                        {subscription?.limits?.extensions || 5}
+                                        {subscription?.limits?.extensions ?? subscription?.limits?.maxExtensions ?? 0}
                                     </span>
                                 </div>
                                 <div className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-800 min-w-[120px]">
-                                    <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider block">Free Minutes</span>
+                                    <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider block">Numbers</span>
                                     <span className="text-lg font-extrabold text-gray-900 dark:text-white font-mono">
-                                        {subscription?.limits?.free_mins || 500}
+                                        {subscription?.limits?.numbers ?? subscription?.limits?.maxNumbers ?? 0}
+                                    </span>
+                                </div>
+                                <div className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-800 min-w-[150px]">
+                                    <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider block">Monitoring Extensions</span>
+                                    <span className="text-lg font-extrabold text-gray-900 dark:text-white font-mono">
+                                        {subscription?.limits?.monitoring_extensions ?? subscription?.limits?.maxMonitoringExtensions ?? 0}
                                     </span>
                                 </div>
                                 <div className="px-4.5 py-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 min-w-[180px]">
@@ -306,19 +312,15 @@ const PlansPage = () => {
                                                 <ul className="space-y-2 text-xs text-gray-600 dark:text-slate-300 font-medium">
                                                     <li className="flex items-center gap-2">
                                                         <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                                                        <span><strong>{p.extensions || 1}</strong> SIP Extensions</span>
+                                                        <span><strong>{p.extensions ?? p.maxExtensions ?? 0}</strong> SIP Extensions</span>
                                                     </li>
                                                     <li className="flex items-center gap-2">
                                                         <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                                                        <span><strong>{p.free_mins || 0}</strong> Free Inbound Minutes</span>
+                                                        <span><strong>{p.numbers ?? p.maxNumbers ?? 0}</strong> Included Numbers</span>
                                                     </li>
                                                     <li className="flex items-center gap-2">
                                                         <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                                                        <span><strong>{p.tfns || 0}</strong> Toll-Free Numbers (TFN)</span>
-                                                    </li>
-                                                    <li className="flex items-center gap-2">
-                                                        <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                                                        <span><strong>{p.dids ?? 0}</strong> Direct Inward Dialing (DID)</span>
+                                                        <span><strong>{p.monitoring_extensions ?? p.maxMonitoringExtensions ?? 0}</strong> Monitoring Extensions</span>
                                                     </li>
                                                 </ul>
                                             </div>

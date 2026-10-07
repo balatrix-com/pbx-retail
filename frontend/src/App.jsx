@@ -159,6 +159,10 @@ function App() {
                                                 <Route path="/settings" element={<BrandingSettingsPage />} />
                                             </Route>
 
+                                            <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+                                                <Route path="/telecom/trunks" element={<CarriersGatewaysPage />} />
+                                            </Route>
+
 
                                             {/* Super Admin Only */}
                                             <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
@@ -172,7 +176,6 @@ function App() {
                                                 <Route path="/super-admin/subscriptions" element={<PlansPage />} />
                                                 <Route path="/super-admin/plans" element={<PlansPage />} />
                                                 <Route path="/super-admin/plans/new" element={<CreatePlanPage />} />
-                                                <Route path="/super-admin/carriers" element={<CarriersGatewaysPage />} />
                                                 <Route path="/tenants" element={<TenantsPage />} />
                                                 <Route path="/revenue" element={<RevenuePage />} />
                                                 <Route path="/admin/extension-status" element={<ExtensionStatus />} />

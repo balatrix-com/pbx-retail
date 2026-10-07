@@ -86,11 +86,6 @@ const UserManagement = () => {
     };
 
     const handleToggleMonitoring = async (userId, currentValue) => {
-        if (userId === user.id) {
-            alert('You cannot modify your own account');
-            return;
-        }
-
         if (!currentValue) {
             setMonitoringTarget(userId);
             setShowMonitoringModal(true);
@@ -238,7 +233,7 @@ const UserManagement = () => {
                                         onToggleMonitoring={handleToggleMonitoring}
                                         onViewActivity={handleViewActivity}
                                         onRefresh={fetchUsers}
-                                        isSuperAdmin={isSuperAdmin}
+                                        canManageMonitoring={isAdmin || isSuperAdmin}
                                     />
                                 ))
                             )}
@@ -287,7 +282,7 @@ const UserManagement = () => {
     );
 };
 
-const UserRow = ({ user, currentUserId, onUpdateStatus, onToggleMonitoring, onViewActivity, onRefresh, isSuperAdmin }) => {
+const UserRow = ({ user, currentUserId, onUpdateStatus, onToggleMonitoring, onViewActivity, onRefresh, canManageMonitoring }) => {
     const isSelf = user.id === currentUserId;
     const { addToast } = useToast();
     const [copied, setCopied] = useState(false);
@@ -396,11 +391,11 @@ const UserRow = ({ user, currentUserId, onUpdateStatus, onToggleMonitoring, onVi
             <td className="hidden xl:table-cell px-6 py-5 whitespace-nowrap text-center">
                 <button
                     onClick={() => onToggleMonitoring(user.id, user.monitoringEnabled)}
-                    disabled={isSelf || !isSuperAdmin}
+                    disabled={!canManageMonitoring || !['ADMIN', 'SUPPORT'].includes(user.role)}
                     className={clsx(
                         "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none ring-offset-2",
                         user.monitoringEnabled ? 'bg-primary-600 ring-primary-600' : 'bg-gray-200 ring-gray-100',
-                        (isSelf || !isSuperAdmin) && 'opacity-30 cursor-not-allowed'
+                        (!canManageMonitoring || !['ADMIN', 'SUPPORT'].includes(user.role)) && 'opacity-30 cursor-not-allowed'
                     )}
                 >
                     <span

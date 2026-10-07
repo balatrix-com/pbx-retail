@@ -1,81 +1,97 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { KamailioDBService } from '../freeswitch/kamailio-db.service';
+import { CacheFlushService } from '../freeswitch/cache-flush.service';
+import { CreateInboundWhitelistDto, UpdateInboundWhitelistDto } from './dto/inbound-whitelist.dto';
 
 @Injectable()
 export class InboundWhitelistService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly kamailioDb: KamailioDBService,
+    private readonly cacheFlush: CacheFlushService,
   ) {}
 
-  async findAll() {
+  private requireTenant(tenantId?: string): string {
+    if (!tenantId) throw new ForbiddenException('Tenant account is required');
+    return tenantId;
+  }
+
+  private async tenant(tenantId?: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: this.requireTenant(tenantId) },
+      select: { id: true, customerCode: true },
+    });
+    if (!tenant?.customerCode) throw new ForbiddenException('Tenant customer code is required');
+    return { ...tenant, customerCode: tenant.customerCode };
+  }
+
+  findAll(tenantId?: string) {
     return this.prisma.inboundWhitelist.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
+      where: { tenantId: this.requireTenant(tenantId) },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async create(data: { ipAddress: string; port?: number; tag: string }) {
-    const port = data.port !== undefined ? data.port : 5060;
-    
-    // Create in local database first
+  async create(tenantId: string | undefined, data: CreateInboundWhitelistDto) {
+    const tenant = await this.tenant(tenantId);
     const entry = await this.prisma.inboundWhitelist.create({
       data: {
+        tenantId: tenant.id,
         ipAddress: data.ipAddress,
-        port,
-        tag: data.tag,
+        port: data.port ?? 5060,
+        tag: data.tag.trim(),
       },
     });
-
-    // Sync to Kamailio DB
-    await this.kamailioDb.addInboundIP(entry.ipAddress, entry.port, entry.tag);
-
+    await this.kamailioDb.addInboundIP(
+      entry.ipAddress, entry.port, `${tenant.customerCode}:${entry.tag}`,
+    );
+    await this.cacheFlush.flushDIDForCustomer(tenant.customerCode);
     return entry;
   }
 
-  async update(id: number, data: { ipAddress?: string; port?: number; tag?: string }) {
-    const oldEntry = await this.prisma.inboundWhitelist.findUnique({
-      where: { id },
+  async update(tenantId: string | undefined, id: number, data: UpdateInboundWhitelistDto) {
+    const tenant = await this.tenant(tenantId);
+    const oldEntry = await this.prisma.inboundWhitelist.findFirst({
+      where: { id, tenantId: tenant.id },
     });
-    if (!oldEntry) {
-      throw new NotFoundException('Inbound whitelist entry not found');
-    }
+    if (!oldEntry) throw new NotFoundException('Inbound whitelist entry not found');
 
     const updated = await this.prisma.inboundWhitelist.update({
       where: { id },
-      data,
+      data: { ...data, ...(data.tag !== undefined ? { tag: data.tag.trim() } : {}) },
     });
-
-    const ipChanged = data.ipAddress && data.ipAddress !== oldEntry.ipAddress;
-    const portChanged = data.port !== undefined && data.port !== oldEntry.port;
-
-    // If IP or Port changed, we must delete the old one from Kamailio DB first
-    if (ipChanged || portChanged) {
-      await this.kamailioDb.removeInboundIP(oldEntry.ipAddress, oldEntry.port);
-    }
-
-    // Sync/update to Kamailio DB
-    await this.kamailioDb.addInboundIP(updated.ipAddress, updated.port, updated.tag);
-
+    const keyChanged = updated.ipAddress !== oldEntry.ipAddress || updated.port !== oldEntry.port;
+    if (keyChanged) await this.syncSharedAddress(oldEntry.ipAddress, oldEntry.port);
+    await this.kamailioDb.addInboundIP(
+      updated.ipAddress, updated.port, `${tenant.customerCode}:${updated.tag}`,
+    );
+    await this.cacheFlush.flushDIDForCustomer(tenant.customerCode);
     return updated;
   }
 
-  async remove(id: number) {
-    const entry = await this.prisma.inboundWhitelist.findUnique({
-      where: { id },
+  async remove(tenantId: string | undefined, id: number) {
+    const tenant = await this.tenant(tenantId);
+    const entry = await this.prisma.inboundWhitelist.findFirst({ where: { id, tenantId: tenant.id } });
+    if (!entry) throw new NotFoundException('Inbound whitelist entry not found');
+    const deleted = await this.prisma.inboundWhitelist.delete({ where: { id } });
+    await this.syncSharedAddress(entry.ipAddress, entry.port);
+    await this.cacheFlush.flushDIDForCustomer(tenant.customerCode);
+    return deleted;
+  }
+
+  private async syncSharedAddress(ipAddress: string, port: number) {
+    const replacement = await this.prisma.inboundWhitelist.findFirst({
+      where: { ipAddress, port },
+      include: { tenant: { select: { customerCode: true } } },
+      orderBy: { id: 'asc' },
     });
-    if (!entry) {
-      throw new NotFoundException('Inbound whitelist entry not found');
+    if (!replacement) {
+      await this.kamailioDb.removeInboundIP(ipAddress, port);
+      return;
     }
-
-    // Remove from Kamailio DB
-    await this.kamailioDb.removeInboundIP(entry.ipAddress, entry.port);
-
-    // Delete from local database
-    return this.prisma.inboundWhitelist.delete({
-      where: { id },
-    });
+    await this.kamailioDb.addInboundIP(
+      ipAddress, port, `${replacement.tenant.customerCode}:${replacement.tag}`,
+    );
   }
 }

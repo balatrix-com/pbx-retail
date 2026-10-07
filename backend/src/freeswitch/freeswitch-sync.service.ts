@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FreeSwitchDBService } from './freeswitch-db.service';
 import { KamailioDBService } from './kamailio-db.service';
@@ -787,66 +787,25 @@ export class FreeSwitchSyncService {
     }
 
     /**
-     * Dynamically resolves the outbound gateway (host:port) for a tenant.
-     * Uses tenant's assigned gateway, or falls back to system default database gateway.
+     * Resolve only an active endpoint owned by this tenant. There is deliberately
+     * no global fallback: absence of a tenant trunk must block external routing.
      */
     async resolveOutboundGatewayForTenant(tenantId: string | null): Promise<string> {
         this.logger.log(`resolveOutboundGatewayForTenant called for tenantId: "${tenantId}"`);
         if (!tenantId) {
-            const gw = await this.getDefaultSystemGateway();
-            this.logger.log(`resolveOutboundGatewayForTenant: No tenantId provided. Using system default: "${gw}"`);
-            return gw;
+            throw new BadRequestException('Tenant ID is required for outbound routing');
         }
-        const tenant = await this.prisma.tenant.findUnique({
-            where: { id: tenantId },
-            include: { outboundEndpoint: true }
+        const endpoint = await this.prisma.outboundEndpoint.findFirst({
+            where: { tenantId, isActive: true },
+            orderBy: [{ priority: 'asc' }, { id: 'asc' }],
         });
-        this.logger.log(`resolveOutboundGatewayForTenant: Tenant lookup result: customerCode="${tenant?.customerCode}", outboundEndpointId=${tenant?.outboundEndpointId}`);
-        if (tenant?.outboundEndpoint) {
-            const { sipHost, sipPort } = tenant.outboundEndpoint;
+        if (endpoint) {
+            const { sipHost, sipPort } = endpoint;
             const gw = `${sipHost}:${sipPort}`;
-            this.logger.log(`resolveOutboundGatewayForTenant: Tenant has assigned outbound endpoint: "${gw}"`);
+            this.logger.log(`resolveOutboundGatewayForTenant: tenant=${tenantId} endpoint=${endpoint.id} gateway="${gw}"`);
             return gw;
         }
-        const gw = await this.getDefaultSystemGateway();
-        this.logger.log(`resolveOutboundGatewayForTenant: Tenant has no assigned outbound endpoint. Using system default: "${gw}"`);
-        return gw;
-    }
-
-    /**
-     * Resolves the system default outbound gateway from database.
-     * Priority: isSystemDefault endpoint → any active endpoint → env fallback.
-     */
-    async getDefaultSystemGateway(): Promise<string> {
-        // 1. Look for the endpoint explicitly marked as system default
-        const defaultEndpoint = await this.prisma.outboundEndpoint.findFirst({
-            where: { isSystemDefault: true, isActive: true }
-        });
-        if (defaultEndpoint) {
-            const gw = `${defaultEndpoint.sipHost}:${defaultEndpoint.sipPort}`;
-            this.logger.log(`getDefaultSystemGateway: Found active system default endpoint (id=${defaultEndpoint.id}, name="${defaultEndpoint.name}"): "${gw}"`);
-            return gw;
-        }
-
-        // 2. Fallback: pick the first active endpoint if none is marked as default
-        const anyEndpoint = await this.prisma.outboundEndpoint.findFirst({
-            where: { isActive: true },
-            orderBy: { id: 'asc' },
-        });
-        if (anyEndpoint) {
-            const gw = `${anyEndpoint.sipHost}:${anyEndpoint.sipPort}`;
-            this.logger.warn(
-                `getDefaultSystemGateway: No active system-default outbound endpoint found. Using first active endpoint (id=${anyEndpoint.id}, name="${anyEndpoint.name}"): "${gw}"`
-            );
-            return gw;
-        }
-
-        // 3. Last resort: env variable (should not happen in production)
-        const envGateway = process.env.OUTBOUND_GATEWAY || 'localhost:5060';
-        this.logger.error(
-            `getDefaultSystemGateway: No active outbound endpoints found in the database! Falling back to OUTBOUND_GATEWAY env variable (value: "${process.env.OUTBOUND_GATEWAY}"). Resolved to: "${envGateway}"`
-        );
-        return envGateway;
+        throw new BadRequestException('No active outbound trunk is configured for this tenant');
     }
 
     /**
@@ -880,49 +839,4 @@ export class FreeSwitchSyncService {
         }
     }
 
-    /**
-     * Bulk synchronizes all forwarding routes for all tenants relying on the system default gateway.
-     */
-    async syncAllSystemDefaultForwards(): Promise<void> {
-        this.logger.log('Starting bulk resync of system-default forwarding XMLs...');
-        const tenantsWithoutGateway = await this.prisma.tenant.findMany({
-            where: { outboundEndpointId: null },
-            select: { id: true }
-        });
-        const tenantIds = tenantsWithoutGateway.map(t => t.id);
-
-        const [dids, tfns, forwards] = await Promise.all([
-            this.prisma.dID.findMany({
-                where: {
-                    tenantId: { in: tenantIds },
-                    routeType: 'forward'
-                },
-                select: { id: true }
-            }),
-            this.prisma.tFN.findMany({
-                where: {
-                    tenantId: { in: tenantIds },
-                    routeType: 'forward'
-                },
-                select: { id: true }
-            }),
-            this.prisma.dIDForward.findMany({
-                where: { tenantId: { in: tenantIds } },
-                select: { id: true }
-            })
-        ]);
-
-        this.logger.log(`Found ${dids.length} DIDs, ${tfns.length} TFNs, and ${forwards.length} Forwards relying on system default. Syncing...`);
-
-        for (const did of dids) {
-            await this.syncDID(did.id);
-        }
-        for (const tfn of tfns) {
-            await this.syncTFN(tfn.id);
-        }
-        for (const fwd of forwards) {
-            await this.syncDIDForward(fwd.id);
-        }
-        this.logger.log('Bulk resync of system-default forwarding XMLs completed.');
-    }
 }

@@ -4,8 +4,11 @@ import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { Plus, Trash, Edit, Server, ChevronDown, ChevronUp, Shield } from 'lucide-react';
 
+const IPV4_PATTERN = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/;
+const HOSTNAME_PATTERN = /^(?=.{1,253}$)(?:(?!-)[a-zA-Z0-9-]{1,63}(?<!-)\.)+(?!-)[a-zA-Z0-9-]{1,63}(?<!-)$/;
+
 const CarriersGatewaysPage = () => {
-    const { isSuperAdmin } = useAuth();
+    const { isAdmin } = useAuth();
     const { addToast } = useToast();
 
     const [activeTab, setActiveTab] = useState('outbound'); // 'outbound' or 'inbound'
@@ -13,6 +16,7 @@ const CarriersGatewaysPage = () => {
     const [inboundEntries, setInboundEntries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [expandedCarrier, setExpandedCarrier] = useState(null);
+    const [inboundNormalization, setInboundNormalization] = useState('AUTO_10DIGIT');
 
     // Modal states - Carrier / Endpoint
     const [showCarrierModal, setShowCarrierModal] = useState(false);
@@ -28,7 +32,7 @@ const CarriersGatewaysPage = () => {
     // Form states - Carrier / Endpoint
     const [carrierName, setCarrierName] = useState('');
     const [endpointForm, setEndpointForm] = useState({
-        name: '', sipHost: '', sipPort: 5060, transport: 'udp', prefix: '', stripPlus: false, callerIdMode: 'extension', callerIdNumber: '', isActive: true, isSystemDefault: false
+        name: '', sipHost: '', sipPort: 5060, transport: 'udp', prefix: '', stripPlus: false, callerIdMode: 'extension', callerIdNumber: '', isActive: true, priority: 100
     });
 
     // Form states - Inbound ACL
@@ -37,10 +41,10 @@ const CarriersGatewaysPage = () => {
     });
 
     useEffect(() => {
-        if (isSuperAdmin) {
+        if (isAdmin) {
             fetchData();
         }
-    }, [isSuperAdmin, activeTab]);
+    }, [isAdmin, activeTab]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -48,7 +52,7 @@ const CarriersGatewaysPage = () => {
             if (activeTab === 'outbound') {
                 await fetchCarriers();
             } else {
-                await fetchInboundWhitelist();
+                await Promise.all([fetchInboundWhitelist(), fetchInboundNormalization()]);
             }
         } catch (error) {
             console.error(error);
@@ -59,7 +63,7 @@ const CarriersGatewaysPage = () => {
 
     const fetchCarriers = async () => {
         try {
-            const { data } = await api.get('/carriers');
+            const { data } = await api.get('/tenant/carriers');
             setCarriers(data || []);
         } catch (error) {
             addToast('error', 'Failed to load carriers');
@@ -68,10 +72,29 @@ const CarriersGatewaysPage = () => {
 
     const fetchInboundWhitelist = async () => {
         try {
-            const { data } = await api.get('/inbound-whitelist');
+            const { data } = await api.get('/tenant/inbound-whitelist');
             setInboundEntries(data || []);
         } catch (error) {
             addToast('error', 'Failed to load inbound whitelist');
+        }
+    };
+
+    const fetchInboundNormalization = async () => {
+        try {
+            const { data } = await api.get('/tenant/settings/inbound-normalization');
+            setInboundNormalization(data?.inboundNormalization || 'AUTO_10DIGIT');
+        } catch (error) {
+            addToast('error', 'Failed to load inbound normalization');
+        }
+    };
+
+    const saveInboundNormalization = async (value) => {
+        try {
+            await api.put('/tenant/settings/inbound-normalization', { inboundNormalization: value });
+            setInboundNormalization(value);
+            addToast('success', 'Inbound normalization updated');
+        } catch (error) {
+            addToast('error', error.response?.data?.message || 'Failed to update normalization');
         }
     };
 
@@ -79,10 +102,10 @@ const CarriersGatewaysPage = () => {
     const handleSaveCarrier = async () => {
         try {
             if (editingCarrier) {
-                await api.put(`/carriers/${editingCarrier.id}`, { name: carrierName });
+                await api.put(`/tenant/carriers/${editingCarrier.id}`, { name: carrierName });
                 addToast('success', 'Carrier updated');
             } else {
-                await api.post('/carriers', { name: carrierName });
+                await api.post('/tenant/carriers', { name: carrierName });
                 addToast('success', 'Carrier created');
             }
             setShowCarrierModal(false);
@@ -95,7 +118,7 @@ const CarriersGatewaysPage = () => {
     const handleDeleteCarrier = async (id) => {
         if (!window.confirm('Delete this carrier? This will also delete all endpoints.')) return;
         try {
-            await api.delete(`/carriers/${id}`);
+            await api.delete(`/tenant/carriers/${id}`);
             addToast('success', 'Carrier deleted');
             fetchCarriers();
         } catch (error) {
@@ -105,12 +128,18 @@ const CarriersGatewaysPage = () => {
 
     // Endpoint functions
     const handleSaveEndpoint = async () => {
+        const host = endpointForm.sipHost.trim();
+        if (!IPV4_PATTERN.test(host) && !HOSTNAME_PATTERN.test(host)) {
+            addToast('error', 'SIP host must be a valid IPv4 address or hostname');
+            return;
+        }
         try {
+            const payload = { ...endpointForm, sipHost: host };
             if (editingEndpoint) {
-                await api.put(`/carriers/${selectedCarrierId}/endpoints/${editingEndpoint.id}`, endpointForm);
+                await api.put(`/tenant/carriers/${selectedCarrierId}/endpoints/${editingEndpoint.id}`, payload);
                 addToast('success', 'Endpoint updated');
             } else {
-                await api.post(`/carriers/${selectedCarrierId}/endpoints`, endpointForm);
+                await api.post(`/tenant/carriers/${selectedCarrierId}/endpoints`, payload);
                 addToast('success', 'Endpoint created');
             }
             setShowEndpointModal(false);
@@ -123,7 +152,7 @@ const CarriersGatewaysPage = () => {
     const handleDeleteEndpoint = async (carrierId, endpointId) => {
         if (!window.confirm('Delete this endpoint?')) return;
         try {
-            await api.delete(`/carriers/${carrierId}/endpoints/${endpointId}`);
+            await api.delete(`/tenant/carriers/${carrierId}/endpoints/${endpointId}`);
             addToast('success', 'Endpoint deleted');
             fetchCarriers();
         } catch (error) {
@@ -133,12 +162,18 @@ const CarriersGatewaysPage = () => {
 
     // Inbound ACL functions
     const handleSaveInbound = async () => {
+        const ipAddress = inboundForm.ipAddress.trim();
+        if (!IPV4_PATTERN.test(ipAddress)) {
+            addToast('error', 'Inbound carrier address must be a valid IPv4 address');
+            return;
+        }
         try {
+            const payload = { ...inboundForm, ipAddress };
             if (editingInbound) {
-                await api.put(`/inbound-whitelist/${editingInbound.id}`, inboundForm);
+                await api.put(`/tenant/inbound-whitelist/${editingInbound.id}`, payload);
                 addToast('success', 'Inbound whitelist entry updated');
             } else {
-                await api.post('/inbound-whitelist', inboundForm);
+                await api.post('/tenant/inbound-whitelist', payload);
                 addToast('success', 'Inbound whitelist entry created');
             }
             setShowInboundModal(false);
@@ -151,7 +186,7 @@ const CarriersGatewaysPage = () => {
     const handleDeleteInbound = async (id) => {
         if (!window.confirm('Delete this inbound whitelist entry? This will instantly remove permission from Kamailio.')) return;
         try {
-            await api.delete(`/inbound-whitelist/${id}`);
+            await api.delete(`/tenant/inbound-whitelist/${id}`);
             addToast('success', 'Inbound entry deleted');
             fetchInboundWhitelist();
         } catch (error) {
@@ -159,14 +194,14 @@ const CarriersGatewaysPage = () => {
         }
     };
 
-    if (!isSuperAdmin) return <div className="p-8 text-red-500 font-bold">Access Denied</div>;
+    if (!isAdmin) return <div className="p-8 text-red-500 font-bold">Access Denied</div>;
 
     return (
         <div className="p-8">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Carrier Gateways & ACL</h1>
-                    <p className="text-sm text-gray-500 mt-1">Configure outbound trunk routing destinations and inbound IP signaling whitelist.</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Trunks & Carriers</h1>
+                    <p className="text-sm text-gray-500 mt-1">Configure your tenant's outbound trunks, inbound carrier ACL, and DID normalization.</p>
                 </div>
             </div>
 
@@ -235,7 +270,7 @@ const CarriersGatewaysPage = () => {
                                                 onClick={() => {
                                                     setSelectedCarrierId(carrier.id);
                                                     setEditingEndpoint(null);
-                                                    setEndpointForm({ name: '', sipHost: '', sipPort: 5060, transport: 'udp', prefix: '', stripPlus: false, callerIdMode: 'extension', callerIdNumber: '', isActive: true, isSystemDefault: false });
+                                                    setEndpointForm({ name: '', sipHost: '', sipPort: 5060, transport: 'udp', prefix: '', stripPlus: false, callerIdMode: 'extension', callerIdNumber: '', isActive: true, priority: 100 });
                                                     setShowEndpointModal(true);
                                                 }}
                                                 className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium hover:underline"
@@ -278,11 +313,9 @@ const CarriersGatewaysPage = () => {
                                                                 <td className="py-3 font-medium text-gray-900">
                                                                     <div className="flex items-center gap-2">
                                                                         <span>{ep.name}</span>
-                                                                        {ep.isSystemDefault && (
-                                                                            <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                                                                System Default
-                                                                            </span>
-                                                                        )}
+                                                                        <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                                            Priority {ep.priority}
+                                                                        </span>
                                                                     </div>
                                                                 </td>
                                                                 <td className="py-3 text-gray-600">{ep.sipHost}:{ep.sipPort}</td>
@@ -325,8 +358,8 @@ const CarriersGatewaysPage = () => {
                 <div>
                     <div className="flex justify-between items-center mb-4">
                         <div>
-                            <h2 className="text-lg font-semibold text-gray-800">Global Inbound Whitelist</h2>
-                            <p className="text-sm text-gray-500">Add trusted carrier source IP addresses to allow inbound SIP traffic.</p>
+                            <h2 className="text-lg font-semibold text-gray-800">Inbound Trunks & ACL</h2>
+                            <p className="text-sm text-gray-500">Add source IPs for your carriers and choose how their inbound DIDs are normalized.</p>
                         </div>
                         <button
                             onClick={() => { setEditingInbound(null); setInboundForm({ ipAddress: '', port: 5060, tag: '' }); setShowInboundModal(true); }}
@@ -334,6 +367,19 @@ const CarriersGatewaysPage = () => {
                         >
                             <Plus size={16} /> Add IP Address
                         </button>
+                    </div>
+
+                    <div className="bg-white border rounded-lg shadow-sm p-4 mb-5">
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">Inbound DID normalization</label>
+                        <select
+                            className="w-full max-w-xl border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none"
+                            value={inboundNormalization}
+                            onChange={(event) => saveInboundNormalization(event.target.value)}
+                        >
+                            <option value="AUTO_10DIGIT">Normalize to 10 digits (strip +1/1) — Recommended</option>
+                            <option value="STRIP_PLUS">Strip leading +</option>
+                            <option value="NONE">Pass verbatim (no normalization)</option>
+                        </select>
                     </div>
 
                     {inboundEntries.length === 0 ? (
@@ -434,6 +480,11 @@ const CarriersGatewaysPage = () => {
                                     <option value="tls">TLS</option>
                                 </select>
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-gray-700">Priority</label>
+                                <input type="number" min="1" max="10000" className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none" value={endpointForm.priority} onChange={e => setEndpointForm({ ...endpointForm, priority: parseInt(e.target.value) || 100 })} />
+                                <p className="text-xs text-gray-500 mt-1">Lower numbers are selected first.</p>
+                            </div>
                             <div className="flex gap-4">
                                 <div className="flex-1">
                                     <label className="block text-sm font-medium mb-1 text-gray-700">Dial Prefix (Optional)</label>
@@ -461,12 +512,6 @@ const CarriersGatewaysPage = () => {
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" checked={endpointForm.isActive} onChange={e => setEndpointForm({ ...endpointForm, isActive: e.target.checked })} />
                                         <span className="text-sm font-medium text-gray-700">Active (Enable outbound routing)</span>
-                                    </label>
-                                </div>
-                                <div>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={endpointForm.isSystemDefault || false} onChange={e => setEndpointForm({ ...endpointForm, isSystemDefault: e.target.checked })} />
-                                        <span className="text-sm font-medium text-gray-700">Set as System Default Outbound Gateway</span>
                                     </label>
                                 </div>
                             </div>

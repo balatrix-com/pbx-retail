@@ -28,7 +28,7 @@ export class KamailioDBService {
     }
 
     private async callKamailioRpc(method: string, params: any[] = []): Promise<void> {
-        const rpcUrl = this.configService?.get<string>('kamailio.rpcUrl') || process.env.KAMAILIO_RPC_URL || `http://${process.env.FS_DB_HOST || '10.30.0.61'}:8080/rpc`;
+        const rpcUrl = this.configService?.get<string>('kamailio.rpcUrl') || process.env.KAMAILIO_RPC_URL || `http://${process.env.FS_DB_HOST || '10.30.0.60'}:8080/rpc`;
         try {
             const response = await fetch(rpcUrl, {
                 method: 'POST',
@@ -40,14 +40,17 @@ export class KamailioDBService {
                     params
                 })
             });
+            if (!response.ok) {
+                throw new Error(`Kamailio RPC returned HTTP ${response.status}`);
+            }
             const data = await response.json();
             if (data.error) {
-                this.logger.error(`Kamailio RPC Error [${method}]:`, data.error);
-            } else {
-                this.logger.log(`Kamailio RPC Success [${method}]`);
+                throw new Error(`Kamailio RPC error: ${JSON.stringify(data.error)}`);
             }
+            this.logger.log(`Kamailio RPC Success [${method}]`);
         } catch (error) {
             this.logger.error(`Kamailio RPC Request Failed [${method}]:`, error);
+            throw error;
         }
     }
 
@@ -157,7 +160,7 @@ export class KamailioDBService {
     async addCarrierIP(ip: string, port: number, tag: string): Promise<void> {
         try {
             await this.executeQueries([
-                { text: 'DELETE FROM address WHERE ip_addr = $1 AND port = $2', params: [ip, port] },
+                { text: 'DELETE FROM address WHERE grp = 1 AND ip_addr = $1 AND port = $2', params: [ip, port] },
                 { text: 'INSERT INTO address (grp, ip_addr, mask, port, tag) VALUES ($1, $2, $3, $4, $5)', params: [1, ip, 32, port, tag] }
             ]);
             this.logger.log(`Added Carrier IP to Kamailio: ${ip}:${port} (${tag})`);
@@ -171,7 +174,7 @@ export class KamailioDBService {
      * Remove Carrier IP from Kamailio address table
      */
     async removeCarrierIP(ip: string, port: number): Promise<void> {
-        const query = `DELETE FROM address WHERE ip_addr = $1 AND port = $2`;
+        const query = `DELETE FROM address WHERE grp = 1 AND ip_addr = $1 AND port = $2`;
         try {
             await this.executeQuery(query, [ip, port]);
             this.logger.log(`Removed Carrier IP from Kamailio: ${ip}:${port}`);
@@ -187,13 +190,14 @@ export class KamailioDBService {
     async addInboundIP(ip: string, port: number, tag: string): Promise<void> {
         try {
             await this.executeQueries([
-                { text: 'DELETE FROM address WHERE ip_addr = $1 AND port = $2', params: [ip, port] },
+                { text: 'DELETE FROM address WHERE grp = 1 AND ip_addr = $1 AND port = $2', params: [ip, port] },
                 { text: 'INSERT INTO address (grp, ip_addr, mask, port, tag) VALUES ($1, $2, $3, $4, $5)', params: [1, ip, 32, port, tag] }
             ]);
             this.logger.log(`Added Inbound IP to Kamailio: ${ip}:${port} (${tag})`);
             await this.callKamailioRpc('permissions.addressReload');
         } catch (error) {
             this.logger.error(`Failed to add Inbound IP ${ip}:${port}:`, error);
+            throw error;
         }
     }
 
@@ -201,13 +205,14 @@ export class KamailioDBService {
      * Remove Inbound Carrier IP from Kamailio address table
      */
     async removeInboundIP(ip: string, port: number): Promise<void> {
-        const query = `DELETE FROM address WHERE ip_addr = $1 AND port = $2`;
+        const query = `DELETE FROM address WHERE grp = 1 AND ip_addr = $1 AND port = $2`;
         try {
             await this.executeQuery(query, [ip, port]);
             this.logger.log(`Removed Inbound IP from Kamailio: ${ip}:${port}`);
             await this.callKamailioRpc('permissions.addressReload');
         } catch (error) {
             this.logger.error(`Failed to remove Inbound IP ${ip}:${port}:`, error);
+            throw error;
         }
     }
 }

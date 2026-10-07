@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BillingCycle, Tier } from '@prisma/client';
 
 @Injectable()
-export class PlansService implements OnModuleInit {
+export class PlansService {
     private readonly logger = new Logger(PlansService.name);
     private subBillingUrl: string;
 
@@ -18,32 +18,6 @@ export class PlansService implements OnModuleInit {
         this.subBillingUrl = this.configService.get<string>('SUB_BILLING_API_URL') || 'http://localhost:5005/api';
     }
 
-    async onModuleInit() {
-        await this.seedPlans();
-    }
-
-    async seedPlans() {
-        const plans = [
-            { name: 'Standard Monthly', billingCycle: BillingCycle.MONTHLY, tier: Tier.STANDARD, price: 9.99, freeMinutes: 100 },
-            { name: 'Standard Yearly', billingCycle: BillingCycle.YEARLY, tier: Tier.STANDARD, price: 99.99, freeMinutes: 100 },
-            { name: 'Premium Monthly', billingCycle: BillingCycle.MONTHLY, tier: Tier.PREMIUM, price: 19.99, freeMinutes: 500 },
-            { name: 'Premium Yearly', billingCycle: BillingCycle.YEARLY, tier: Tier.PREMIUM, price: 199.99, freeMinutes: 500 },
-            { name: 'Enterprise Monthly', billingCycle: BillingCycle.MONTHLY, tier: Tier.ENTERPRISE, price: 49.99, freeMinutes: 1000 },
-            { name: 'Enterprise Yearly', billingCycle: BillingCycle.YEARLY, tier: Tier.ENTERPRISE, price: 499.99, freeMinutes: 1000 },
-        ];
-
-        for (const plan of plans) {
-            const exists = await this.prisma.plan.findFirst({
-                where: { name: plan.name, billingCycle: plan.billingCycle, tier: plan.tier },
-            });
-
-            if (!exists) {
-                await this.prisma.plan.create({ data: plan });
-                console.log(`Seeded plan: ${plan.name}`);
-            }
-        }
-    }
-
     async findAll(userId?: string) {
         try {
             this.logger.log(`Fetching plans from sub-billing: ${this.subBillingUrl}/plans`);
@@ -51,7 +25,7 @@ export class PlansService implements OnModuleInit {
                 this.httpService.get(`${this.subBillingUrl}/plans`)
             );
             const data = response.data?.data || response.data;
-            if (Array.isArray(data) && data.length > 0) {
+            if (Array.isArray(data)) {
                 return data;
             }
         } catch (error) {
@@ -60,10 +34,8 @@ export class PlansService implements OnModuleInit {
 
         return this.prisma.plan.findMany({
             where: {
-                OR: [
-                    { isCustom: false },
-                    userId ? { isCustom: true, createdBy: userId } : undefined
-                ].filter(Boolean) as any
+                isCustom: true,
+                ...(userId ? { createdBy: userId } : {})
             },
             orderBy: [
                 { isCustom: 'asc' }, // Standard first
@@ -91,13 +63,15 @@ export class PlansService implements OnModuleInit {
             data: {
                 name: data.name,
                 price: Number(data.price ?? data.amount ?? 0),
-                freeMinutes: Number(data.freeMinutes ?? data.free_mins ?? 0),
+                freeMinutes: 0,
                 isCustom: true,
                 createdBy: userId,
                 tier: data.tier || Tier.BASIC,
                 billingCycle: data.billingCycle || BillingCycle.MONTHLY,
-                maxDIDs: Number(data.maxDIDs ?? data.dids ?? 0),
-                maxTFNs: Number(data.maxTFNs ?? data.tfns ?? 0),
+                maxDIDs: 0,
+                maxTFNs: 0,
+                maxNumbers: Number(data.maxNumbers ?? data.numbers ?? 0),
+                maxMonitoringExtensions: Number(data.maxMonitoringExtensions ?? data.monitoring_extensions ?? 0),
                 maxExtensions: Number(data.maxExtensions ?? data.extensions ?? 0),
                 maxRingGroups: Number(data.maxRingGroups ?? 0),
                 maxIVRs: Number(data.maxIVRs ?? 0),

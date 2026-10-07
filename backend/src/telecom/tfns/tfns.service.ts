@@ -24,6 +24,26 @@ export class TFNsService {
         private readonly configService: ConfigService,
     ) { }
 
+    private async assertNumberQuota(tenantId: string) {
+        const subscription = await this.prisma.subscription.findFirst({
+            where: { tenantId, status: 'ACTIVE' },
+            include: { plan: { select: { maxNumbers: true } } },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (!subscription) {
+            throw new BadRequestException('An active package is required before assigning numbers.');
+        }
+        const [tfns, dids] = await Promise.all([
+            this.prisma.tFN.count({ where: { tenantId } }),
+            this.prisma.dID.count({ where: { tenantId } }),
+        ]);
+        const used = tfns + dids;
+        const limit = subscription.plan.maxNumbers;
+        if (used >= limit) {
+            throw new BadRequestException(`Numbers quota reached (${used}/${limit}). TFNs and DIDs share this limit.`);
+        }
+    }
+
     private async syncAssetsToSubBilling(tenantId: string, assets: { tfns?: string[], dids?: string[] }) {
         try {
             const subscription = await this.prisma.subscription.findFirst({
@@ -73,6 +93,7 @@ export class TFNsService {
      * Create a new TFN
      */
     async create(tenantId: string, dto: CreateTFNDto) {
+        await this.assertNumberQuota(tenantId);
         // Enforce system limits
         const limitStr = process.env.SYSTEM_LIMIT_TFNS;
         if (limitStr) {
@@ -274,6 +295,7 @@ export class TFNsService {
 
         if (!tfn) throw new NotFoundException('TFN not found');
         if (tfn.tenantId) throw new BadRequestException('TFN already assigned');
+        await this.assertNumberQuota(tenantId);
 
         // Enforce system limits
         const limitStr = process.env.SYSTEM_LIMIT_TFNS;

@@ -1,126 +1,137 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { InboundNormalization } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
+import { CacheFlushService } from '../freeswitch/cache-flush.service';
+import { CreateCarrierDto, EndpointDto, UpdateCarrierDto, UpdateEndpointDto } from './dto/carrier.dto';
 
 @Injectable()
 export class CarriersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly freeSwitchSync: FreeSwitchSyncService,
+    private readonly cacheFlush: CacheFlushService,
   ) {}
 
-  async getCarriers() {
+  private requireTenant(tenantId?: string): string {
+    if (!tenantId) throw new ForbiddenException('Tenant account is required');
+    return tenantId;
+  }
+
+  private async tenantContext(tenantId?: string) {
+    const id = this.requireTenant(tenantId);
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id }, select: { id: true, customerCode: true },
+    });
+    if (!tenant) throw new ForbiddenException('Tenant account was not found');
+    return tenant;
+  }
+
+  private async flush(tenantId?: string) {
+    const tenant = await this.tenantContext(tenantId);
+    if (tenant.customerCode) await this.cacheFlush.flushCarrier(tenant.customerCode);
+    await this.freeSwitchSync.syncTenantForwards(tenant.id);
+  }
+
+  getCarriers(tenantId?: string) {
     return this.prisma.outboundCarrier.findMany({
-      include: {
-        endpoints: true,
-      },
+      where: { tenantId: this.requireTenant(tenantId) },
+      include: { endpoints: { orderBy: [{ priority: 'asc' }, { id: 'asc' }] } },
+      orderBy: { name: 'asc' },
     });
   }
 
-  async createCarrier(data: { name: string }) {
+  createCarrier(tenantId: string | undefined, data: CreateCarrierDto) {
     return this.prisma.outboundCarrier.create({
-      data,
+      data: { name: data.name.trim(), tenantId: this.requireTenant(tenantId) },
     });
   }
 
-  async updateCarrier(id: number, data: { name: string }) {
-    return this.prisma.outboundCarrier.update({
-      where: { id },
-      data,
+  async updateCarrier(tenantId: string | undefined, id: number, data: UpdateCarrierDto) {
+    const result = await this.prisma.outboundCarrier.updateMany({
+      where: { id, tenantId: this.requireTenant(tenantId) }, data: { name: data.name.trim() },
     });
+    if (!result.count) throw new NotFoundException('Carrier not found');
+    return this.prisma.outboundCarrier.findUnique({ where: { id }, include: { endpoints: true } });
   }
 
-  async deleteCarrier(id: number) {
-    return this.prisma.outboundCarrier.delete({
-      where: { id },
+  async deleteCarrier(tenantId: string | undefined, id: number) {
+    const owned = await this.prisma.outboundCarrier.findFirst({
+      where: { id, tenantId: this.requireTenant(tenantId) }, select: { id: true },
     });
+    if (!owned) throw new NotFoundException('Carrier not found');
+    const deleted = await this.prisma.outboundCarrier.delete({ where: { id } });
+    await this.flush(tenantId);
+    return deleted;
   }
 
-  async createEndpoint(carrierId: number, data: any) {
-    if (data.isSystemDefault) {
-      const created = await this.prisma.$transaction(async (tx) => {
-        await tx.outboundEndpoint.updateMany({
-          data: { isSystemDefault: false },
-        });
-        return tx.outboundEndpoint.create({
-          data: {
-            ...data,
-            carrierId,
-          },
-        });
-      });
-
-      await this.freeSwitchSync.syncAllSystemDefaultForwards();
-      return created;
-    }
-
-    return this.prisma.outboundEndpoint.create({
+  async createEndpoint(tenantId: string | undefined, carrierId: number, data: EndpointDto) {
+    const tenant = await this.tenantContext(tenantId);
+    const carrier = await this.prisma.outboundCarrier.findFirst({
+      where: { id: carrierId, tenantId: tenant.id }, select: { id: true },
+    });
+    if (!carrier) throw new NotFoundException('Carrier not found');
+    const created = await this.prisma.outboundEndpoint.create({
       data: {
         ...data,
-        carrierId,
+        name: data.name.trim(), sipHost: data.sipHost.trim().toLowerCase(),
+        isSystemDefault: false, carrierId, tenantId: tenant.id,
       },
     });
+    await this.flush(tenant.id);
+    return created;
   }
 
-  async updateEndpoint(id: number, data: any) {
-    const oldEndpoint = await this.prisma.outboundEndpoint.findUnique({ where: { id } });
-    if (!oldEndpoint) throw new NotFoundException('Endpoint not found');
-
-    const isNowDefault = data.isSystemDefault === true;
-    const wasDefault = oldEndpoint.isSystemDefault === true;
-    const hostOrPortChanged = (data.sipHost !== undefined && data.sipHost !== oldEndpoint.sipHost) || 
-                              (data.sipPort !== undefined && data.sipPort !== oldEndpoint.sipPort);
-
-    let updated;
-    if (isNowDefault && !wasDefault) {
-      updated = await this.prisma.$transaction(async (tx) => {
-        await tx.outboundEndpoint.updateMany({
-          data: { isSystemDefault: false },
-        });
-        return tx.outboundEndpoint.update({
-          where: { id },
-          data,
-        });
-      });
-    } else {
-      updated = await this.prisma.outboundEndpoint.update({
-        where: { id },
-        data,
-      });
-    }
-
-    // Resync tenants directly assigned to this endpoint when host/port changes
-    if (hostOrPortChanged) {
-      const assignedTenants = await this.prisma.tenant.findMany({
-        where: { outboundEndpointId: id },
-        select: { id: true },
-      });
-      for (const t of assignedTenants) {
-        await this.freeSwitchSync.syncTenantForwards(t.id);
-      }
-    }
-
-    // Resync system-default-reliant tenants when default status or host/port changes
-    if (isNowDefault || (wasDefault && hostOrPortChanged) || (wasDefault && !isNowDefault)) {
-      await this.freeSwitchSync.syncAllSystemDefaultForwards();
-    }
-
+  async updateEndpoint(
+    tenantId: string | undefined, carrierId: number, id: number, data: UpdateEndpointDto,
+  ) {
+    const tenant = this.requireTenant(tenantId);
+    const existing = await this.prisma.outboundEndpoint.findFirst({
+      where: { id, carrierId, tenantId: tenant },
+    });
+    if (!existing) throw new NotFoundException('Endpoint not found');
+    const updated = await this.prisma.outboundEndpoint.update({
+      where: { id },
+      data: {
+        ...data,
+        ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+        ...(data.sipHost !== undefined ? { sipHost: data.sipHost.trim().toLowerCase() } : {}),
+        isSystemDefault: false,
+      },
+    });
+    await this.flush(tenant);
     return updated;
   }
 
-  async deleteEndpoint(id: number) {
-    const endpoint = await this.prisma.outboundEndpoint.findUnique({ where: { id } });
-    if (!endpoint) throw new NotFoundException('Endpoint not found');
-
-    const wasDefault = endpoint.isSystemDefault === true;
-    const deleted = await this.prisma.outboundEndpoint.delete({
-      where: { id },
+  async deleteEndpoint(tenantId: string | undefined, carrierId: number, id: number) {
+    const tenant = this.requireTenant(tenantId);
+    const existing = await this.prisma.outboundEndpoint.findFirst({
+      where: { id, carrierId, tenantId: tenant }, select: { id: true },
     });
-
-    if (wasDefault) {
-      await this.freeSwitchSync.syncAllSystemDefaultForwards();
-    }
-
+    if (!existing) throw new NotFoundException('Endpoint not found');
+    const deleted = await this.prisma.outboundEndpoint.delete({ where: { id } });
+    await this.flush(tenant);
     return deleted;
+  }
+
+  async getInboundNormalization(tenantId?: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: this.requireTenant(tenantId) }, select: { inboundNormalization: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    return tenant;
+  }
+
+  async updateInboundNormalization(tenantId: string | undefined, rule: InboundNormalization) {
+    if (!Object.values(InboundNormalization).includes(rule)) {
+      throw new BadRequestException('Invalid inbound normalization rule');
+    }
+    const tenant = await this.prisma.tenant.update({
+      where: { id: this.requireTenant(tenantId) },
+      data: { inboundNormalization: rule },
+      select: { customerCode: true, inboundNormalization: true },
+    });
+    if (tenant.customerCode) await this.cacheFlush.flushDIDForCustomer(tenant.customerCode);
+    return { inboundNormalization: tenant.inboundNormalization };
   }
 }

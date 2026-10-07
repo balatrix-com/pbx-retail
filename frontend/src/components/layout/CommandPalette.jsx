@@ -18,7 +18,7 @@ const CommandPalette = () => {
     const inputRef = useRef(null);
     const resultContainerRef = useRef(null);
     const navigate = useNavigate();
-    const { user, isSuperAdmin, logout } = useAuth();
+    const { user, isSuperAdmin, isAdmin, logout } = useAuth();
 
     // Hotkey Listener
     useEffect(() => {
@@ -96,11 +96,12 @@ const CommandPalette = () => {
             { id: 'nav-dashboard', type: 'navigation', label: 'Go to Dashboard', icon: LayoutDashboard, path: '/platform' },
             { id: 'nav-users', type: 'navigation', label: 'Go to Users', icon: User, path: isSuperAdmin ? '/admin/users' : '/users' },
             { id: 'nav-audit', type: 'navigation', label: 'Go to Audit Logs', icon: FileText, path: '/admin/audit-logs', requiredRole: 'SUPER_ADMIN' },
-            { id: 'nav-carriers', type: 'navigation', label: 'Go to Carriers & Gateways', icon: Server, path: '/super-admin/carriers', requiredRole: 'SUPER_ADMIN' },
+            { id: 'nav-carriers', type: 'navigation', label: 'Go to Trunks & Carriers', icon: Server, path: '/telecom/trunks', requiredRole: 'ADMIN' },
             { id: 'nav-profile', type: 'navigation', label: 'Profile Settings', icon: Settings, path: '/profile' },
             { id: 'nav-logout', type: 'action', label: 'Logout', icon: LogOut, action: () => logout() },
         ].filter(item => {
             if (item.requiredRole === 'SUPER_ADMIN' && !isSuperAdmin) return false;
+            if (item.requiredRole === 'ADMIN' && !isAdmin) return false;
             return item.label.toLowerCase().includes(lowerQ);
         });
 

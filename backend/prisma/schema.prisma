@@ -43,6 +43,10 @@ model Tenant {
   partner              Partner?              @relation(fields: [partnerId], references: [id])
   outboundEndpointId   Int?
   outboundEndpoint     OutboundEndpoint?     @relation(fields: [outboundEndpointId], references: [id], onDelete: SetNull)
+  inboundNormalization InboundNormalization  @default(AUTO_10DIGIT)
+  outboundCarriers     OutboundCarrier[]
+  ownedOutboundEndpoints OutboundEndpoint[]   @relation("TenantOutboundEndpoints")
+  inboundWhitelist     InboundWhitelist[]
 
   @@map("tenants")
 }
@@ -235,6 +239,8 @@ model Plan {
   allowSchedules      Boolean        @default(false)
   allowVoicemail      Boolean        @default(true)
   maxDIDs             Int            @default(10)
+  maxNumbers          Int            @default(0)
+  maxMonitoringExtensions Int        @default(0)
   maxExtensions       Int            @default(50)
   maxIVRs             Int            @default(5)
   maxRingGroups       Int            @default(10)
@@ -645,17 +651,22 @@ model Partner {
 
 model OutboundCarrier {
   id        Int                @id @default(autoincrement())
-  name      String             @unique // e.g., "Telnyx", "Twilio"
+  tenantId  String
+  name      String             // e.g., "Telnyx", "Twilio"
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   endpoints OutboundEndpoint[]
 
+  @@unique([tenantId, name])
+  @@index([tenantId])
   @@map("outbound_carriers")
 }
 
 model OutboundEndpoint {
   id              Int              @id @default(autoincrement())
   carrierId       Int
+  tenantId        String
   name            String           // e.g., "US-East Gateway", "Backup Gateway"
   sipHost         String           // e.g., "sip.telnyx.com" or "64.227.10.111"
   sipPort         Int              @default(5060)
@@ -666,24 +677,39 @@ model OutboundEndpoint {
   callerIdNumber  String?          // Override caller ID number if mode is 'override'
   isActive        Boolean          @default(true)
   isSystemDefault Boolean          @default(false)
+  priority        Int              @default(100)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   carrier         OutboundCarrier  @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  tenant          Tenant           @relation("TenantOutboundEndpoints", fields: [tenantId], references: [id], onDelete: Cascade)
   tenants         Tenant[]
 
   @@unique([carrierId, name])
+  @@index([tenantId, isActive, priority])
   @@map("outbound_endpoints")
 }
 
 model InboundWhitelist {
   id        Int      @id @default(autoincrement())
-  ipAddress String   @unique // The carrier source IP to whitelist
+  tenantId  String
+  ipAddress String   // The carrier source IP to whitelist
   port      Int      @default(5060)
   tag       String   // Description/Label (e.g., "Telnyx Inbound")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([tenantId, ipAddress, port])
+  @@index([tenantId])
+  @@index([ipAddress, port])
   @@map("inbound_whitelist")
+}
+
+enum InboundNormalization {
+  NONE
+  STRIP_PLUS
+  STRIP_PLUS_ONE_US
+  AUTO_10DIGIT
 }
 
 model RateCard {

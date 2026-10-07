@@ -24,6 +24,26 @@ export class DIDsService {
         private readonly configService: ConfigService,
     ) { }
 
+    private async assertNumberQuota(tenantId: string) {
+        const subscription = await this.prisma.subscription.findFirst({
+            where: { tenantId, status: 'ACTIVE' },
+            include: { plan: { select: { maxNumbers: true } } },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (!subscription) {
+            throw new BadRequestException('An active package is required before assigning numbers.');
+        }
+        const [tfns, dids] = await Promise.all([
+            this.prisma.tFN.count({ where: { tenantId } }),
+            this.prisma.dID.count({ where: { tenantId } }),
+        ]);
+        const used = tfns + dids;
+        const limit = subscription.plan.maxNumbers;
+        if (used >= limit) {
+            throw new BadRequestException(`Numbers quota reached (${used}/${limit}). TFNs and DIDs share this limit.`);
+        }
+    }
+
     private async syncAssetsToSubBilling(tenantId: string, assets: { tfns?: string[], dids?: string[] }) {
         try {
             const subscription = await this.prisma.subscription.findFirst({
@@ -83,6 +103,10 @@ export class DIDsService {
      * Assign an available DID to a tenant
      */
     async assign(id: string, tenantId: string) {
+        const did = await this.prisma.dID.findUnique({ where: { id } });
+        if (!did) throw new NotFoundException('DID not found');
+        if (did.tenantId) throw new BadRequestException('DID already assigned');
+        await this.assertNumberQuota(tenantId);
         const updated = await this.prisma.dID.update({
             where: { id },
             data: { tenantId }
@@ -102,6 +126,7 @@ export class DIDsService {
      * Includes routing validation
      */
     async create(tenantId: string, dto: CreateDIDDto) {
+        await this.assertNumberQuota(tenantId);
         // Enforce system limits
         const limitStr = process.env.SYSTEM_LIMIT_DIDS;
         if (limitStr) {

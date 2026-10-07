@@ -7,50 +7,17 @@ export const subscriptionService = {
     getPlans: async () => {
         try {
             const res = await api.get('/plans');
-            if (Array.isArray(res.data) && res.data.length > 0) {
+            if (Array.isArray(res.data)) {
                 return res.data;
             }
-            if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+            if (res.data?.data && Array.isArray(res.data.data)) {
                 return res.data.data;
             }
+            return [];
         } catch (e) {
-            console.warn('GET /plans endpoint fallback:', e);
+            console.error('GET /plans endpoint failed:', e);
+            throw e;
         }
-        return [
-            {
-                plan_id: 'tier_1_starter',
-                name: 'Tier 1 Starter Plan',
-                amount: 39.99,
-                currency: 'usd',
-                validity_months: 1,
-                tfns: 1,
-                dids: 0,
-                free_mins: 500,
-                extensions: 5
-            },
-            {
-                plan_id: 'tier_2_pro',
-                name: 'Tier 2 Pro Business Plan',
-                amount: 79.99,
-                currency: 'usd',
-                validity_months: 1,
-                tfns: 3,
-                dids: 2,
-                free_mins: 1500,
-                extensions: 20
-            },
-            {
-                plan_id: 'tier_3_enterprise',
-                name: 'Tier 3 Enterprise Global Plan',
-                amount: 149.99,
-                currency: 'usd',
-                validity_months: 1,
-                tfns: 10,
-                dids: 5,
-                free_mins: 5000,
-                extensions: 100
-            }
-        ];
     },
 
     createPlan: async (payload) => {

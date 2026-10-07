@@ -18,8 +18,10 @@ async function main() {
             billingCycle: 'MONTHLY',
             tier: 'BASIC',
             price: 10.00,
-            freeMinutes: 100,
-            overagePrice: 0.15
+            freeMinutes: 0,
+            overagePrice: 0,
+            maxNumbers: 2,
+            maxMonitoringExtensions: 1
         }
     });
 
@@ -34,8 +36,10 @@ async function main() {
             billingCycle: 'MONTHLY',
             tier: 'STANDARD',
             price: 30.00,
-            freeMinutes: 500,
-            overagePrice: 0.10
+            freeMinutes: 0,
+            overagePrice: 0,
+            maxNumbers: 10,
+            maxMonitoringExtensions: 3
         }
     });
 
@@ -54,28 +58,36 @@ async function main() {
     }
 
     // 3. Seed Super Admin
-    const superAdminEmail = 'superadmin@example.com';
-    const hashedPassword = await bcrypt.hash('SuperAdmin123!', 10);
-    
-    await prisma.user.upsert({
-        where: { email: superAdminEmail },
-        update: {
-            monitoringEnabled: true,
-            monitoringExtension: '999001',
-            monitoringSecret: 'SuperSecret123!'
-        },
-        create: {
+    const superAdminEmail = 'superadmin@balatrix.com';
+    const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'OnidaMaruti1)';
+    const hashedPassword = await bcrypt.hash(superAdminPassword, 10);
+
+    await prisma.$transaction(async (tx) => {
+        const existingSuperAdmin =
+            await tx.user.findUnique({ where: { email: superAdminEmail } })
+            || await tx.user.findUnique({ where: { email: 'superadmin@example.com' } })
+            || await tx.user.findFirst({ where: { role: 'SUPER_ADMIN' }, orderBy: { createdAt: 'asc' } });
+
+        const data = {
             email: superAdminEmail,
             password: hashedPassword,
-            role: 'SUPER_ADMIN',
-            status: 'ACTIVE',
+            role: 'SUPER_ADMIN' as const,
+            status: 'ACTIVE' as const,
             name: 'Super Admin',
+            tenantId: null,
+            forcePasswordChange: false,
             monitoringEnabled: true,
             monitoringExtension: '999001',
             monitoringSecret: 'SuperSecret123!'
+        };
+
+        if (existingSuperAdmin) {
+            await tx.user.update({ where: { id: existingSuperAdmin.id }, data });
+        } else {
+            await tx.user.create({ data });
         }
     });
-    console.log('Seeded/Updated Super Admin user with monitoring extension 999001');
+    console.log(`Seeded/Updated Super Admin ${superAdminEmail} with monitoring extension 999001`);
 
     // Sync Super Admin monitoring extension to Kamailio subscriber database
     await syncKamailioSubscriber('999001', 'SuperSecret123!');
@@ -92,7 +104,7 @@ async function syncKamailioSubscriber(username: string, passwordPlain: string) {
     
     const realm = process.env.SIP_REALM || 'wlabel.balatrix.com';
     const client = new Client({
-        host: process.env.FS_DB_HOST || '10.30.0.61',
+        host: process.env.FS_DB_HOST || '10.30.0.60',
         port: parseInt(process.env.FS_DB_PORT || '5432', 10),
         database: process.env.KAMAILIO_DB_NAME || 'kamailio',
         user: process.env.FS_DB_USER || 'freeswitch',
