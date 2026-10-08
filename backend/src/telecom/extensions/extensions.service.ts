@@ -112,7 +112,11 @@ export class ExtensionsService {
                         this.logger.warn(`Failed to sync FreeSWITCH/Kamailio for ${extNum}: ${err.message}`);
                     });
                 } catch (createErr: any) {
-                    this.logger.error(`Error auto-creating extension ${extNum} for ${targetTenantId}: ${createErr.message}`);
+                    if (createErr.code === 'P2002') {
+                        this.logger.debug(`Extension ${extNum} already created concurrently`);
+                    } else {
+                        this.logger.error(`Error auto-creating extension ${extNum} for ${targetTenantId}: ${createErr.message}`);
+                    }
                 }
             } else {
                 // Ensure existing extension is registered in Kamailio subscriber table
