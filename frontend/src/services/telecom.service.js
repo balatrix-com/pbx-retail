@@ -7,8 +7,8 @@ export const telecomService = {
         return response.data;
     },
     getNumberQuota: async () => (await api.get('/telecom/phone-numbers/quota')).data,
-    addNumber: async (type, number) => (await api.post(type === 'DID' ? '/telecom/dids' : '/telecom/tfns',
-        type === 'DID' ? { didNumber: number } : { tfnNumber: number })).data,
+    addNumber: async (type, number, subscriptionId) => (await api.post(type === 'DID' ? '/telecom/dids' : '/telecom/tfns',
+        type === 'DID' ? { didNumber: number, subscriptionId } : { tfnNumber: number, subscriptionId })).data,
     removeNumber: async (type, id) => (await api.delete(`/telecom/${type === 'DID' ? 'dids' : 'tfns'}/${id}`)).data,
     getPhoneNumber: async (id) => {
         const response = await api.get(`/telecom/phone-numbers/${id}`);

@@ -12,6 +12,7 @@ const MonitoringExtensionModal = ({
     initialName = '',
     initialUserId = '',
     users = [],
+    subscriptions = [],
     tenantId,
     customerCode = ''
 }) => {
@@ -22,6 +23,7 @@ const MonitoringExtensionModal = ({
     const [selectedUserId, setSelectedUserId] = useState(initialUserId);
     const [userList, setUserList] = useState(users);
     const [error, setError] = useState('');
+    const [subscriptionId, setSubscriptionId] = useState('');
 
     // Fetch users if not passed via props (runs once on mount or when tenantId changes)
     React.useEffect(() => {
@@ -79,6 +81,7 @@ const MonitoringExtensionModal = ({
             monitoringSecret: secret,
             name,
             userId: selectedUserId
+            ,subscriptionId: subscriptionId || undefined
         });
     };
 
@@ -101,6 +104,7 @@ const MonitoringExtensionModal = ({
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {!isEditing && <label className="block">Owning subscription<select className="w-full border rounded p-2" value={subscriptionId} onChange={e => setSubscriptionId(e.target.value)} required><option value="">Select subscription</option>{subscriptions.map(s => <option disabled={s.usage.monitoring_extensions >= s.entitlement_snapshot.monitoring_extensions} key={s.id} value={s.id}>{s.plan_name} ({s.subscription_id}) — {Math.max(0, s.entitlement_snapshot.monitoring_extensions - s.usage.monitoring_extensions)} available</option>)}</select></label>}
                     {/* User Selection Dropdown */}
                     <div>
                         <label htmlFor="monitoring-user" className="block text-sm font-medium text-gray-700 mb-1">Select User</label>

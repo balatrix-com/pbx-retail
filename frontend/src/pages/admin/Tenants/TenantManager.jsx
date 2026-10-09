@@ -13,7 +13,7 @@ const TABS = [
     { id: 'extensions', label: 'Extensions', icon: Users },
     { id: 'users', label: 'Users', icon: User },
     { id: 'features', label: 'Feature Controller', icon: Sliders },
-    { id: 'addons', label: 'Add-ons', icon: CreditCard },
+    { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
     { id: 'customize', label: 'Customize', icon: Palette }
 ];
 
@@ -113,7 +113,7 @@ const TenantManager = ({ tenantId, onClose }) => {
                         {activeTab === 'extensions' && <ExtensionsTab tenant={tenant} onUpdate={handleRefresh} />}
                         {activeTab === 'users' && <UsersTab tenant={tenant} />}
                         {activeTab === 'features' && <FeaturesTab tenant={tenant} onUpdate={handleRefresh} />}
-                        {activeTab === 'addons' && <AddonsTab tenant={tenant} onUpdate={handleRefresh} />}
+                        {activeTab === 'subscriptions' && <a className="text-primary-600 underline" href={`/super-admin/subscriptions?tenantId=${encodeURIComponent(tenant.id)}`}>Manage this tenant's subscriptions and allocated assets</a>}
                         {activeTab === 'customize' && <CustomizeTab tenant={tenant} onUpdate={handleRefresh} />}
                     </div>
                 </div>

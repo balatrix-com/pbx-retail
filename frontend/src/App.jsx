@@ -42,6 +42,7 @@ import CarriersGatewaysPage from './pages/admin/CarriersGatewaysPage';
 import BrandingSettingsPage from './pages/admin/BrandingSettingsPage';
 import ExtensionStatus from './pages/admin/ExtensionStatus';
 import PlansPage from './pages/admin/PlansPage';
+import SubscriptionsPage from './pages/billing/SubscriptionsPage';
 import CreatePlanPage from './pages/admin/CreatePlanPage';
 import OnboardingLayout from './pages/onboarding/OnboardingLayout';
 import TfnOnboardingPage from './pages/onboarding/TfnOnboardingPage';
@@ -148,7 +149,7 @@ function App() {
                                                     </MonitoringRoute>
                                                 } />
                                                 <Route path="/cdrs" element={<CdrsPage />} />
-                                                <Route path="/subscriptions" element={<PlansPage />} />
+                                                <Route path="/subscriptions" element={<SubscriptionsPage />} />
                                                 <Route path="/subscriptions/plans/new" element={<CreatePlanPage />} />
                                             </Route>
 
@@ -171,7 +172,7 @@ function App() {
                                                 <Route path="/super-admin/users" element={<SuperAdminUsers />} />
                                                 <Route path="/super-admin/rate-cards" element={<RateCardsPage />} />
                                                 <Route path="/super-admin/packages" element={<PackagesPage />} />
-                                                <Route path="/super-admin/subscriptions" element={<PlansPage />} />
+                                                <Route path="/super-admin/subscriptions" element={<SubscriptionsPage />} />
                                                 <Route path="/super-admin/plans" element={<PlansPage />} />
                                                 <Route path="/super-admin/plans/new" element={<CreatePlanPage />} />
                                                 <Route path="/tenants" element={<TenantsPage />} />

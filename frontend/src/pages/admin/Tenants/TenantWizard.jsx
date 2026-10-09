@@ -84,9 +84,9 @@ const TenantWizard = ({ onClose, onSuccess }) => {
         try {
             const [plansData, catalogData] = await Promise.all([
                 subscriptionService.getPlans(),
-                subscriptionService.getCatalog()
+                Promise.resolve([])
             ]);
-            const availablePlans = plansData || [];
+            const availablePlans = (plansData || []).filter(p => !p.plan_category || p.plan_category === 'base');
             setPlans(availablePlans);
             if (availablePlans.length > 0 && !selectedPlanId) {
                 setSelectedPlanId(availablePlans[0].plan_id || availablePlans[0].id || availablePlans[0].name);
@@ -706,9 +706,9 @@ const TenantWizard = ({ onClose, onSuccess }) => {
                             <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="text-xs font-extrabold text-gray-700 dark:text-slate-300 uppercase tracking-wider block">
-                                        Capacity Add-ons (Optional)
+                                        Additional capacity
                                     </label>
-                                    <span className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">Add instant resources to this tenant</span>
+                                    <span className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">Activate capacity plans from Subscriptions after customer creation.</span>
                                 </div>
 
                                 <div className="space-y-2 max-h-52 overflow-y-auto pr-1 border border-gray-100 dark:border-slate-800 rounded-xl p-2 bg-gray-50/50 dark:bg-slate-800/30">

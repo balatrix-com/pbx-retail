@@ -14,6 +14,7 @@ import { LookupRedisService } from '../../redis/lookup-redis.module';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
+import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 
 @Injectable()
 export class ExtensionsService {
@@ -25,6 +26,7 @@ export class ExtensionsService {
         private readonly lookupRedis: LookupRedisService,
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
+        private readonly subscriptions: SubscriptionsService,
     ) { }
 
     private async resolveTenantId(tenantId: string): Promise<string> {
@@ -72,6 +74,7 @@ export class ExtensionsService {
         const existingMap = new Map(existingExtensions.map(e => [e.extensionNumber, e]));
 
         for (const extAsset of subBillingAssets.extensions) {
+            if (extAsset.status !== 'active') continue;
             let extNum = String(extAsset.extension_number || extAsset.extensionNumber).trim();
             if (!extNum) continue;
 
@@ -184,6 +187,7 @@ export class ExtensionsService {
      * - Hash password
      */
     async create(tenantId: string, dto: CreateExtensionDto) {
+        await this.subscriptions.capacity(tenantId,'extensions',dto.subscriptionId);
         // Enforce system limits
         const limitStr = process.env.SYSTEM_LIMIT_EXTENSIONS;
         if (limitStr) {
@@ -274,6 +278,8 @@ export class ExtensionsService {
         });
 
         this.logger.log(`Created extension ${extension.extensionNumber} for tenant ${tenantId}`);
+        try { await this.subscriptions.assignExtension(tenantId,extension,dto.subscriptionId); }
+        catch(error){await this.prisma.extension.delete({where:{id:extension.id}});throw error;}
 
         // Sync to FreeSWITCH/Kamailio — non-fatal if unreachable
         try {
@@ -296,6 +302,7 @@ export class ExtensionsService {
      * Update extension (cannot change extension number)
      */
     async update(tenantId: string, id: string, dto: UpdateExtensionDto) {
+        await this.subscriptions.assertEditable('extension', id);
         // Verify ownership
         const extension = await this.prisma.extension.findFirst({
             where: { id, tenantId },
@@ -401,12 +408,9 @@ export class ExtensionsService {
             throw new BadRequestException(`Cannot delete extension. It is currently the routing target for DID ${didUsage.number}.`);
         }
 
-        // Sync: Delete from FreeSwitch — non-fatal if unreachable
-        try {
-            await this.freeSwitchSync.deleteExtension(extension);
-        } catch (syncErr) {
-            this.logger.warn(`FreeSWITCH sync failed for deleted extension ${extension.extensionNumber}: ${syncErr.message}`);
-        }
+        // Remove SIP/routing successfully before freeing the paid subscription slot.
+        await this.freeSwitchSync.deleteExtension(extension);
+        await this.subscriptions.unassignExtension(tenantId,extension);
 
         // Delete
         await this.prisma.extension.delete({ where: { id } });

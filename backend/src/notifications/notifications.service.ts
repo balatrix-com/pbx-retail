@@ -11,12 +11,10 @@ export class NotificationsService {
      * Get recent notifications for a user/tenant
      */
     async getNotifications(tenantId: string, userId: string, limit = 50) {
-        if (!tenantId) return [];
         return this.prisma.notification.findMany({
             where: {
-                tenantId,
                 OR: [
-                    { userId: null }, // tenant-wide
+                    ...(tenantId ? [{ tenantId, userId: null }] : []), // tenant-wide
                     { userId: userId } // user-specific
                 ]
             },
@@ -31,14 +29,12 @@ export class NotificationsService {
      * Mark a specific notification as read
      */
     async markAsRead(id: string, tenantId: string, userId: string) {
-        if (!tenantId) throw new Error('Unauthorized');
         // Ensure the notification belongs to this tenant/user before updating
         const notification = await this.prisma.notification.findFirst({
             where: {
                 id,
-                tenantId,
                 OR: [
-                    { userId: null },
+                    ...(tenantId ? [{ tenantId, userId: null }] : []),
                     { userId: userId }
                 ]
             }
@@ -58,13 +54,11 @@ export class NotificationsService {
      * Mark all notifications as read for a user
      */
     async markAllAsRead(tenantId: string, userId: string) {
-        if (!tenantId) return;
         return this.prisma.notification.updateMany({
             where: {
-                tenantId,
                 read: false,
                 OR: [
-                    { userId: null },
+                    ...(tenantId ? [{ tenantId, userId: null }] : []),
                     { userId: userId }
                 ]
             },

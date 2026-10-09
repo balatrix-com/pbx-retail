@@ -27,10 +27,14 @@ describe('UsersService monitoring entitlements and reassignment', () => {
         kamailio = { syncSubscriber: jest.fn().mockResolvedValue(undefined), deleteSubscriber: jest.fn().mockResolvedValue(undefined) };
         const http: any = { get: jest.fn().mockReturnValue(of({ data: { success: true, data: { addon_units: 2, subscription_id: 'sub' } } })) };
         const config: any = { get: jest.fn().mockReturnValue('http://billing/api') };
-        service = new UsersService(prisma, kamailio, {} as any, { publish: jest.fn() } as any, http, config);
+        const subscriptions: any = { list: jest.fn().mockResolvedValue([
+            { id:'base',subscription_type:'base',status:'active',entitlement_snapshot:{monitoring_extensions:1} },
+            { id:'capacity',subscription_type:'capacity',status:'active',entitlement_snapshot:{monitoring_extensions:2} },
+        ]), transferMonitoring:jest.fn().mockResolvedValue(undefined), assignMonitoring:jest.fn(),unassignMonitoring:jest.fn(),capacity:jest.fn() };
+        service = new UsersService(prisma, kamailio, {} as any, { publish: jest.fn() } as any, http, config, subscriptions);
     });
 
-    it('adds active purchased units to the plan monitoring limit', async () => {
+    it('adds active capacity subscription seats to the base monitoring limit', async () => {
         expect(await service.getMonitoringSeats('admin')).toMatchObject({ used: 1, planLimit: 1, addonUnits: 2, limit: 3, remaining: 2, customerCode: 'U1002', pendingStaffInvites: 1 });
     });
 

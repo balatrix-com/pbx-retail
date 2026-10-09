@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { KamailioDBService } from '../freeswitch/kamailio-db.service';
 import { MailService } from '../mail/mail.service';
@@ -56,6 +57,7 @@ describe('UsersService - Staff Invite Lifecycle & Auto-Flush', () => {
                 { provide: REDIS_CLIENT, useValue: { publish: jest.fn() } },
                 { provide: HttpService, useValue: { get: jest.fn() } },
                 { provide: ConfigService, useValue: { get: jest.fn() } },
+                { provide: SubscriptionsService, useValue: {} },
             ],
         }).compile();
 

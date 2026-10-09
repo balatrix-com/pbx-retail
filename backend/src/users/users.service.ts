@@ -14,6 +14,7 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom, timeout } from 'rxjs';
 import { ReassignMonitoringDto } from './dto/reassign-monitoring.dto';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Injectable()
 export class UsersService {
@@ -24,6 +25,7 @@ export class UsersService {
         @Inject(REDIS_CLIENT) private readonly redisClient: RedisClientType,
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
+        private readonly subscriptions: SubscriptionsService,
     ) { }
 
     private async monitoringAddonUnits(tenantId: string): Promise<number> {
@@ -345,7 +347,8 @@ export class UsersService {
         monitoringEnabled: boolean,
         monitoringExtension?: string,
         monitoringSecret?: string,
-        name?: string
+        name?: string,
+        subscriptionId?: string
     ) {
         const [actor, targetUser] = await Promise.all([
             this.prisma.user.findUnique({ where: { id: actorId }, select: { tenantId: true, role: true } }),
@@ -375,8 +378,10 @@ export class UsersService {
         }
 
         // Resolve billing entitlement before taking the tenant advisory lock.
-        const addonUnits = monitoringEnabled && !targetUser.monitoringEnabled
-            ? await this.monitoringAddonUnits(targetUser.tenantId) : 0;
+        const billingSubscriptions = await this.subscriptions.list(targetUser.tenantId);
+        const activeSubscriptions = billingSubscriptions.filter(s => ['active', 'grace'].includes(s.status));
+        const monitoringLimit = activeSubscriptions.reduce((n, s) => n + Number(s.entitlement_snapshot.monitoring_extensions || 0), 0);
+        if (monitoringEnabled && !targetUser.monitoringEnabled) await this.subscriptions.capacity(targetUser.tenantId, 'monitoring_extensions', subscriptionId);
 
         const updatedUser = await this.prisma.$transaction(async tx => {
             // Serialize seat changes for this tenant so concurrent Admin requests cannot exceed the plan.
@@ -388,14 +393,8 @@ export class UsersService {
                 throw new BadRequestException('Monitoring seat changed; refresh and try again');
             }
             if (monitoringEnabled && !targetUser.monitoringEnabled) {
-                const subscription = await tx.subscription.findFirst({
-                    where: { tenantId: targetUser.tenantId!, status: 'ACTIVE' },
-                    include: { plan: { select: { maxMonitoringExtensions: true } } },
-                    orderBy: { createdAt: 'desc' },
-                });
-                if (!subscription) throw new BadRequestException('An active package is required before assigning monitoring extensions');
                 const assigned = await tx.user.count({ where: { tenantId: targetUser.tenantId!, monitoringEnabled: true } });
-                const limit = subscription.plan.maxMonitoringExtensions + addonUnits;
+                const limit = monitoringLimit;
                 if (assigned >= limit) throw new BadRequestException(`Monitoring extension quota reached (${assigned}/${limit})`);
             }
             if (monitoringEnabled) {
@@ -418,6 +417,8 @@ export class UsersService {
 
         // Sync with Kamailio
         try {
+            if (monitoringEnabled) await this.subscriptions.assignMonitoring(targetUser.tenantId, updatedUser, subscriptionId);
+            else await this.subscriptions.unassignMonitoring(targetUser.tenantId, targetUserId);
             if (monitoringEnabled) {
                 await this.kamailioService.syncSubscriber(extension!, secret!, true);
                 if (targetUser.monitoringExtension && targetUser.monitoringExtension !== extension) {
@@ -509,6 +510,7 @@ export class UsersService {
         });
 
         try {
+            await this.subscriptions.transferMonitoring(actor.tenantId!, original.from.id, { ...original.to, monitoringExtension: extension });
             await this.kamailioService.syncSubscriber(extension, original.secret, true);
             if (original.from.monitoringExtension !== extension) {
                 await this.kamailioService.deleteSubscriber(original.from.monitoringExtension!, true);
@@ -561,11 +563,12 @@ export class UsersService {
             this.prisma.tenant.findUnique({ where: { id: actor.tenantId }, select: { customerCode: true } }),
             this.prisma.user.count({ where: { tenantId: actor.tenantId, role: Role.SUPPORT, status: UserStatus.INVITED } }),
         ]);
-        const planLimit = subscription?.plan.maxMonitoringExtensions ?? 0;
-        const addonUnits = subscription ? await this.monitoringAddonUnits(actor.tenantId) : 0;
+        const subscriptions = (await this.subscriptions.list(actor.tenantId)).filter(s => ['active','grace'].includes(s.status));
+        const planLimit = subscriptions.filter(s => s.subscription_type === 'base').reduce((n,s) => n + Number(s.entitlement_snapshot.monitoring_extensions || 0), 0);
+        const addonUnits = subscriptions.filter(s => s.subscription_type === 'capacity').reduce((n,s) => n + Number(s.entitlement_snapshot.monitoring_extensions || 0), 0);
         const limit = planLimit + addonUnits;
         return { users, used, limit, planLimit, addonUnits, customerCode: tenant?.customerCode, pendingStaffInvites,
-            remaining: Math.max(0, limit - used), hasActivePlan: !!subscription };
+            subscriptions, remaining: Math.max(0, limit - used), hasActivePlan: subscriptions.length > 0 };
     }
 
     async deleteUser(actorId: string, targetUserId: string) {
@@ -582,6 +585,7 @@ export class UsersService {
 
         if (targetUser.monitoringExtension) {
             await this.kamailioService.deleteSubscriber(targetUser.monitoringExtension, true);
+            if(targetUser.tenantId) await this.subscriptions.unassignMonitoring(targetUser.tenantId,targetUserId);
             try {
                 await this.redisClient.publish('monitor_seat_changes', JSON.stringify({ userId: targetUserId }));
             } catch (error) {

@@ -80,7 +80,8 @@ export class UsersController {
             dto.monitoringEnabled,
             dto.monitoringExtension,
             dto.monitoringSecret,
-            dto.name
+            dto.name,
+            dto.subscriptionId
         );
     }
 

@@ -12,6 +12,7 @@ import { FreeSwitchSyncService } from '../../freeswitch/freeswitch-sync.service'
 import { CreateTFNDto, UpdateTFNDto } from './dto';
 import { LookupRedisService } from '../../redis/lookup-redis.module';
 import { Prisma } from '@prisma/client';
+import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 
 @Injectable()
 export class TFNsService {
@@ -23,36 +24,17 @@ export class TFNsService {
         private lookupRedis: LookupRedisService,
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
+        private readonly subscriptions: SubscriptionsService,
     ) { }
 
     private async assertNumberQuota(tenantId: string, db: PrismaService | Prisma.TransactionClient = this.prisma) {
-        const subscription = await db.subscription.findFirst({
-            where: { tenantId, status: 'ACTIVE' },
-            include: { plan: { select: { maxNumbers: true } } },
-            orderBy: { createdAt: 'desc' },
-        });
-        if (!subscription) {
-            throw new BadRequestException('An active package is required before assigning numbers.');
-        }
-        const [tfns, dids] = await Promise.all([
-            db.tFN.count({ where: { tenantId } }),
-            db.dID.count({ where: { tenantId } }),
-        ]);
-        const used = tfns + dids;
-        const limit = subscription.plan.maxNumbers;
-        if (used >= limit) {
-            throw new BadRequestException(`Numbers quota reached (${used}/${limit}). TFNs and DIDs share this limit.`);
-        }
+        await this.subscriptions.capacity(tenantId, 'numbers');
     }
 
-    private async syncAssetsToSubBilling(tenantId: string, assets: { tfns?: string[], dids?: string[] }) {
+    private async syncAssetsToSubBilling(tenantId: string, assets: { tfns?: string[], dids?: string[] }, selected?: string) {
         try {
-            const subscription = await this.prisma.subscription.findFirst({
-                where: { tenantId, status: 'ACTIVE' },
-                orderBy: { createdAt: 'desc' }
-            });
-
-            const targetId = subscription?.subBillingSubscriptionId || tenantId;
+            const subscription = await this.subscriptions.capacity(tenantId, 'numbers', selected);
+            const targetId = subscription.id;
             const subBilling = this.configService.get<any>('subBilling');
             const apiUrl = subBilling?.apiUrl || process.env.SUB_BILLING_API_URL;
             if (!apiUrl) throw new Error('Sub-billing API URL is not configured');
@@ -71,8 +53,9 @@ export class TFNsService {
         try {
             const subBilling = this.configService.get<any>('subBilling');
             const apiUrl = subBilling?.apiUrl || process.env.SUB_BILLING_API_URL;
-            const subscription = await this.prisma.subscription.findFirst({ where: { tenantId }, orderBy: { createdAt: 'desc' } });
-            const targetId = subscription?.subBillingSubscriptionId || tenantId;
+            const owner = (await this.subscriptions.list(tenantId)).find(s => s.assets.some((a: any) => a.type === 'tfn' && a.value === number && a.status !== 'released'));
+            if (!owner) throw new BadRequestException('Number has no subscription owner; reconcile before removing it');
+            const targetId = owner.id;
             if (!apiUrl) throw new Error('Sub-billing API URL is not configured');
             const response = await lastValueFrom(this.httpService.post(`${apiUrl}/pbx/unassign-assets/${encodeURIComponent(targetId)}`, { tfns: [number] }));
             if (response.data?.success === false) throw new Error(response.data?.error || 'Sub-billing rejected the unassignment');
@@ -111,6 +94,7 @@ export class TFNsService {
      * Create a new TFN
      */
     async create(tenantId: string, dto: CreateTFNDto) {
+        await this.subscriptions.capacity(tenantId, 'numbers', dto.subscriptionId);
         // Enforce system limits
         const limitStr = process.env.SYSTEM_LIMIT_TFNS;
         if (limitStr) {
@@ -137,7 +121,6 @@ export class TFNsService {
         const { tfn, claimed } = await this.prisma.$transaction(async tx => {
             await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`number:${dto.tfnNumber}`}))`;
             await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`numbers:${tenantId}`}))`;
-            await this.assertNumberQuota(tenantId, tx);
             if (await tx.dID.findUnique({ where: { number: dto.tfnNumber } })) {
                 throw new BadRequestException('Number already exists as a DID');
             }
@@ -175,7 +158,7 @@ export class TFNsService {
 
         this.logger.log(`Created TFN ${tfn.number} for tenant ${tenantId}`);
         try {
-            await this.syncAssetsToSubBilling(tenantId, { tfns: [tfn.number] });
+            await this.syncAssetsToSubBilling(tenantId, { tfns: [tfn.number] }, dto.subscriptionId);
         } catch (error) {
             if (claimed) {
                 await this.prisma.tFN.update({ where: { id: tfn.id }, data: {
@@ -199,6 +182,7 @@ export class TFNsService {
      * Update TFN
      */
     async update(tenantId: string, id: string, dto: UpdateTFNDto) {
+        await this.subscriptions.assertEditable('tfn', id);
         // Verify ownership
         const existing = await this.prisma.tFN.findFirst({
             where: { id, tenantId },

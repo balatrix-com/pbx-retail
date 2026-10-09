@@ -1,6 +1,9 @@
 import { IsString, IsNotEmpty, IsOptional, IsIn, Matches } from 'class-validator';
 
 export class CreateDIDDto {
+    @IsOptional()
+    @IsString()
+    subscriptionId?: string;
     @IsString()
     @IsNotEmpty()
     @Matches(/^\+[1-9]\d{6,14}$/, { message: 'DID must be in E.164 format, for example +15551234567' })

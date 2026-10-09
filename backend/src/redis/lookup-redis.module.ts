@@ -158,8 +158,8 @@ export class LookupRedisService {
         this.logger.log('Starting bulk sync for Redis Lookup DB...');
 
         const [dids, tfns, tenantsWithExtensions] = await Promise.all([
-            this.prisma.dID.findMany({ select: { number: true, tenant: { select: { customerCode: true } } } }),
-            this.prisma.tFN.findMany({ select: { number: true, tenant: { select: { customerCode: true } } }, where: { tenantId: { not: null } } }),
+            this.prisma.dID.findMany({ where: { isActive: true }, select: { number: true, tenant: { select: { customerCode: true } } } }),
+            this.prisma.tFN.findMany({ select: { number: true, tenant: { select: { customerCode: true } } }, where: { tenantId: { not: null }, status: 'ASSIGNED' } }),
             this.prisma.tenant.findMany({
                 where: { 
                     extensions: { some: {} },

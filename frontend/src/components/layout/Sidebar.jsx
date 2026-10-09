@@ -86,13 +86,15 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     { name: 'Extension Status', href: '/admin/extension-status', icon: Radio },
                     { name: 'Call Monitoring', href: '/monitoring', icon: Activity },
                     { name: 'Call Records', href: '/cdrs', icon: History },
-                    { name: 'Plans/Add-ons', href: '/super-admin/subscriptions', icon: CreditCard },
+                    { name: 'Subscriptions', href: '/super-admin/subscriptions', icon: CreditCard },
+                    { name: 'Plan Catalog', href: '/super-admin/plans', icon: CreditCard },
                     { name: 'User Management', href: '/super-admin/users', icon: Users },
                     { name: 'System Settings', href: '/settings', icon: Settings },
                 ];
                 break;
             case 'ADMIN':
                 items = [
+                    { name: 'Subscriptions', href: '/subscriptions', icon: CreditCard },
                     { name: 'Dashboard', href: '/dashboard', icon: LayoutGrid },
                     { name: 'Wallet', href: '/wallet', icon: Wallet },
                     { name: 'Phone Numbers', href: '/telecom/phone-numbers', icon: Phone },

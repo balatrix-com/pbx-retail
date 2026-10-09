@@ -32,6 +32,7 @@ const PhoneNumbersPage = () => {
     const [adding, setAdding] = useState(false);
     const [addType, setAddType] = useState('DID');
     const [newNumber, setNewNumber] = useState('');
+    const [subscriptionId, setSubscriptionId] = useState('');
     const [savingNumber, setSavingNumber] = useState(false);
     const [numberError, setNumberError] = useState('');
     const isAdmin = user?.role === 'ADMIN';
@@ -107,7 +108,7 @@ const PhoneNumbersPage = () => {
         setNumberError('');
         setSavingNumber(true);
         try {
-            await telecomService.addNumber(addType, newNumber.trim());
+            await telecomService.addNumber(addType, newNumber.trim(), subscriptionId || undefined);
             setAdding(false);
             setNewNumber('');
             addToast('success', `${addType} added`);
@@ -498,6 +499,8 @@ const PhoneNumbersPage = () => {
                             <option value="DID">Local / DID</option><option value="TFN">Toll-Free / TFN</option>
                         </select>
                         <label className="block text-sm font-semibold text-gray-800 dark:text-white" htmlFor="new-number">Number</label>
+                        <label htmlFor="number-subscription">Owning subscription</label>
+                        <select id="number-subscription" value={subscriptionId} onChange={event => setSubscriptionId(event.target.value)} required className="w-full border rounded-lg p-2 dark:bg-slate-800"><option value="">Select a subscription</option>{quota?.subscriptions?.map(s => <option disabled={s.usage.numbers >= s.entitlement_snapshot.numbers} value={s.id} key={s.id}>{s.plan_name} ({s.subscription_id}) — {Math.max(0, s.entitlement_snapshot.numbers - s.usage.numbers)} numbers available</option>)}</select>
                         <input id="new-number" type="tel" required value={newNumber} onChange={event => setNewNumber(event.target.value)} placeholder="+15551234567" className="min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:bg-slate-800 dark:text-white" />
                         {numberError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{numberError}</p>}
                         <div className="flex justify-end gap-2">

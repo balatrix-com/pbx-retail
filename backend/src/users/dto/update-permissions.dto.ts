@@ -1,6 +1,9 @@
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpdatePermissionsDto {
+    @IsOptional()
+    @IsString()
+    subscriptionId?: string;
     @IsBoolean()
     monitoringEnabled: boolean;
 

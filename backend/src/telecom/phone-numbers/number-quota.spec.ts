@@ -18,9 +18,11 @@ describe('Shared plan number quota', () => {
     const redis: any = { updateNumberLookup: jest.fn() };
     const http: any = {};
     const config: any = {};
+    const subscriptions: any = {capacity:jest.fn()};
 
     beforeEach(() => {
         jest.clearAllMocks();
+        subscriptions.capacity.mockRejectedValue(new BadRequestException('Subscription number capacity is full'));
         tx.subscription.findFirst.mockResolvedValue({ plan: { maxNumbers: 1 } });
         tx.tFN.count.mockResolvedValue(1);
         tx.dID.count.mockResolvedValue(0);
@@ -34,22 +36,23 @@ describe('Shared plan number quota', () => {
     });
 
     it('rejects a DID when a TFN has filled the pooled allowance', async () => {
-        const service = new DIDsService(prisma, sync, redis, http, config);
+        const service = new DIDsService(prisma, sync, redis, http, config, subscriptions);
         await expect(service.create('tenant-1', { didNumber: '+15551234567' })).rejects.toThrow(BadRequestException);
         expect(tx.dID.create).not.toHaveBeenCalled();
     });
 
     it('rejects a TFN when a TFN has filled the pooled allowance', async () => {
-        const service = new TFNsService(prisma, sync, redis, http, config);
+        const service = new TFNsService(prisma, sync, redis, http, config, subscriptions);
         await expect(service.create('tenant-1', { tfnNumber: '+18005551234' })).rejects.toThrow(BadRequestException);
         expect(tx.tFN.create).not.toHaveBeenCalled();
     });
 
     it('claims an available TFN inventory row without creating a duplicate', async () => {
+        subscriptions.capacity.mockResolvedValue({id:'sub'});
         tx.tFN.count.mockResolvedValue(0);
         tx.tFN.findUnique.mockResolvedValue({ id: 'inventory-tfn', number: '+18005551234', tenantId: null, status: 'AVAILABLE' });
         tx.tFN.update.mockResolvedValue({ id: 'inventory-tfn', number: '+18005551234', tenantId: 'tenant-1' });
-        const service = new TFNsService(prisma, sync, redis, http, config);
+        const service = new TFNsService(prisma, sync, redis, http, config, subscriptions);
         jest.spyOn(service as any, 'syncAssetsToSubBilling').mockResolvedValue(undefined);
 
         await service.create('tenant-1', { tfnNumber: '+18005551234' });
@@ -62,11 +65,12 @@ describe('Shared plan number quota', () => {
     });
 
     it('claims an unassigned DID inventory row without creating a duplicate', async () => {
+        subscriptions.capacity.mockResolvedValue({id:'sub'});
         tx.tFN.count.mockResolvedValue(0);
         tx.dID.findFirst.mockResolvedValue(null);
         tx.dID.findUnique.mockResolvedValue({ id: 'inventory-did', number: '+15551234567', tenantId: null });
         tx.dID.update.mockResolvedValue({ id: 'inventory-did', number: '+15551234567', tenantId: 'tenant-1' });
-        const service = new DIDsService(prisma, sync, redis, http, config);
+        const service = new DIDsService(prisma, sync, redis, http, config, subscriptions);
         jest.spyOn(service as any, 'syncAssetsToSubBilling').mockResolvedValue(undefined);
 
         await service.create('tenant-1', { didNumber: '+15551234567' });

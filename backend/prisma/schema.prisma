@@ -97,6 +97,7 @@ model Extension {
   password                   String?
   sequenceId                 Int               @default(0)
   recordingEnabled           Boolean           @default(false)
+  isActive                   Boolean           @default(true)
   tenant                     Tenant            @relation(fields: [tenantId], references: [id])
   ringGroupMembers           RingGroupMember[]
 

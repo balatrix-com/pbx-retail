@@ -65,7 +65,7 @@ function ExtensionsPage() {
         setShowMonitoringModal(true);
     };
 
-    const handleUpdateMonitoring = async ({ monitoringExtension, monitoringSecret, name, userId: selectedUserId }) => {
+    const handleUpdateMonitoring = async ({ monitoringExtension, monitoringSecret, name, userId: selectedUserId, subscriptionId }) => {
         const userId = selectedUserId;
         if (!userId) return;
         try {
@@ -77,7 +77,7 @@ function ExtensionsPage() {
                 });
             } else {
                 await api.patch(`/users/${userId}/permissions`, {
-                    monitoringEnabled: true, monitoringExtension,
+                    monitoringEnabled: true, monitoringExtension, subscriptionId,
                     ...(monitoringSecret ? { monitoringSecret } : {}), name,
                 });
             }
@@ -161,7 +161,7 @@ function ExtensionsPage() {
                 <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <p className="font-bold text-indigo-900">Monitoring Extensions: {monitoringSeats.used} / {monitoringSeats.limit}</p>
-                        <p className="text-sm text-indigo-800">{monitoringSeats.planLimit || 0} plan seats + {monitoringSeats.addonUnits || 0} purchased add-on seats.</p>
+                        <p className="text-sm text-indigo-800">{monitoringSeats.planLimit || 0} base-plan seats + {monitoringSeats.addonUnits || 0} capacity-plan seats.</p>
                         {!monitoringSeats.hasActivePlan && <p className="text-sm text-indigo-800">An active plan is required before assigning seats.</p>}
                         {monitoringSeats.remaining > 0 && !hasEligibleMonitoringUser && (
                             <p className="mt-1 text-sm text-indigo-900">
@@ -361,6 +361,7 @@ function ExtensionsPage() {
                     loading={savingMonitoring}
                     users={monitoringSeats.users.filter(user => !user.monitoringEnabled || user.id === selectedMonitoringUser?.id)}
                     customerCode={monitoringSeats.customerCode || ''}
+                    subscriptions={monitoringSeats.subscriptions || []}
                     initialUserId={selectedMonitoringUser?.id || ''}
                     initialExtension={selectedMonitoringUser?.monitoringExtension || ''}
                     initialName={selectedMonitoringUser?.name || ''}
