@@ -22,6 +22,7 @@ function ExtensionsPage() {
     const { role, user: currentUser, refreshUser } = useAuth();
     const canManageExtensions = role === 'SUPER_ADMIN';
     const canManageMonitoring = role === 'ADMIN';
+    const hasEligibleMonitoringUser = monitoringSeats.users.some(user => !user.monitoringEnabled);
 
     useEffect(() => {
         fetchData();
@@ -162,12 +163,26 @@ function ExtensionsPage() {
                         <p className="font-bold text-indigo-900">Monitoring Extensions: {monitoringSeats.used} / {monitoringSeats.limit}</p>
                         <p className="text-sm text-indigo-800">{monitoringSeats.planLimit || 0} plan seats + {monitoringSeats.addonUnits || 0} purchased add-on seats.</p>
                         {!monitoringSeats.hasActivePlan && <p className="text-sm text-indigo-800">An active plan is required before assigning seats.</p>}
+                        {monitoringSeats.remaining > 0 && !hasEligibleMonitoringUser && (
+                            <p className="mt-1 text-sm text-indigo-900">
+                                {monitoringSeats.pendingStaffInvites > 0
+                                    ? 'A seat is available. A staff invitation is pending; assign the seat after they accept it.'
+                                    : 'A seat is available, but every active Admin or Support user already has one. Invite another staff member, then assign the seat after they accept.'}
+                            </p>
+                        )}
                     </div>
-                    <button type="button" onClick={() => { setSelectedMonitoringUser(null); setShowMonitoringModal(true); }}
-                        disabled={!monitoringSeats.remaining || !monitoringSeats.users.some(user => !user.monitoringEnabled)}
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
-                        <Plus className="h-4 w-4" /> Add Monitoring Extension
-                    </button>
+                    {monitoringSeats.remaining > 0 && !hasEligibleMonitoringUser ? (
+                        <button type="button" onClick={() => navigate('/users')}
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <Plus className="h-4 w-4" /> {monitoringSeats.pendingStaffInvites > 0 ? 'View Staff Invitations' : 'Invite Staff to Use Seat'}
+                        </button>
+                    ) : (
+                        <button type="button" onClick={() => { setSelectedMonitoringUser(null); setShowMonitoringModal(true); }}
+                            disabled={!monitoringSeats.remaining}
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+                            <Plus className="h-4 w-4" /> Add Monitoring Extension
+                        </button>
+                    )}
                 </div>
             )}
 

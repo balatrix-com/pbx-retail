@@ -232,18 +232,6 @@ export class UsersService {
             throw new BadRequestException('Admin must belong to a tenant');
         }
 
-        // Restriction: Only 1 support user per tenant
-        const existingSupport = await this.prisma.user.findFirst({
-            where: {
-                tenantId,
-                role: Role.SUPPORT
-            }
-        });
-
-        if (existingSupport) {
-            throw new BadRequestException('This tenant already has a support user. Only one support user is allowed per tenant.');
-        }
-
         // Create support user
         const supportUser = await this.prisma.user.create({
             data: {
@@ -558,7 +546,7 @@ export class UsersService {
     async getMonitoringSeats(actorId: string) {
         const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { tenantId: true, role: true } });
         if (actor?.role !== Role.ADMIN || !actor.tenantId) throw new ForbiddenException('Admin access required');
-        const [subscription, users, used, tenant] = await Promise.all([
+        const [subscription, users, used, tenant, pendingStaffInvites] = await Promise.all([
             this.prisma.subscription.findFirst({
                 where: { tenantId: actor.tenantId, status: 'ACTIVE' },
                 include: { plan: { select: { maxMonitoringExtensions: true } } },
@@ -571,11 +559,12 @@ export class UsersService {
             }),
             this.prisma.user.count({ where: { tenantId: actor.tenantId, monitoringEnabled: true } }),
             this.prisma.tenant.findUnique({ where: { id: actor.tenantId }, select: { customerCode: true } }),
+            this.prisma.user.count({ where: { tenantId: actor.tenantId, role: Role.SUPPORT, status: UserStatus.INVITED } }),
         ]);
         const planLimit = subscription?.plan.maxMonitoringExtensions ?? 0;
         const addonUnits = subscription ? await this.monitoringAddonUnits(actor.tenantId) : 0;
         const limit = planLimit + addonUnits;
-        return { users, used, limit, planLimit, addonUnits, customerCode: tenant?.customerCode,
+        return { users, used, limit, planLimit, addonUnits, customerCode: tenant?.customerCode, pendingStaffInvites,
             remaining: Math.max(0, limit - used), hasActivePlan: !!subscription };
     }
 
@@ -729,18 +718,6 @@ export class UsersService {
 
         if (existingUser) {
             throw new BadRequestException('User already exists');
-        }
-
-        // Restriction: Only 1 support user per tenant
-        const existingSupport = await this.prisma.user.findFirst({
-            where: {
-                tenantId: admin.tenantId,
-                role: Role.SUPPORT
-            }
-        });
-
-        if (existingSupport) {
-            throw new BadRequestException('This tenant already has a support user. Only one support user is allowed per tenant.');
         }
 
         // Generate invite token

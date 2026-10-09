@@ -31,7 +31,7 @@ describe('UsersService monitoring entitlements and reassignment', () => {
     });
 
     it('adds active purchased units to the plan monitoring limit', async () => {
-        expect(await service.getMonitoringSeats('admin')).toMatchObject({ used: 1, planLimit: 1, addonUnits: 2, limit: 3, remaining: 2, customerCode: 'U1002' });
+        expect(await service.getMonitoringSeats('admin')).toMatchObject({ used: 1, planLimit: 1, addonUnits: 2, limit: 3, remaining: 2, customerCode: 'U1002', pendingStaffInvites: 1 });
     });
 
     it('transfers one seat and keeps its SIP password when no replacement is supplied', async () => {

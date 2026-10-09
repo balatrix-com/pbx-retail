@@ -66,7 +66,6 @@ describe('UsersService - Staff Invite Lifecycle & Auto-Flush', () => {
         it('should create an invited user with a secure invite token and 7-day expiry', async () => {
             prisma.user.findUnique.mockResolvedValueOnce(mockAdmin); // admin lookup
             prisma.user.findUnique.mockResolvedValueOnce(null); // existing user check
-            prisma.user.findFirst.mockResolvedValueOnce(null); // existing support check
 
             const createdUser = {
                 id: 'staff-uuid-101',
@@ -89,6 +88,21 @@ describe('UsersService - Staff Invite Lifecycle & Auto-Flush', () => {
             expect(result.inviteLink).toContain('/invite/accept?token=');
             expect(mailService.sendSupportInvitationEmail).toHaveBeenCalled();
         });
+    });
+
+    it('allows another Support user so purchased monitoring seats can be assigned', async () => {
+        prisma.user.findUnique.mockResolvedValueOnce(mockAdmin).mockResolvedValueOnce(null);
+        prisma.user.findFirst.mockResolvedValueOnce({ id: 'existing-support', role: Role.SUPPORT });
+        prisma.user.create.mockResolvedValueOnce({
+            id: 'second-support', email: 'second@balatrix.com', name: 'Second Staff',
+            role: Role.SUPPORT, status: UserStatus.INVITED,
+        });
+
+        const result = await service.inviteSupportUser('admin-uuid-1', {
+            email: 'second@balatrix.com', name: 'Second Staff',
+        });
+        expect(result.id).toBe('second-support');
+        expect(prisma.user.findFirst).not.toHaveBeenCalled();
     });
 
     describe('2. getInviteLink (SuperAdmin / Admin API)', () => {
