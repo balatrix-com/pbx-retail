@@ -7,7 +7,6 @@ import {
     Body,
     Param,
     UseGuards,
-    Query,
 } from '@nestjs/common';
 import { DIDsService } from './dids.service';
 import { CreateDIDDto, UpdateDIDDto } from './dto';
@@ -27,12 +26,9 @@ export class DIDsController {
      * List all DIDs for tenant
      */
     @Get()
-    @Roles(Role.ADMIN, Role.SUPPORT, Role.SUPER_ADMIN)
-    findAll(@GetUser() user: any, @Query('tenantId') tenantId?: string) {
-        const targetTenantId = (user.role === Role.SUPER_ADMIN || user.role === Role.SUPPORT) && tenantId
-            ? tenantId
-            : user.tenantId;
-        return this.didsService.findAll(targetTenantId);
+    @Roles(Role.ADMIN, Role.SUPPORT)
+    findAll(@GetUser() user: any) {
+        return this.didsService.findAll(user.tenantId);
     }
 
     /**
@@ -46,37 +42,13 @@ export class DIDsController {
     }
 
     /**
-     * GET /telecom/dids/available
-     * Get unassigned DIDs
-     */
-    @Get('available')
-    @Roles(Role.SUPER_ADMIN)
-    findAvailable() {
-        return this.didsService.findAvailable();
-    }
-
-    /**
-     * POST /telecom/dids/:id/assign
-     * Assign DID to tenant
-     */
-    @Post(':id/assign')
-    @Roles(Role.SUPER_ADMIN)
-    assign(@Param('id') id: string, @Body('tenantId') tenantId: string) {
-        return this.didsService.assign(id, tenantId);
-    }
-
-    /**
      * POST /telecom/dids
      * Create new DID
      */
     @Post()
-    @Roles(Role.SUPER_ADMIN)
-    create(@GetUser() user: any, @Body() dto: CreateDIDDto & { targetTenantId?: string }) {
-        const tenantId = (user.role === Role.SUPER_ADMIN) && dto.targetTenantId
-            ? dto.targetTenantId
-            : user.tenantId;
-
-        return this.didsService.create(tenantId, dto);
+    @Roles(Role.ADMIN)
+    create(@GetUser() user: any, @Body() dto: CreateDIDDto) {
+        return this.didsService.create(user.tenantId, dto);
     }
 
     /**

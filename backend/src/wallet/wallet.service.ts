@@ -9,6 +9,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
 import { LookupRedisService } from '../redis/lookup-redis.module';
+import { mirrorSubBillingPlan } from '../plans/plan-mirror';
 
 @Injectable()
 export class WalletService {
@@ -209,6 +210,21 @@ export class WalletService {
     async switchSubscriptionPlan(tenantId: string, planId: string, immediate: boolean = true) {
         const customerId = await this.getSubBillingCustomerId(tenantId);
         try {
+            const planResponse = await firstValueFrom(this.httpService.get(`${this.subBillingUrl}/plans/${encodeURIComponent(planId)}`));
+            const remotePlan = planResponse.data?.data || planResponse.data;
+            if (!remotePlan || remotePlan.plan_id !== planId) {
+                throw new BadRequestException(`Sub-billing plan ${planId} was not found`);
+            }
+            const [tfns, dids, monitoringSeats] = await Promise.all([
+                this.prisma.tFN.count({ where: { tenantId } }),
+                this.prisma.dID.count({ where: { tenantId } }),
+                this.prisma.user.count({ where: { tenantId, monitoringEnabled: true } }),
+            ]);
+            if (tfns + dids > Number(remotePlan.numbers) || monitoringSeats > Number(remotePlan.monitoring_extensions)) {
+                throw new BadRequestException('Remove excess numbers or monitoring seats before switching to this plan');
+            }
+            const localPlan = await mirrorSubBillingPlan(this.prisma, remotePlan);
+
             this.logger.log(`Switching subscription plan in sub-billing for customer ${customerId} (tenant ${tenantId}) to ${planId}`);
             const response = await firstValueFrom(
                 this.httpService.post(`${this.subBillingUrl}/subscriptions/switch-plan`, {
@@ -222,37 +238,11 @@ export class WalletService {
             endDate.setFullYear(endDate.getFullYear() + 1);
 
             const subBillingData = response.data?.data;
+            if (response.data?.success === false) throw new BadRequestException(response.data.message || 'Sub-billing rejected the plan switch');
+            if (subBillingData?.scheduled_switch_at) return response.data;
             const subBillingSubId = subBillingData?.subscription_id || subBillingData?.id;
-
-            // Find matching local plan in Prisma DB (for foreign key relation)
-            let localPlan = await this.prisma.plan.findFirst({
-                where: { OR: [{ id: planId }, { name: { equals: planId, mode: 'insensitive' } }] }
-            });
-            if (!localPlan) {
-                localPlan = await this.prisma.plan.findFirst();
-            }
-            const localPlanIdToUse = localPlan ? localPlan.id : planId;
-
-            // Fetch dynamic plan limits from sub-billing system
-            let allowedExtensions = 5;
-            let freeMins = localPlan?.freeMinutes || 500;
-            try {
-                const planRes = await firstValueFrom(
-                    this.httpService.get(`${this.subBillingUrl}/plans/${planId}`)
-                );
-                const subPlan = planRes.data?.data || planRes.data;
-                if (subPlan) {
-                    if (subPlan.extensions !== undefined && subPlan.extensions !== null) {
-                        allowedExtensions = Number(subPlan.extensions);
-                    }
-                    if (subPlan.free_mins !== undefined && subPlan.free_mins !== null) {
-                        freeMins = Number(subPlan.free_mins);
-                    }
-                }
-            } catch (err) {
-                this.logger.warn(`Could not fetch plan limits from sub-billing for ${planId}: ${err.message}`);
-                allowedExtensions = localPlan?.maxExtensions || 5;
-            }
+            const allowedExtensions = localPlan.maxExtensions;
+            const freeMins = 0;
 
             const existingSub = await this.prisma.subscription.findFirst({
                 where: { tenantId }
@@ -262,7 +252,7 @@ export class WalletService {
                 await this.prisma.subscription.update({
                     where: { id: existingSub.id },
                     data: {
-                        planId: localPlanIdToUse,
+                        planId: localPlan.id,
                         subBillingSubscriptionId: subBillingSubId || existingSub.subBillingSubscriptionId,
                         status: 'ACTIVE',
                         remainingFreeMinutes: freeMins,
@@ -273,7 +263,7 @@ export class WalletService {
                 await this.prisma.subscription.create({
                     data: {
                         tenantId,
-                        planId: localPlanIdToUse,
+                        planId: localPlan.id,
                         subBillingSubscriptionId: subBillingSubId || undefined,
                         status: 'ACTIVE',
                         startDate: new Date(),

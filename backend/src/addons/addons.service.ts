@@ -36,28 +36,6 @@ export class AddonsService {
             description: 'Add 1 extra SIP extension with full PBX routing'
         },
         {
-            addon_id: 'addon_tfn_1',
-            name: '1 Extra Toll-Free Number (TFN)',
-            resource_type: 'tfn',
-            units_count: 1,
-            unit_price: 5.00,
-            price: 5.00,
-            currency: 'USD',
-            is_active: true,
-            description: 'Reserve 1 additional Toll-Free phone number'
-        },
-        {
-            addon_id: 'addon_did_1',
-            name: '1 Direct Inward Dialing (DID)',
-            resource_type: 'did',
-            units_count: 1,
-            unit_price: 3.00,
-            price: 3.00,
-            currency: 'USD',
-            is_active: true,
-            description: 'Dedicated local phone number for direct inward calls'
-        },
-        {
             addon_id: 'addon_recording_100gb',
             name: '100 GB Call Recording Storage',
             resource_type: 'storage',
@@ -67,17 +45,6 @@ export class AddonsService {
             currency: 'USD',
             is_active: true,
             description: 'Secure cloud storage for call recordings and voicemail'
-        },
-        {
-            addon_id: 'addon_monitoring_user',
-            name: 'Call Monitoring User Seat',
-            resource_type: 'mon',
-            units_count: 1,
-            unit_price: 15.00,
-            price: 15.00,
-            currency: 'USD',
-            is_active: true,
-            description: 'Real-time eavesdrop, whisper coaching, and supervisor barge'
         }
     ];
 
@@ -90,6 +57,12 @@ export class AddonsService {
         this.subBillingUrl = this.configService.get<string>('SUB_BILLING_API_URL') || 'http://localhost:5005/api';
     }
 
+    private isPlanLimitedAddon(addonId: string, resourceType?: string) {
+        const type = String(resourceType || '').toLowerCase();
+        return ['tfn', 'did', 'number', 'numbers', 'mon', 'monitoring'].includes(type) ||
+            /(^|[_-])(tfn|did|toll|number|monitor)([_-]|$)/i.test(addonId);
+    }
+
     async getCatalog(): Promise<AddonCatalogItem[]> {
         try {
             this.logger.log(`Fetching addon catalog from sub-billing: ${this.subBillingUrl}/addons/catalog`);
@@ -98,7 +71,7 @@ export class AddonsService {
             );
             const data = response.data?.data || response.data;
             if (Array.isArray(data) && data.length > 0) {
-                return data.map(item => ({
+                return data.filter(item => !this.isPlanLimitedAddon(item.addon_id, item.resource_type)).map(item => ({
                     addon_id: item.addon_id,
                     name: item.name,
                     resource_type: item.resource_type,
@@ -170,6 +143,7 @@ export class AddonsService {
 
     async getQuote(tenantId: string, addonId: string, quantity: number = 1) {
         if (!tenantId) throw new BadRequestException('Tenant ID is required');
+        if (this.isPlanLimitedAddon(addonId)) throw new BadRequestException('Numbers and monitoring seats are controlled by the plan');
         const qty = Math.max(1, Number(quantity) || 1);
 
         const customerId = await this.walletService.getSubBillingCustomerId(tenantId).catch(() => tenantId);
@@ -184,6 +158,7 @@ export class AddonsService {
                 })
             );
             if (response.data?.success && response.data?.data) {
+                if (this.isPlanLimitedAddon(addonId, response.data.data.resource_type)) throw new BadRequestException('Numbers and monitoring seats are controlled by the plan');
                 return response.data.data;
             }
         } catch (err: any) {
@@ -246,6 +221,7 @@ export class AddonsService {
     }
 
     async purchaseAddon(tenantId: string, addonId: string, quantity: number = 1) {
+        if (this.isPlanLimitedAddon(addonId)) throw new BadRequestException('Numbers and monitoring seats are controlled by the plan');
         const quote = await this.getQuote(tenantId, addonId, quantity);
         if (!quote.sufficient_funds) {
             throw new BadRequestException(

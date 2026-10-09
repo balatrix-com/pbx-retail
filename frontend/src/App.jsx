@@ -37,7 +37,6 @@ import AllUsersPage from './pages/admin/AllUsersPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
 import TenantsPage from './pages/admin/Tenants/TenantsPage';
 import RateCardsPage from './pages/admin/RateCardsPage';
-import NumbersManagement from './pages/admin/NumbersManagement';
 import PackagesPage from './pages/admin/PackagesPage';
 import CarriersGatewaysPage from './pages/admin/CarriersGatewaysPage';
 import BrandingSettingsPage from './pages/admin/BrandingSettingsPage';
@@ -171,7 +170,6 @@ function App() {
                                                 <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
                                                 <Route path="/super-admin/users" element={<SuperAdminUsers />} />
                                                 <Route path="/super-admin/rate-cards" element={<RateCardsPage />} />
-                                                <Route path="/super-admin/numbers" element={<NumbersManagement />} />
                                                 <Route path="/super-admin/packages" element={<PackagesPage />} />
                                                 <Route path="/super-admin/subscriptions" element={<PlansPage />} />
                                                 <Route path="/super-admin/plans" element={<PlansPage />} />

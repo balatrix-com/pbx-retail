@@ -22,7 +22,13 @@ describe('WalletService (switchSubscriptionPlan & Kamailio Sync)', () => {
                 findUnique: jest.fn().mockResolvedValue({ id: 'U1010', customerCode: '1010', subBillingCustomerId: 'U1010' }),
             },
             plan: {
-                findFirst: jest.fn().mockResolvedValue({ id: 'plan-starter-uuid', name: 'Starter' }),
+                findUnique: jest.fn().mockResolvedValue({
+                    id: 'plan-starter-uuid', name: 'Starter', subBillingPlanId: 'tier_1_starter',
+                    maxNumbers: 2, maxMonitoringExtensions: 1,
+                }),
+                update: jest.fn().mockImplementation(({ data }) => Promise.resolve({
+                    id: 'plan-starter-uuid', maxExtensions: 5, ...data,
+                })),
             },
             subscription: {
                 findFirst: jest.fn().mockResolvedValue(null),
@@ -33,6 +39,9 @@ describe('WalletService (switchSubscriptionPlan & Kamailio Sync)', () => {
                 findUnique: jest.fn().mockResolvedValue(null),
                 create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: `ext-uuid-${data.extensionNumber}`, ...data })),
             },
+            tFN: { count: jest.fn().mockResolvedValue(0) },
+            dID: { count: jest.fn().mockResolvedValue(0) },
+            user: { count: jest.fn().mockResolvedValue(0) },
         };
 
         freeSwitchSync = {
@@ -52,7 +61,7 @@ describe('WalletService (switchSubscriptionPlan & Kamailio Sync)', () => {
                             subscription_id: 'sub-uuid-1',
                             plan_id: 'tier_1_starter',
                             extensions: 5,
-                            free_minutes: 100
+                            free_minutes: 0
                         }
                     }
                 })
@@ -63,8 +72,13 @@ describe('WalletService (switchSubscriptionPlan & Kamailio Sync)', () => {
                         success: true,
                         data: {
                             plan_id: 'tier_1_starter',
+                            name: 'Starter',
+                            numbers: 2,
+                            monitoring_extensions: 1,
+                            amount: 20,
+                            validity_months: 1,
                             extensions: 5,
-                            free_minutes: 100
+                            free_minutes: 0
                         }
                     }
                 })

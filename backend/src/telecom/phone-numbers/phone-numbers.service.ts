@@ -3,13 +3,30 @@ import { DIDsService } from '../dids/dids.service';
 import { TFNsService } from '../tfns/tfns.service';
 import { PhoneNumberResponseDto } from './dto/phone-number-response.dto';
 import { UpdatePhoneNumberDto } from './dto/update-phone-number.dto';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class PhoneNumbersService {
     constructor(
         private readonly didsService: DIDsService,
         private readonly tfnsService: TFNsService,
+        private readonly prisma: PrismaService,
     ) { }
+
+    async getQuota(tenantId: string) {
+        const subscription = await this.prisma.subscription.findFirst({
+            where: { tenantId, status: 'ACTIVE' },
+            include: { plan: { select: { maxNumbers: true } } },
+            orderBy: { createdAt: 'desc' },
+        });
+        const [tfns, dids] = await Promise.all([
+            this.prisma.tFN.count({ where: { tenantId } }),
+            this.prisma.dID.count({ where: { tenantId } }),
+        ]);
+        const used = tfns + dids;
+        const limit = subscription?.plan.maxNumbers ?? 0;
+        return { used, limit, remaining: Math.max(0, limit - used), hasActivePlan: !!subscription };
+    }
 
     async findAll(tenantId: string): Promise<PhoneNumberResponseDto[]> {
         const [dids, tfns] = await Promise.all([
@@ -39,7 +56,7 @@ export class PhoneNumbersService {
                 id: tfn.id,
                 number: tfn.number,
                 type: 'TFN',
-                status: tfn.status,
+                status: tfn.status === 'ASSIGNED' ? 'ACTIVE' : tfn.status,
                 monthlyFee: tfn.price ? Number(tfn.price) : 0,
                 routeType: tfn.routeType,
                 routeTargetId: tfn.routeTargetId,
@@ -86,7 +103,7 @@ export class PhoneNumbersService {
                 id: result.id,
                 number: result.number,
                 type: 'TFN',
-                status: result.status,
+                status: result.status === 'ASSIGNED' ? 'ACTIVE' : result.status,
                 monthlyFee: result.price ? Number(result.price) : 0,
                 routeType: result.routeType,
                 routeTargetId: result.routeTargetId,

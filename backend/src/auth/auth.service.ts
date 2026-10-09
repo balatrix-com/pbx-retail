@@ -114,7 +114,7 @@ export class AuthService {
 
     async login(user: User) {
         const userVar = user as any;
-        const tokens = await this.getTokens(userVar.id, userVar.email, userVar.role, userVar.tenantId, userVar.monitoringEnabled);
+        const tokens = await this.getTokens(userVar.id, userVar.email, userVar.role, userVar.tenantId, userVar.forcePasswordChange, userVar.monitoringEnabled);
         await this.updateRefreshToken(userVar.id, tokens.refreshToken);
 
         const fullUser = await this.prisma.user.findUnique({
@@ -244,7 +244,7 @@ export class AuthService {
         // Get enforcement state
         const enforcement = await this.enforcementService.getUserEnforcementState(userId);
 
-        const { password, refreshToken, partnerId, partner: userPartner, ...result } = user;
+        const { password, refreshToken, monitoringSecret, partnerId, partner: userPartner, ...result } = user;
 
         let tenantFeatures = null;
         if (user.tenant) {
@@ -258,7 +258,6 @@ export class AuthService {
                 didForwardEnabled: true,
                 didForwardLimit: 10,
                 monitorEnabled: true,
-                monitorLimit: 10,
             };
         }
 

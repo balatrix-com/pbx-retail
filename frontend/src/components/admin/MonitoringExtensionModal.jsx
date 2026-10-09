@@ -86,8 +86,8 @@ const MonitoringExtensionModal = ({
             return;
         }
 
-        if (!extension || !secret) {
-            setError('Extension and Secret are required');
+        if (!extension || (!secret && !isEditing)) {
+            setError('Extension and SIP password are required');
             return;
         }
 
@@ -187,13 +187,14 @@ const MonitoringExtensionModal = ({
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">SIP Password</label>
                         <input
-                            type="text"
+                            type="password"
                             className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-primary-500 outline-none"
                             value={secret}
                             onChange={e => setSecret(e.target.value)}
                             placeholder="Strong password"
-                            required
+                            required={!isEditing}
                         />
+                        {isEditing && <p className="mt-1 text-xs text-gray-500">Leave blank to keep the current SIP password.</p>}
                     </div>
 
                     <div className="flex justify-end gap-2 mt-6">

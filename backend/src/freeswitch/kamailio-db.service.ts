@@ -105,9 +105,10 @@ export class KamailioDBService {
      * Sync Subscriber to Kamailio
      * Calculates HA1/HA1B and upserts into subscriber table
      */
-    async syncSubscriber(username: string, passwordPlain: string): Promise<void> {
+    async syncSubscriber(username: string, passwordPlain: string, strict = false): Promise<void> {
         if (!this.realm) {
             this.logger.error('Cannot sync subscriber: SIP_REALM is not defined in environment variables.');
+            if (strict) throw new Error('SIP_REALM is not configured');
             return;
         }
 
@@ -134,15 +135,17 @@ export class KamailioDBService {
             this.logger.log(`Synced Kamailio subscriber: ${username}@${this.realm}`);
         } catch (error) {
             this.logger.error(`Failed to sync Kamailio subscriber ${username}:`, error);
+            if (strict) throw error;
         }
     }
 
     /**
      * Delete Subscriber from Kamailio
      */
-    async deleteSubscriber(username: string): Promise<void> {
+    async deleteSubscriber(username: string, strict = false): Promise<void> {
         if (!this.realm) {
             this.logger.error('Cannot delete subscriber: SIP_REALM is not defined in environment variables.');
+            if (strict) throw new Error('SIP_REALM is not configured');
             return;
         }
 
@@ -151,6 +154,7 @@ export class KamailioDBService {
             this.logger.log(`Deleted Kamailio subscriber: ${username}@${this.realm}`);
         } catch (error) {
             this.logger.error(`Failed to delete Kamailio subscriber ${username}:`, error);
+            if (strict) throw error;
         }
     }
 

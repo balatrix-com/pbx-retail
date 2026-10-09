@@ -86,7 +86,6 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     { name: 'Extension Status', href: '/admin/extension-status', icon: Radio },
                     { name: 'Call Monitoring', href: '/monitoring', icon: Activity },
                     { name: 'Call Records', href: '/cdrs', icon: History },
-                    { name: 'Manage Numbers', href: '/super-admin/numbers', icon: Phone },
                     { name: 'Plans/Add-ons', href: '/super-admin/subscriptions', icon: CreditCard },
                     { name: 'User Management', href: '/super-admin/users', icon: Users },
                     { name: 'System Settings', href: '/settings', icon: Settings },

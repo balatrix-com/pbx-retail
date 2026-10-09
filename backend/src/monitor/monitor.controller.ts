@@ -4,12 +4,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { FeatureGuard } from '../auth/guards/feature.guard';
 import { RequireFeature } from '../auth/decorators/feature.decorator';
+import { MonitoringAccessService } from './monitoring-access.service';
 
 @Controller('monitor')
 @UseGuards(JwtAuthGuard, RolesGuard, FeatureGuard)
 @RequireFeature('monitor')
 export class MonitorController {
-    constructor(private readonly monitorService: MonitorService) { }
+    constructor(private readonly monitorService: MonitorService, private readonly monitoringAccess: MonitoringAccessService) { }
 
     @Get('active-calls')
     @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
@@ -19,9 +20,7 @@ export class MonitorController {
         const user = req.user;
 
         // Check permissions
-        if (user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && !user.monitoringEnabled) {
-            throw new ForbiddenException('Monitoring access restrictions apply');
-        }
+        await this.monitoringAccess.getAssignedExtension(user);
 
         // Standard tenant isolation: non-SUPER_ADMIN users cannot query other tenants or 'all'
         if (user.role !== 'SUPER_ADMIN') {
@@ -41,11 +40,9 @@ export class MonitorController {
     async initiateBarge(@Request() req: any, @Body() body: { uuid_in: string; uuid_out: string; mode: 'barge' | 'listen' | 'whisper', adminExtension?: string }) {
         const user = req.user;
 
-        if (user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && !user.monitoringEnabled) {
-            throw new ForbiddenException('Monitoring access restricted');
-        }
+        const assignedExtension = await this.monitoringAccess.getAssignedExtension(user);
 
-        let adminExtension = body.adminExtension;
+        let adminExtension = assignedExtension;
         if (user.role === 'SUPER_ADMIN') {
             adminExtension = '999001';
             if (body.mode !== 'listen') {

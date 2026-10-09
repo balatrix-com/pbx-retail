@@ -52,8 +52,14 @@ export class UsersController {
         return this.usersService.updateUserStatus(user.id, targetUserId, dto.status);
     }
 
+    @Get('monitoring/seats')
+    @Roles(Role.ADMIN)
+    getMonitoringSeats(@GetUser() user: User) {
+        return this.usersService.getMonitoringSeats(user.id);
+    }
+
     @Patch(':id/permissions')
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+    @Roles(Role.ADMIN)
     @Audit('USER_ROLE_UPDATED', 'USER_MANAGEMENT')
     updatePermissions(
         @GetUser() user: User,

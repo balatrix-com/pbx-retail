@@ -6,6 +6,10 @@ export const telecomService = {
         const response = await api.get('/telecom/phone-numbers', { params });
         return response.data;
     },
+    getNumberQuota: async () => (await api.get('/telecom/phone-numbers/quota')).data,
+    addNumber: async (type, number) => (await api.post(type === 'DID' ? '/telecom/dids' : '/telecom/tfns',
+        type === 'DID' ? { didNumber: number } : { tfnNumber: number })).data,
+    removeNumber: async (type, id) => (await api.delete(`/telecom/${type === 'DID' ? 'dids' : 'tfns'}/${id}`)).data,
     getPhoneNumber: async (id) => {
         const response = await api.get(`/telecom/phone-numbers/${id}`);
         return response.data;
@@ -21,11 +25,6 @@ export const telecomService = {
         return response.data;
     },
 
-    purchaseTFN: async (number) => {
-        const response = await api.post('/telecom/tfns/purchase', { number });
-        return response.data;
-    },
-
     getMyTfns: async () => {
         const response = await api.get('/telecom/tfns/mine');
         return response.data;
@@ -36,15 +35,6 @@ export const telecomService = {
         const response = await api.get('/telecom/dids');
         return response.data;
     },
-    getAvailableDids: async () => {
-        const response = await api.get('/telecom/dids/available');
-        return response.data;
-    },
-    assignDID: async (id, tenantId) => {
-        const response = await api.post(`/telecom/dids/${id}/assign`, { tenantId });
-        return response.data;
-    },
-
     // Extensions
     listExtensions: async () => {
         const response = await api.get('/telecom/extensions');
@@ -59,17 +49,6 @@ export const telecomService = {
     getExtensionStatus: async (tenantId) => {
         const response = await api.get('/telecom/extensions/status', { params: { tenantId } });
         return response.data;
-    },
-
-    // Monitoring
-    getMonitoringStatus: async () => {
-        const response = await api.get('/telecom/monitoring/live');
-        return response.data;
-    },
-
-    purchaseMonitoring: async () => {
-        const response = await api.post('/telecom/monitoring/purchase', {});
-        return response.data; // should return updated status
     },
 
     // Usage/CDRs (Using UsageService endpoints)
@@ -174,39 +153,6 @@ export const telecomService = {
         return response.data;
     },
 
-    // Admin Number Management
-    adminGetAllNumbers: async () => {
-        const response = await api.get('/admin/numbers');
-        return response.data;
-    },
-    adminAddTFN: async (data) => {
-        const response = await api.post('/admin/numbers/tfn', data);
-        return response.data;
-    },
-    adminAddTFNBulk: async (data) => {
-        const response = await api.post('/admin/numbers/tfn/bulk', data);
-        return response.data;
-    },
-    adminAddDID: async (data) => {
-        const response = await api.post('/admin/numbers/did', data);
-        return response.data;
-    },
-    adminAddDIDBulk: async (data) => {
-        const response = await api.post('/admin/numbers/did/bulk', data);
-        return response.data;
-    },
-    adminAssignNumber: async (data) => {
-        const response = await api.post('/admin/numbers/assign', data);
-        return response.data;
-    },
-    adminUnassignNumber: async (data) => {
-        const response = await api.post('/admin/numbers/unassign', data);
-        return response.data;
-    },
-    adminDeleteNumber: async (data) => {
-        const response = await api.post('/admin/numbers/delete', data);
-        return response.data;
-    },
 };
 
 export default telecomService;

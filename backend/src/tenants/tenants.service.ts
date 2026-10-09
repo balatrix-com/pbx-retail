@@ -232,7 +232,6 @@ export class TenantsService {
             didForwardEnabled: true,
             didForwardLimit: 10,
             monitorEnabled: true,
-            monitorLimit: 10
         };
 
         // Override local wallet with real-time balance and credit limit from billing system
@@ -412,7 +411,6 @@ export class TenantsService {
         didForwardEnabled?: boolean;
         didForwardLimit?: number;
         monitorEnabled?: boolean;
-        monitorLimit?: number;
         recordingAllowed?: boolean;
     }) {
         const tenant = await this.prisma.tenant.findUnique({
@@ -435,7 +433,6 @@ export class TenantsService {
                 didForwardEnabled: dto.didForwardEnabled ?? true,
                 didForwardLimit: dto.didForwardLimit ?? 10,
                 monitorEnabled: dto.monitorEnabled ?? true,
-                monitorLimit: dto.monitorLimit ?? 10,
                 recordingAllowed: dto.recordingAllowed ?? false,
                 recordingEnabled: false,
             },
@@ -449,7 +446,6 @@ export class TenantsService {
                 didForwardEnabled: dto.didForwardEnabled,
                 didForwardLimit: dto.didForwardLimit,
                 monitorEnabled: dto.monitorEnabled,
-                monitorLimit: dto.monitorLimit,
                 recordingAllowed: dto.recordingAllowed,
                 ...(isDisablingRecording ? { recordingEnabled: false } : {}),
             }
@@ -601,15 +597,6 @@ export class TenantsService {
                 data: {
                     tenantId: tenant.id,
                     balance: 0.00
-                }
-            });
-
-            // 3. Create Monitoring Addon (Default Active?)
-            await prisma.monitoringAddOn.create({
-                data: {
-                    tenantId: tenant.id,
-                    isActive: true,
-                    price: 5.00
                 }
             });
 

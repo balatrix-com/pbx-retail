@@ -97,7 +97,6 @@ export class TenantsController {
             didForwardEnabled?: boolean;
             didForwardLimit?: number;
             monitorEnabled?: boolean;
-            monitorLimit?: number;
             recordingAllowed?: boolean;
         }
     ) {

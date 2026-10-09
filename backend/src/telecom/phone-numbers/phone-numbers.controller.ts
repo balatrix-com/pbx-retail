@@ -5,7 +5,6 @@ import {
     Body,
     Param,
     UseGuards,
-    Query,
 } from '@nestjs/common';
 import { PhoneNumbersService } from './phone-numbers.service';
 import { UpdatePhoneNumberDto } from './dto/update-phone-number.dto';
@@ -21,22 +20,25 @@ export class PhoneNumbersController {
     constructor(private readonly phoneNumbersService: PhoneNumbersService) { }
 
     @Get()
-    @Roles(Role.ADMIN, Role.SUPPORT, Role.SUPER_ADMIN)
-    findAll(@GetUser() user: any, @Query('tenantId') tenantId?: string) {
-        const targetTenantId = (user.role === Role.SUPER_ADMIN || user.role === Role.SUPPORT) && tenantId
-            ? tenantId
-            : user.tenantId;
-        return this.phoneNumbersService.findAll(targetTenantId);
+    @Roles(Role.ADMIN, Role.SUPPORT)
+    findAll(@GetUser() user: any) {
+        return this.phoneNumbersService.findAll(user.tenantId);
+    }
+
+    @Get('quota')
+    @Roles(Role.ADMIN)
+    getQuota(@GetUser() user: any) {
+        return this.phoneNumbersService.getQuota(user.tenantId);
     }
 
     @Get(':id')
-    @Roles(Role.ADMIN, Role.SUPPORT, Role.SUPER_ADMIN)
+    @Roles(Role.ADMIN, Role.SUPPORT)
     findOne(@GetUser() user: any, @Param('id') id: string) {
         return this.phoneNumbersService.findOne(user.tenantId, id);
     }
 
     @Put(':id')
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+    @Roles(Role.ADMIN)
     update(
         @GetUser() user: any,
         @Param('id') id: string,

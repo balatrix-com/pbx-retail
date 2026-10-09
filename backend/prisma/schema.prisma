@@ -224,6 +224,7 @@ model User {
 
 model Plan {
   id                  String         @id @default(uuid())
+  subBillingPlanId    String?        @unique
   name                String
   description         String?
   stripePriceId       String?
@@ -612,7 +613,6 @@ model TenantFeature {
   didForwardEnabled Boolean  @default(true)
   didForwardLimit   Int      @default(10)
   monitorEnabled    Boolean  @default(true)
-  monitorLimit      Int      @default(10)
   recordingEnabled  Boolean  @default(false)
   recordingAllowed  Boolean  @default(false)
   createdAt         DateTime @default(now())

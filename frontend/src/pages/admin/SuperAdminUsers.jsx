@@ -3,7 +3,6 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { Building2, Users, Shield, Eye, Ban, CheckCircle, AlertTriangle, ChevronRight, Briefcase, Wallet, CreditCard, Trash2, Key, Search, RefreshCw, UserCheck, ShieldCheck, Mail, ArrowRight } from 'lucide-react';
 import ActivityModal from '../../components/admin/ActivityModal';
-import MonitoringExtensionModal from '../../components/admin/MonitoringExtensionModal';
 import Pagination from '../../components/common/Pagination';
 import { clsx } from 'clsx';
 
@@ -30,9 +29,6 @@ const SuperAdminUsers = () => {
     const [showWalletModal, setShowWalletModal] = useState(false);
     const [walletForm, setWalletForm] = useState({ amount: '', type: 'CREDIT', description: 'Manual Adjustment' });
 
-    // Monitoring State
-    const [showMonitoringModal, setShowMonitoringModal] = useState(false);
-    const [monitoringTarget, setMonitoringTarget] = useState(null);
 
     useEffect(() => {
         if (isSuperAdmin) {
@@ -139,36 +135,6 @@ const SuperAdminUsers = () => {
             window.open(`/impersonate?token=${accessToken}&refresh=${refreshToken}`, '_blank');
         } catch (error) {
             console.error('Impersonation error:', error);
-        }
-    };
-
-    const handleToggleMonitoring = async (userId, currentValue) => {
-        if (!currentValue) {
-            setMonitoringTarget(userId);
-            setShowMonitoringModal(true);
-        } else {
-            try {
-                await api.patch(`/users/${userId}/permissions`, { monitoringEnabled: false });
-                if (selectedTenant) fetchUsersForTenant(selectedTenant);
-            } catch (error) {
-                console.error('Failed to disable monitoring:', error);
-            }
-        }
-    };
-
-    const handleEnableMonitoring = async ({ monitoringExtension, monitoringSecret }) => {
-        if (!monitoringTarget) return;
-        try {
-            await api.patch(`/users/${monitoringTarget}/permissions`, {
-                monitoringEnabled: true,
-                monitoringExtension,
-                monitoringSecret
-            });
-            setShowMonitoringModal(false);
-            setMonitoringTarget(null);
-            if (selectedTenant) fetchUsersForTenant(selectedTenant);
-        } catch (error) {
-            console.error('Failed to enable monitoring:', error);
         }
     };
 
@@ -361,7 +327,6 @@ const SuperAdminUsers = () => {
                                                         onImpersonate={handleImpersonate}
                                                         onViewActivity={() => setSelectedUserForActivity(admin)}
                                                         onDelete={handleDeleteUser}
-                                                        onToggleMonitoring={handleToggleMonitoring}
                                                         onResetPassword={handleResetPassword}
                                                     />
                                                 ))}
@@ -384,7 +349,6 @@ const SuperAdminUsers = () => {
                                                         onSuspend={handleSuspendUser}
                                                         onViewActivity={() => setSelectedUserForActivity(staff)}
                                                         onDelete={handleDeleteUser}
-                                                        onToggleMonitoring={handleToggleMonitoring}
                                                         onResetPassword={handleResetPassword}
                                                     />
                                                 ))}
@@ -477,21 +441,11 @@ const SuperAdminUsers = () => {
                 </div>
             )}
 
-            {showMonitoringModal && (
-                <MonitoringExtensionModal
-                    onClose={() => {
-                        setShowMonitoringModal(false);
-                        setMonitoringTarget(null);
-                    }}
-                    onSubmit={handleEnableMonitoring}
-                    tenantId={selectedTenant}
-                />
-            )}
         </div>
     );
 };
 
-const AdminCard = ({ admin, supportUsers, expanded, onToggle, onSuspend, onImpersonate, onViewActivity, onDelete, onToggleMonitoring, onResetPassword }) => {
+const AdminCard = ({ admin, supportUsers, expanded, onToggle, onSuspend, onImpersonate, onViewActivity, onDelete, onResetPassword }) => {
     return (
         <div className={clsx(
             "bg-white rounded-3xl shadow-sm ring-1 transition-all duration-300 overflow-hidden",
@@ -585,7 +539,6 @@ const AdminCard = ({ admin, supportUsers, expanded, onToggle, onSuspend, onImper
                                 onSuspend={onSuspend}
                                 onViewActivity={onViewActivity}
                                 onDelete={onDelete}
-                                onToggleMonitoring={onToggleMonitoring}
                                 onResetPassword={onResetPassword}
                             />
                         ))}
@@ -596,7 +549,7 @@ const AdminCard = ({ admin, supportUsers, expanded, onToggle, onSuspend, onImper
     );
 };
 
-const UserCard = ({ user, onSuspend, onViewActivity, onDelete, onToggleMonitoring, onResetPassword }) => {
+const UserCard = ({ user, onSuspend, onViewActivity, onDelete, onResetPassword }) => {
     return (
         <div className="bg-gray-50/50 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 ring-1 ring-gray-100 group transition-all hover:bg-white hover:ring-primary-200 hover:shadow-sm">
             <div className="flex items-center gap-4 w-full">
@@ -609,15 +562,6 @@ const UserCard = ({ user, onSuspend, onViewActivity, onDelete, onToggleMonitorin
                 </div>
                 <div className="flex items-center gap-3">
                     <StatusBadge status={user.status} />
-                    <label className="flex items-center gap-2 cursor-pointer group/toggle">
-                        <div 
-                            onClick={(e) => { e.stopPropagation(); onToggleMonitoring(user.id, user.monitoringEnabled); }}
-                            className={clsx("relative inline-flex h-4 w-8 rounded-full transition-colors", user.monitoringEnabled ? "bg-primary-600" : "bg-gray-300")}
-                        >
-                            <span className={clsx("inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 mt-0.5 ml-0.5", user.monitoringEnabled ? "translate-x-4" : "translate-x-0")} />
-                        </div>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest hidden sm:block">Monitor</span>
-                    </label>
                 </div>
             </div>
             

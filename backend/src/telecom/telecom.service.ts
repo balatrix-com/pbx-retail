@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
-import { TransactionType, TFNStatus } from '@prisma/client';
+import { TFNStatus } from '@prisma/client';
 import { EnforcementService, ServiceState } from '../enforcement/enforcement.service';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
 import { AudioUploadService } from '../freeswitch/audio-upload.service';
@@ -48,33 +48,6 @@ export class TelecomService implements OnModuleInit {
         });
     }
 
-    async purchaseTFN(tenantId: string, number: string) {
-        const state = await this.enforcementService.getServiceState(tenantId);
-        if (state === ServiceState.PLAN_EXPIRED) throw new ForbiddenException('Plan expired');
-        if (state === ServiceState.WALLET_NEGATIVE) throw new ForbiddenException('Wallet negative');
-
-        const tfn = await this.prisma.tFN.findUnique({ where: { number } });
-        if (!tfn) throw new NotFoundException('TFN not found');
-        if (tfn.status !== TFNStatus.AVAILABLE) throw new BadRequestException('TFN not available');
-
-        // Charge Wallet (One-time setup or pro-rated first month? Usually immediate charge)
-        try {
-            await this.walletService.adjustBalance(tenantId, Number(tfn.price), TransactionType.DEBIT, `Purchase TFN ${number}`, `TFN-${tfn.id}`);
-        } catch (err) {
-            throw new ForbiddenException('Insufficient funds to purchase TFN');
-        }
-
-        // Assign
-        return this.prisma.tFN.update({
-            where: { id: tfn.id },
-            data: {
-                status: TFNStatus.ASSIGNED,
-                tenantId,
-                purchasedAt: new Date()
-            }
-        });
-    }
-
     // --- Extension Logic ---
 
     async listExtensions(tenantId: string) {
@@ -100,56 +73,6 @@ export class TelecomService implements OnModuleInit {
                 sipPassword: data.sipPassword || 'changeme',
             }
         });
-    }
-
-    // --- Monitoring Add-on Logic ---
-
-    async purchaseMonitoring(tenantId: string) {
-        const existing = await this.prisma.monitoringAddOn.findUnique({ where: { tenantId } });
-        if (existing && existing.isActive) throw new BadRequestException('Monitoring already active');
-
-        // Price
-        const PRICE = 5.00; // Hardcoded or config
-
-        try {
-            await this.walletService.adjustBalance(tenantId, PRICE, TransactionType.DEBIT, 'Purchase Monitoring Add-on', 'MONITORING-ADDON');
-        } catch (err) {
-            throw new ForbiddenException('Insufficient funds for Monitoring');
-        }
-
-        if (existing) {
-            return this.prisma.monitoringAddOn.update({
-                where: { tenantId },
-                data: { isActive: true }
-            });
-        } else {
-            return this.prisma.monitoringAddOn.create({
-                data: {
-                    tenantId,
-                    price: PRICE
-                }
-            });
-        }
-    }
-
-    async getMonitoringStatus(tenantId: string) {
-        const state = await this.enforcementService.getServiceState(tenantId);
-        if (state === ServiceState.PLAN_EXPIRED) throw new ForbiddenException(`Monitoring unavailable: ${state}`);
-
-        const addon = await this.prisma.monitoringAddOn.findUnique({ where: { tenantId } });
-        if (!addon || !addon.isActive) {
-            return { active: false };
-        }
-
-        // Return Mock Data
-        return {
-            activeCalls: Math.floor(Math.random() * 10),
-            queues: [
-                { name: 'Support', waiting: Math.floor(Math.random() * 5) },
-                { name: 'Sales', waiting: Math.floor(Math.random() * 3) }
-            ],
-            serverStatus: 'HEALTHY'
-        };
     }
 
     // --- Call Recording Logic ---

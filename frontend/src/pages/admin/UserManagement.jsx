@@ -5,7 +5,6 @@ import api from '../../services/api';
 import { clsx } from 'clsx';
 import { Users, Shield, UserPlus, Activity, Trash2, CheckCircle2, Ban, Eye, X, ShieldCheck, Mail, Calendar, Link as LinkIcon, RotateCw, Copy, Check } from 'lucide-react';
 import ActivityModal from '../../components/admin/ActivityModal';
-import MonitoringExtensionModal from '../../components/admin/MonitoringExtensionModal';
 import Pagination from '../../components/common/Pagination';
 
 const UserManagement = () => {
@@ -15,8 +14,6 @@ const UserManagement = () => {
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [showActivityModal, setShowActivityModal] = useState(false);
-    const [showMonitoringModal, setShowMonitoringModal] = useState(false);
-    const [monitoringTarget, setMonitoringTarget] = useState(null);
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 20,
@@ -82,38 +79,6 @@ const UserManagement = () => {
         } catch (error) {
             console.error('Failed to update status:', error);
             alert('Failed to update user status');
-        }
-    };
-
-    const handleToggleMonitoring = async (userId, currentValue) => {
-        if (!currentValue) {
-            setMonitoringTarget(userId);
-            setShowMonitoringModal(true);
-        } else {
-            try {
-                await api.patch(`/users/${userId}/permissions`, { monitoringEnabled: false });
-                fetchUsers();
-            } catch (error) {
-                console.error('Failed to disable monitoring:', error);
-            }
-        }
-    };
-
-    const handleEnableMonitoring = async ({ monitoringExtension, monitoringSecret, name }) => {
-        if (!monitoringTarget) return;
-        try {
-            await api.patch(`/users/${monitoringTarget}/permissions`, {
-                monitoringEnabled: true,
-                monitoringExtension,
-                monitoringSecret,
-                name
-            });
-            setShowMonitoringModal(false);
-            setMonitoringTarget(null);
-            fetchUsers();
-        } catch (error) {
-            console.error('Failed to enable monitoring:', error);
-            alert('Failed to enable monitoring: ' + (error.response?.data?.message || error.message));
         }
     };
 
@@ -212,7 +177,6 @@ const UserManagement = () => {
                                 <th scope="col" className="px-6 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Team Member</th>
                                 <th scope="col" className="px-6 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Current Status</th>
                                 <th scope="col" className="hidden lg:table-cell px-6 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">System Role</th>
-                                <th scope="col" className="hidden xl:table-cell px-6 py-5 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Monitor</th>
                                 <th scope="col" className="px-6 py-5 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Control</th>
                             </tr>
                         </thead>
@@ -220,7 +184,7 @@ const UserManagement = () => {
                             {loading ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan="5" className="px-6 py-8"><div className="h-4 bg-gray-100 rounded-full w-full"></div></td>
+                                        <td colSpan="4" className="px-6 py-8"><div className="h-4 bg-gray-100 rounded-full w-full"></div></td>
                                     </tr>
                                 ))
                             ) : (
@@ -230,10 +194,8 @@ const UserManagement = () => {
                                         user={u}
                                         currentUserId={user.id}
                                         onUpdateStatus={handleUpdateStatus}
-                                        onToggleMonitoring={handleToggleMonitoring}
                                         onViewActivity={handleViewActivity}
                                         onRefresh={fetchUsers}
-                                        canManageMonitoring={isAdmin || isSuperAdmin}
                                     />
                                 ))
                             )}
@@ -268,21 +230,11 @@ const UserManagement = () => {
                 />
             )}
 
-            {showMonitoringModal && (
-                <MonitoringExtensionModal
-                    onClose={() => {
-                        setShowMonitoringModal(false);
-                        setMonitoringTarget(null);
-                    }}
-                    onSubmit={handleEnableMonitoring}
-                    initialName={users.find(u => u.id === monitoringTarget)?.name || ''}
-                />
-            )}
         </div>
     );
 };
 
-const UserRow = ({ user, currentUserId, onUpdateStatus, onToggleMonitoring, onViewActivity, onRefresh, canManageMonitoring }) => {
+const UserRow = ({ user, currentUserId, onUpdateStatus, onViewActivity, onRefresh }) => {
     const isSelf = user.id === currentUserId;
     const { addToast } = useToast();
     const [copied, setCopied] = useState(false);
@@ -387,24 +339,6 @@ const UserRow = ({ user, currentUserId, onUpdateStatus, onToggleMonitoring, onVi
                     <Shield size={14} className="text-gray-300" />
                     {user.role}
                 </span>
-            </td>
-            <td className="hidden xl:table-cell px-6 py-5 whitespace-nowrap text-center">
-                <button
-                    onClick={() => onToggleMonitoring(user.id, user.monitoringEnabled)}
-                    disabled={!canManageMonitoring || !['ADMIN', 'SUPPORT'].includes(user.role)}
-                    className={clsx(
-                        "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none ring-offset-2",
-                        user.monitoringEnabled ? 'bg-primary-600 ring-primary-600' : 'bg-gray-200 ring-gray-100',
-                        (!canManageMonitoring || !['ADMIN', 'SUPPORT'].includes(user.role)) && 'opacity-30 cursor-not-allowed'
-                    )}
-                >
-                    <span
-                        className={clsx(
-                            "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition duration-300 ease-in-out",
-                            user.monitoringEnabled ? 'translate-x-5' : 'translate-x-0'
-                        )}
-                    />
-                </button>
             </td>
             <td className="px-6 py-5 whitespace-nowrap text-right">
                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">

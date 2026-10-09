@@ -14,7 +14,9 @@ import {
     ArrowUpRight,
     Layers,
     DollarSign,
-    Hash
+    Hash,
+    Plus,
+    Trash2
 } from 'lucide-react';
 import RoutingModal from '../../components/telecom/RoutingModal';
 
@@ -26,6 +28,13 @@ const PhoneNumbersPage = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [walletBalance, setWalletBalance] = useState(0);
+    const [quota, setQuota] = useState(null);
+    const [adding, setAdding] = useState(false);
+    const [addType, setAddType] = useState('DID');
+    const [newNumber, setNewNumber] = useState('');
+    const [savingNumber, setSavingNumber] = useState(false);
+    const [numberError, setNumberError] = useState('');
+    const isAdmin = user?.role === 'ADMIN';
 
     // Filters & Search
     const [searchTerm, setSearchTerm] = useState('');
@@ -58,12 +67,14 @@ const PhoneNumbersPage = () => {
         else setLoading(true);
 
         try {
-            const [numbersData, walletData] = await Promise.all([
+            const [numbersData, walletData, quotaData] = await Promise.all([
                 telecomService.getPhoneNumbers(),
-                user?.tenantId ? walletService.getWallet(user.tenantId).catch(() => ({ balance: 0 })) : Promise.resolve({ balance: 0 })
+                user?.tenantId ? walletService.getWallet(user.tenantId).catch(() => ({ balance: 0 })) : Promise.resolve({ balance: 0 }),
+                isAdmin ? telecomService.getNumberQuota() : Promise.resolve(null),
             ]);
 
             setNumbers(Array.isArray(numbersData) ? numbersData : []);
+            setQuota(quotaData);
             if (walletData && walletData.balance !== undefined) {
                 setWalletBalance(walletData.balance);
             }
@@ -89,6 +100,34 @@ const PhoneNumbersPage = () => {
         setNumbers(prev =>
             prev.map(item => item.id === updatedNum.id ? { ...item, ...updatedNum } : item)
         );
+    };
+
+    const handleAddNumber = async (event) => {
+        event.preventDefault();
+        setNumberError('');
+        setSavingNumber(true);
+        try {
+            await telecomService.addNumber(addType, newNumber.trim());
+            setAdding(false);
+            setNewNumber('');
+            addToast('success', `${addType} added`);
+            await loadData(true);
+        } catch (err) {
+            setNumberError(err.response?.data?.message || 'Could not add this number');
+        } finally {
+            setSavingNumber(false);
+        }
+    };
+
+    const handleRemoveNumber = async (item) => {
+        if (!window.confirm(`Remove ${item.number} from your numbers?`)) return;
+        try {
+            await telecomService.removeNumber(item.type, item.id);
+            addToast('success', 'Number removed');
+            await loadData(true);
+        } catch (err) {
+            addToast('error', err.response?.data?.message || 'Could not remove this number');
+        }
     };
 
     // Filtered data
@@ -164,6 +203,16 @@ const PhoneNumbersPage = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {isAdmin && (
+                        <button
+                            type="button"
+                            onClick={() => { setNumberError(''); setAdding(true); }}
+                            disabled={!quota?.remaining}
+                            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <Plus className="h-4 w-4" /> Add Number
+                        </button>
+                    )}
                     <span className="text-sm text-gray-700 dark:text-slate-300 font-mono bg-white dark:bg-[#0d0e13] border border-gray-200 dark:border-white/[0.08] px-3.5 py-2 rounded-lg shadow-sm">
                         Available Balance:
                         <span className="font-bold text-indigo-600 dark:text-indigo-400 ml-2">
@@ -182,6 +231,14 @@ const PhoneNumbersPage = () => {
                     </button>
                 </div>
             </div>
+
+            {isAdmin && quota && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+                    <strong>Plan numbers: {quota.used} / {quota.limit}</strong>
+                    <span className="ml-2">DIDs and Toll-Free numbers share this allowance.</span>
+                    {!quota.hasActivePlan && <span className="ml-2">An active plan is required to add numbers.</span>}
+                </div>
+            )}
 
             {/* Quick Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -394,14 +451,23 @@ const PhoneNumbersPage = () => {
 
                                             {/* Actions */}
                                             <td className="py-4 px-6 text-right">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleOpenRouting(item)}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50 transition"
-                                                >
-                                                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                                                    Configure
-                                                </button>
+                                                {isAdmin && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenRouting(item)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50 transition"
+                                                    >
+                                                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                                                        Configure
+                                                    </button>
+                                                )}
+                                                {isAdmin && (
+                                                    <button type="button" onClick={() => handleRemoveNumber(item)}
+                                                        className="ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 dark:text-red-300 dark:hover:bg-red-950/40"
+                                                        aria-label={`Remove ${item.number}`}>
+                                                        <Trash2 className="h-4 w-4" /> Remove
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -422,6 +488,25 @@ const PhoneNumbersPage = () => {
                 phoneNumber={selectedNumber}
                 onSave={handleRoutingSaved}
             />
+            {adding && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Add phone number">
+                    <form onSubmit={handleAddNumber} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add Phone Number</h2>
+                        <p className="text-sm text-gray-600 dark:text-slate-300">{quota?.remaining} of {quota?.limit} plan slots available.</p>
+                        <label className="block text-sm font-semibold text-gray-800 dark:text-white" htmlFor="number-type">Type</label>
+                        <select id="number-type" value={addType} onChange={event => setAddType(event.target.value)} className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:bg-slate-800 dark:text-white">
+                            <option value="DID">Local / DID</option><option value="TFN">Toll-Free / TFN</option>
+                        </select>
+                        <label className="block text-sm font-semibold text-gray-800 dark:text-white" htmlFor="new-number">Number</label>
+                        <input id="new-number" type="tel" required value={newNumber} onChange={event => setNewNumber(event.target.value)} placeholder="+15551234567" className="min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:bg-slate-800 dark:text-white" />
+                        {numberError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{numberError}</p>}
+                        <div className="flex justify-end gap-2">
+                            <button type="button" onClick={() => setAdding(false)} disabled={savingNumber} className="min-h-11 rounded-lg px-4 text-gray-700 dark:text-gray-200">Cancel</button>
+                            <button type="submit" disabled={savingNumber} className="min-h-11 rounded-lg bg-indigo-600 px-4 font-semibold text-white disabled:opacity-50">{savingNumber ? 'Adding…' : 'Add Number'}</button>
+                        </div>
+                    </form>
+                </div>
+            )}
         </div>
     );
 };

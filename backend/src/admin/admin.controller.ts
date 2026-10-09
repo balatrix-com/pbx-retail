@@ -157,65 +157,6 @@ export class AdminController {
     }
 
     /**
-     * Number Management (TFN & DID)
-     */
-    @Get('numbers')
-    @Roles('SUPER_ADMIN')
-    getAllNumbers() {
-        return this.adminService.getAllNumbers();
-    }
-
-    @Post('numbers/tfn')
-    @Roles('SUPER_ADMIN')
-    @Audit('TFN_CREATED', 'MANAGE_NUMBERS')
-    addTFN(@Body() data: { number: string; price?: number; isDemo?: boolean }) {
-        return this.adminService.addTFN(data);
-    }
-
-    @Post('numbers/tfn/bulk')
-    @Roles('SUPER_ADMIN')
-    @Audit('TFN_CREATED', 'MANAGE_NUMBERS')
-    addTFNBulk(@Body() data: { numbers: string[]; price?: number; isDemo?: boolean }) {
-        return this.adminService.addTFNBulk(data);
-    }
-
-
-    @Post('numbers/did')
-    @Roles('SUPER_ADMIN')
-    @Audit('DID_CREATED', 'MANAGE_NUMBERS')
-    addDID(@Body() data: { number: string; monthlyFee?: number; provider?: string }) {
-        return this.adminService.addDID(data);
-    }
-
-    @Post('numbers/did/bulk')
-    @Roles('SUPER_ADMIN')
-    @Audit('DID_CREATED', 'MANAGE_NUMBERS')
-    addDIDBulk(@Body() data: { numbers: string[]; monthlyFee?: number; provider?: string }) {
-        return this.adminService.addDIDBulk(data);
-    }
-
-    @Post('numbers/assign')
-    @Roles('SUPER_ADMIN')
-    @Audit('NUMBER_ASSIGNED', 'MANAGE_NUMBERS')
-    assignNumber(@Body() data: { type: 'TFN' | 'DID'; id: string; tenantId: string }) {
-        return this.adminService.assignNumber(data.type, data.id, data.tenantId);
-    }
-
-    @Post('numbers/unassign')
-    @Roles('SUPER_ADMIN')
-    @Audit('NUMBER_UNASSIGNED', 'MANAGE_NUMBERS')
-    unassignNumber(@Body() data: { type: 'TFN' | 'DID'; id: string }) {
-        return this.adminService.unassignNumber(data.type, data.id);
-    }
-
-    @Post('numbers/delete')
-    @Roles('SUPER_ADMIN')
-    @Audit('NUMBER_DELETED', 'MANAGE_NUMBERS')
-    deleteNumber(@Body() data: { type: 'TFN' | 'DID'; id: string }) {
-        return this.adminService.deleteNumber(data.type, data.id);
-    }
-
-    /**
      * White-label Branding & Partners Management (SUPER_ADMIN only)
      */
     @Get('branding/current')

@@ -14,6 +14,7 @@ import { REDIS_SUBSCRIBER, REDIS_CLIENT } from '../redis/redis.module';
 import type { RedisClientType } from 'redis';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { MonitoringAccessService } from './monitoring-access.service';
 
 const ANALYTICS_INTERVAL_MS = 30_000; // 30 seconds
 
@@ -37,6 +38,7 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
         @Inject(REDIS_CLIENT) private readonly redisClient: RedisClientType,
         private readonly jwtService: JwtService,
         private readonly prismaService: PrismaService,
+        private readonly monitoringAccess: MonitoringAccessService,
     ) { }
 
     async afterInit() {
@@ -86,6 +88,16 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
                     }
                 } catch (error) {
                     this.logger.error('Error processing call update:', error);
+                }
+            });
+            await this.redisSubscriber.subscribe('monitor_seat_changes', async (message) => {
+                try {
+                    const { userId } = JSON.parse(message);
+                    for (const socket of await this.server.fetchSockets()) {
+                        if (socket.data.user?.sub === userId) socket.disconnect(true);
+                    }
+                } catch (error) {
+                    this.logger.warn('Could not process monitoring seat change');
                 }
             });
             this.logger.log('Subscribed to calls_stream successfully');
@@ -210,8 +222,9 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
             const payload = this.jwtService.verify(token);
 
             // Check permissions
-            const canMonitor = payload.role === 'SUPER_ADMIN' || payload.role === 'ADMIN' || payload.monitoringEnabled === true;
-            if (!canMonitor) {
+            try {
+                await this.monitoringAccess.getAssignedExtension(payload);
+            } catch (error) {
                 this.logger.warn(`Client ${client.id} (User: ${payload.sub}) denied monitoring access`);
                 client.disconnect();
                 return;

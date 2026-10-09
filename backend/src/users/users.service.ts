@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, UserStatus, UserAuditAction } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -8,6 +8,8 @@ import { PaginationQueryDto } from './dto/pagination-query.dto';
 
 import { KamailioDBService } from '../freeswitch/kamailio-db.service';
 import { MailService } from '../mail/mail.service';
+import { REDIS_CLIENT } from '../redis/redis.module';
+import type { RedisClientType } from 'redis';
 
 @Injectable()
 export class UsersService {
@@ -15,6 +17,7 @@ export class UsersService {
         private prisma: PrismaService,
         private kamailioService: KamailioDBService,
         private mailService: MailService,
+        @Inject(REDIS_CLIENT) private readonly redisClient: RedisClientType,
     ) { }
 
     // Helper to create audit log
@@ -135,7 +138,6 @@ export class UsersService {
                 status: true,
                 monitoringEnabled: true,
                 monitoringExtension: true,
-                monitoringSecret: true,
                 tenantId: true,
                 inviteToken: true,
                 inviteTokenExpiry: true,
@@ -259,6 +261,11 @@ export class UsersService {
 
         // Update status
         const updateData: any = { status };
+        if (status !== UserStatus.ACTIVE && targetUser.monitoringEnabled) {
+            updateData.monitoringEnabled = false;
+            updateData.monitoringExtension = null;
+            updateData.monitoringSecret = null;
+        }
         if (status === UserStatus.ACTIVE && targetUser.status === UserStatus.INVITED) {
             updateData.inviteToken = null;
             updateData.inviteTokenExpiry = null;
@@ -268,6 +275,19 @@ export class UsersService {
             where: { id: targetUserId },
             data: updateData
         });
+
+        if (status !== UserStatus.ACTIVE && targetUser.monitoringExtension) {
+            try {
+                await this.kamailioService.deleteSubscriber(targetUser.monitoringExtension, true);
+            } catch (error) {
+                console.error('Could not remove suspended user monitoring SIP subscriber', error);
+            }
+            try {
+                await this.redisClient.publish('monitor_seat_changes', JSON.stringify({ userId: targetUserId }));
+            } catch (error) {
+                console.error('Could not notify monitor gateway of suspended user', error);
+            }
+        }
 
         // If suspending, invalidate refresh token
         if (status === UserStatus.SUSPENDED) {
@@ -302,15 +322,13 @@ export class UsersService {
         monitoringSecret?: string,
         name?: string
     ) {
-        const canManage = await this.canManageUser(actorId, targetUserId);
-        if (!canManage) {
-            throw new ForbiddenException('You do not have permission to manage this user');
+        const [actor, targetUser] = await Promise.all([
+            this.prisma.user.findUnique({ where: { id: actorId }, select: { tenantId: true, role: true } }),
+            this.prisma.user.findUnique({ where: { id: targetUserId } }),
+        ]);
+        if (actor?.role !== Role.ADMIN || !actor.tenantId || actor.tenantId !== targetUser?.tenantId) {
+            throw new ForbiddenException('Only the tenant Admin can manage monitoring extensions');
         }
-
-        const targetUser = await this.prisma.user.findUnique({
-            where: { id: targetUserId },
-            select: { id: true, tenantId: true, role: true, monitoringEnabled: true },
-        });
         if (!targetUser) throw new NotFoundException('User not found');
         if (targetUser.role !== Role.ADMIN && targetUser.role !== Role.SUPPORT) {
             throw new BadRequestException('Monitoring extensions can be assigned only to Admin or Support users');
@@ -318,64 +336,86 @@ export class UsersService {
         if (!targetUser.tenantId) {
             throw new BadRequestException('The target user must belong to a tenant');
         }
+        if (monitoringEnabled && targetUser.status !== UserStatus.ACTIVE) {
+            throw new BadRequestException('Monitoring seats can be assigned only to active users');
+        }
 
-        if (monitoringEnabled && !targetUser.monitoringEnabled) {
-            const subscription = await this.prisma.subscription.findFirst({
-                where: { tenantId: targetUser.tenantId, status: 'ACTIVE' },
-                include: { plan: { select: { maxMonitoringExtensions: true } } },
-                orderBy: { createdAt: 'desc' },
+        const extension = monitoringEnabled ? (monitoringExtension || targetUser.monitoringExtension)?.trim() : null;
+        const secret = monitoringEnabled ? (monitoringSecret || targetUser.monitoringSecret)?.trim() : null;
+        if (monitoringEnabled && (!extension || !secret)) {
+            throw new BadRequestException('Monitoring extension and SIP password are required');
+        }
+        if (monitoringEnabled && targetUser.monitoringEnabled && extension !== targetUser.monitoringExtension) {
+            throw new BadRequestException('Monitoring extension number cannot be changed; remove and recreate the seat');
+        }
+        if (monitoringEnabled) {
+            const tenant = await this.prisma.tenant.findUnique({
+                where: { id: targetUser.tenantId }, select: { customerCode: true },
             });
-            if (!subscription) {
-                throw new BadRequestException('An active package is required before assigning monitoring extensions');
+            const prefix = tenant?.customerCode;
+            if (!prefix || !extension!.startsWith(prefix) || !/^\d+$/.test(extension!.slice(prefix.length))) {
+                throw new BadRequestException('Monitoring extension must use this tenant customer code and a numeric suffix');
             }
-            const assigned = await this.prisma.user.count({
-                where: {
-                    tenantId: targetUser.tenantId,
-                    monitoringEnabled: true,
-                    id: { not: targetUserId },
+        }
+
+        const updatedUser = await this.prisma.$transaction(async tx => {
+            // Serialize seat changes for this tenant so concurrent Admin requests cannot exceed the plan.
+            if (extension) await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`monitor-extension:${extension}`}))`;
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`monitor-tenant:${targetUser.tenantId}`}))`;
+            if (monitoringEnabled && !targetUser.monitoringEnabled) {
+                const subscription = await tx.subscription.findFirst({
+                    where: { tenantId: targetUser.tenantId!, status: 'ACTIVE' },
+                    include: { plan: { select: { maxMonitoringExtensions: true } } },
+                    orderBy: { createdAt: 'desc' },
+                });
+                if (!subscription) throw new BadRequestException('An active package is required before assigning monitoring extensions');
+                const assigned = await tx.user.count({ where: { tenantId: targetUser.tenantId!, monitoringEnabled: true } });
+                const limit = subscription.plan.maxMonitoringExtensions;
+                if (assigned >= limit) throw new BadRequestException(`Monitoring extension quota reached (${assigned}/${limit})`);
+            }
+            if (monitoringEnabled) {
+                const [existingUser, existingExtension] = await Promise.all([
+                    tx.user.findFirst({ where: { monitoringExtension: extension, id: { not: targetUserId } } }),
+                    tx.extension.findFirst({ where: { extensionNumber: extension! } }),
+                ]);
+                if (existingUser || existingExtension) throw new BadRequestException(`Extension ${extension} is already in use`);
+            }
+            return tx.user.update({
+                where: { id: targetUserId },
+                data: {
+                    monitoringEnabled,
+                    monitoringExtension: extension,
+                    monitoringSecret: secret,
+                    name: name === undefined ? undefined : name,
                 },
             });
-            const limit = subscription.plan.maxMonitoringExtensions;
-            if (assigned >= limit) {
-                throw new BadRequestException(`Monitoring extension quota reached (${assigned}/${limit})`);
-            }
-        }
-
-        // Validate extension uniqueness if provided
-        if (monitoringEnabled && monitoringExtension) {
-            const existing = await this.prisma.user.findFirst({
-                where: {
-                    monitoringExtension,
-                    id: { not: targetUserId }
-                }
-            });
-            if (existing) {
-                throw new BadRequestException(`Extension ${monitoringExtension} is already assigned to another user`);
-            }
-        }
-
-        // Update User directly
-        const updatedUser = await this.prisma.user.update({
-            where: { id: targetUserId },
-            data: {
-                monitoringEnabled,
-                monitoringExtension: monitoringExtension === undefined ? undefined : monitoringExtension,
-                monitoringSecret: monitoringSecret === undefined ? undefined : monitoringSecret,
-                name: name === undefined ? undefined : name,
-            }
         });
 
         // Sync with Kamailio
         try {
-            if (monitoringEnabled && updatedUser.monitoringExtension && updatedUser.monitoringSecret) {
-                await this.kamailioService.syncSubscriber(updatedUser.monitoringExtension, updatedUser.monitoringSecret);
-            } else if (!monitoringEnabled && updatedUser.monitoringExtension) {
-                // If monitoring is disabled, remove the SIP account
-                await this.kamailioService.deleteSubscriber(updatedUser.monitoringExtension);
+            if (monitoringEnabled) {
+                await this.kamailioService.syncSubscriber(extension!, secret!, true);
+            } else if (targetUser.monitoringExtension) {
+                await this.kamailioService.deleteSubscriber(targetUser.monitoringExtension, true);
             }
         } catch (error) {
-            // Log but don't fail the request?
-            console.error('Failed to sync monitoring extension to Kamailio', error);
+            await this.prisma.user.update({
+                where: { id: targetUserId },
+                data: {
+                    monitoringEnabled: targetUser.monitoringEnabled,
+                    monitoringExtension: targetUser.monitoringExtension,
+                    monitoringSecret: targetUser.monitoringSecret,
+                },
+            });
+            throw new BadRequestException('Could not synchronize the monitoring SIP extension; the change was reverted');
+        }
+
+        if (!monitoringEnabled) {
+            try {
+                await this.redisClient.publish('monitor_seat_changes', JSON.stringify({ userId: targetUserId }));
+            } catch (error) {
+                console.error('Failed to notify monitor gateway of revoked seat', error);
+            }
         }
 
         // Audit log
@@ -392,6 +432,26 @@ export class UsersService {
         };
     }
 
+    async getMonitoringSeats(actorId: string) {
+        const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { tenantId: true, role: true } });
+        if (actor?.role !== Role.ADMIN || !actor.tenantId) throw new ForbiddenException('Admin access required');
+        const [subscription, users, used] = await Promise.all([
+            this.prisma.subscription.findFirst({
+                where: { tenantId: actor.tenantId, status: 'ACTIVE' },
+                include: { plan: { select: { maxMonitoringExtensions: true } } },
+                orderBy: { createdAt: 'desc' },
+            }),
+            this.prisma.user.findMany({
+                where: { tenantId: actor.tenantId, role: { in: [Role.ADMIN, Role.SUPPORT] }, status: UserStatus.ACTIVE },
+                select: { id: true, email: true, name: true, role: true, monitoringEnabled: true, monitoringExtension: true },
+                orderBy: { email: 'asc' },
+            }),
+            this.prisma.user.count({ where: { tenantId: actor.tenantId, monitoringEnabled: true } }),
+        ]);
+        const limit = subscription?.plan.maxMonitoringExtensions ?? 0;
+        return { users, used, limit, remaining: Math.max(0, limit - used), hasActivePlan: !!subscription };
+    }
+
     async deleteUser(actorId: string, targetUserId: string) {
         const canManage = await this.canManageUser(actorId, targetUserId);
         if (!canManage) {
@@ -403,6 +463,15 @@ export class UsersService {
         });
 
         if (!targetUser) throw new NotFoundException('User not found');
+
+        if (targetUser.monitoringExtension) {
+            await this.kamailioService.deleteSubscriber(targetUser.monitoringExtension, true);
+            try {
+                await this.redisClient.publish('monitor_seat_changes', JSON.stringify({ userId: targetUserId }));
+            } catch (error) {
+                console.error('Could not notify monitor gateway of deleted user', error);
+            }
+        }
 
         // Hard Delete with manual cascade
         await this.prisma.$transaction(async (prisma) => {
