@@ -59,8 +59,8 @@ export class AddonsService {
 
     private isPlanLimitedAddon(addonId: string, resourceType?: string) {
         const type = String(resourceType || '').toLowerCase();
-        return ['tfn', 'did', 'number', 'numbers', 'mon', 'monitoring'].includes(type) ||
-            /(^|[_-])(tfn|did|toll|number|monitor)([_-]|$)/i.test(addonId);
+        return ['tfn', 'did', 'number', 'numbers'].includes(type) ||
+            /(^|[_-])(tfn|did|toll|number)([_-]|$)/i.test(addonId);
     }
 
     async getCatalog(): Promise<AddonCatalogItem[]> {
@@ -143,7 +143,7 @@ export class AddonsService {
 
     async getQuote(tenantId: string, addonId: string, quantity: number = 1) {
         if (!tenantId) throw new BadRequestException('Tenant ID is required');
-        if (this.isPlanLimitedAddon(addonId)) throw new BadRequestException('Numbers and monitoring seats are controlled by the plan');
+        if (this.isPlanLimitedAddon(addonId)) throw new BadRequestException('Numbers are controlled by the plan');
         const qty = Math.max(1, Number(quantity) || 1);
 
         const customerId = await this.walletService.getSubBillingCustomerId(tenantId).catch(() => tenantId);
@@ -157,9 +157,10 @@ export class AddonsService {
                     quantity: qty
                 })
             );
-            if (response.data?.success && response.data?.data) {
-                if (this.isPlanLimitedAddon(addonId, response.data.data.resource_type)) throw new BadRequestException('Numbers and monitoring seats are controlled by the plan');
-                return response.data.data;
+            const officialQuote = response.data?.data || response.data;
+            if (response.data?.success && officialQuote?.addon_id === addonId) {
+                if (this.isPlanLimitedAddon(addonId, officialQuote.resource_type)) throw new BadRequestException('Numbers are controlled by the plan');
+                return officialQuote;
             }
         } catch (err: any) {
             this.logger.debug(`Sub-billing quote API returned error or not found, falling back to local calculation: ${err.message}`);
@@ -210,6 +211,7 @@ export class AddonsService {
             addon_id: addon.addon_id,
             name: addon.name,
             resource_type: addon.resource_type,
+            units_count: addon.units_count || 1,
             quantity: qty,
             unit_price: addon.unit_price,
             remaining_days: remainingDays,
@@ -221,8 +223,9 @@ export class AddonsService {
     }
 
     async purchaseAddon(tenantId: string, addonId: string, quantity: number = 1) {
-        if (this.isPlanLimitedAddon(addonId)) throw new BadRequestException('Numbers and monitoring seats are controlled by the plan');
+        if (this.isPlanLimitedAddon(addonId)) throw new BadRequestException('Numbers are controlled by the plan');
         const quote = await this.getQuote(tenantId, addonId, quantity);
+        const monitoringAddon = quote.resource_type === 'monitoring_extension';
         if (!quote.sufficient_funds) {
             throw new BadRequestException(
                 `Insufficient purchasing power ($${quote.available_purchasing_power.toFixed(2)}) for prorated charge ($${quote.prorated_charge_due.toFixed(2)})`
@@ -240,9 +243,15 @@ export class AddonsService {
                     quantity
                 })
             );
+            if (response.data?.success !== true) {
+                throw new Error(response.data?.message || 'Sub-billing did not confirm the purchase');
+            }
             this.logger.log(`Tenant ${tenantId} successfully purchased add-on ${addonId} x${quantity} in Sub-Billing`);
             return response.data;
         } catch (subErr: any) {
+            if (monitoringAddon) {
+                throw new BadRequestException(`Monitoring add-on purchase was not confirmed by sub-billing: ${subErr.response?.data?.message || subErr.message}`);
+            }
             this.logger.warn(`Sub-billing /addons/purchase endpoint error: ${subErr.message}. Executing local debit fallback.`);
             
             // Debit wallet via walletService

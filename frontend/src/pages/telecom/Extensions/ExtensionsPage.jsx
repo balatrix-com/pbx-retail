@@ -65,16 +65,21 @@ function ExtensionsPage() {
     };
 
     const handleUpdateMonitoring = async ({ monitoringExtension, monitoringSecret, name, userId: selectedUserId }) => {
-        const userId = selectedMonitoringUser?.id || selectedUserId;
+        const userId = selectedUserId;
         if (!userId) return;
         try {
             setSavingMonitoring(true);
-            await api.patch(`/users/${userId}/permissions`, {
-                monitoringEnabled: true,
-                monitoringExtension,
-                ...(monitoringSecret ? { monitoringSecret } : {}),
-                name
-            });
+            if (selectedMonitoringUser && selectedMonitoringUser.id !== userId) {
+                await api.post('/users/monitoring/reassign', {
+                    fromUserId: selectedMonitoringUser.id, toUserId: userId,
+                    monitoringExtension, ...(monitoringSecret ? { monitoringSecret } : {}), name,
+                });
+            } else {
+                await api.patch(`/users/${userId}/permissions`, {
+                    monitoringEnabled: true, monitoringExtension,
+                    ...(monitoringSecret ? { monitoringSecret } : {}), name,
+                });
+            }
             setShowMonitoringModal(false);
             setSelectedMonitoringUser(null);
             if (userId === currentUser?.id) await refreshUser();
@@ -155,7 +160,7 @@ function ExtensionsPage() {
                 <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <p className="font-bold text-indigo-900">Monitoring Extensions: {monitoringSeats.used} / {monitoringSeats.limit}</p>
-                        <p className="text-sm text-indigo-800">Assign one plan seat to an Admin or Support user.</p>
+                        <p className="text-sm text-indigo-800">{monitoringSeats.planLimit || 0} plan seats + {monitoringSeats.addonUnits || 0} purchased add-on seats.</p>
                         {!monitoringSeats.hasActivePlan && <p className="text-sm text-indigo-800">An active plan is required before assigning seats.</p>}
                     </div>
                     <button type="button" onClick={() => { setSelectedMonitoringUser(null); setShowMonitoringModal(true); }}
@@ -339,7 +344,8 @@ function ExtensionsPage() {
                     }}
                     onSubmit={handleUpdateMonitoring}
                     loading={savingMonitoring}
-                    users={selectedMonitoringUser ? [selectedMonitoringUser] : monitoringSeats.users.filter(user => !user.monitoringEnabled)}
+                    users={monitoringSeats.users.filter(user => !user.monitoringEnabled || user.id === selectedMonitoringUser?.id)}
+                    customerCode={monitoringSeats.customerCode || ''}
                     initialUserId={selectedMonitoringUser?.id || ''}
                     initialExtension={selectedMonitoringUser?.monitoringExtension || ''}
                     initialName={selectedMonitoringUser?.name || ''}

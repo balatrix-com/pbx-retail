@@ -12,6 +12,7 @@ import { Role, type User } from '@prisma/client';
 import { CreateSupportUserDto } from './dto/create-support-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdatePermissionsDto } from './dto/update-permissions.dto';
+import { ReassignMonitoringDto } from './dto/reassign-monitoring.dto';
 import { InviteSupportUserDto } from './dto/invite-support-user.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
@@ -56,6 +57,13 @@ export class UsersController {
     @Roles(Role.ADMIN)
     getMonitoringSeats(@GetUser() user: User) {
         return this.usersService.getMonitoringSeats(user.id);
+    }
+
+    @Post('monitoring/reassign')
+    @Roles(Role.ADMIN)
+    @Audit('MONITORING_SEAT_REASSIGNED', 'USER_MANAGEMENT')
+    reassignMonitoring(@GetUser() user: User, @Body() dto: ReassignMonitoringDto) {
+        return this.usersService.reassignMonitoring(user.id, dto);
     }
 
     @Patch(':id/permissions')

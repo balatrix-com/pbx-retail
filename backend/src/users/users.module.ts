@@ -6,9 +6,11 @@ import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
 import { FreeswitchModule } from '../freeswitch/freeswitch.module';
 import { MailModule } from '../mail/mail.module';
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-    imports: [PrismaModule, AuthModule, AuditModule, FreeswitchModule, MailModule],
+    imports: [PrismaModule, AuthModule, AuditModule, FreeswitchModule, MailModule, HttpModule, ConfigModule],
     controllers: [UsersController],
     providers: [UsersService],
     exports: [UsersService]

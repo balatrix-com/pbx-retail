@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { KamailioDBService } from '../freeswitch/kamailio-db.service';
 import { MailService } from '../mail/mail.service';
 import { REDIS_CLIENT } from '../redis/redis.module';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
 import { Role, UserStatus } from '@prisma/client';
 import { BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -52,6 +54,8 @@ describe('UsersService - Staff Invite Lifecycle & Auto-Flush', () => {
                 { provide: KamailioDBService, useValue: { syncSubscriber: jest.fn(), deleteSubscriber: jest.fn() } },
                 { provide: MailService, useValue: mailService },
                 { provide: REDIS_CLIENT, useValue: { publish: jest.fn() } },
+                { provide: HttpService, useValue: { get: jest.fn() } },
+                { provide: ConfigService, useValue: { get: jest.fn() } },
             ],
         }).compile();
 

@@ -10,6 +10,10 @@ import { KamailioDBService } from '../freeswitch/kamailio-db.service';
 import { MailService } from '../mail/mail.service';
 import { REDIS_CLIENT } from '../redis/redis.module';
 import type { RedisClientType } from 'redis';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { firstValueFrom, timeout } from 'rxjs';
+import { ReassignMonitoringDto } from './dto/reassign-monitoring.dto';
 
 @Injectable()
 export class UsersService {
@@ -18,7 +22,40 @@ export class UsersService {
         private kamailioService: KamailioDBService,
         private mailService: MailService,
         @Inject(REDIS_CLIENT) private readonly redisClient: RedisClientType,
+        private readonly httpService: HttpService,
+        private readonly configService: ConfigService,
     ) { }
+
+    private async monitoringAddonUnits(tenantId: string): Promise<number> {
+        const tenant = await this.prisma.tenant.findUnique({
+            where: { id: tenantId }, select: { subBillingCustomerId: true },
+        });
+        if (!tenant?.subBillingCustomerId) throw new BadRequestException('Tenant is not linked to sub-billing');
+        const baseUrl = this.configService.get<string>('SUB_BILLING_API_URL') || 'http://localhost:5005/api';
+        try {
+            const response = await firstValueFrom(this.httpService.get(
+                `${baseUrl}/addons/customer/${encodeURIComponent(tenant.subBillingCustomerId)}/monitoring-entitlement`,
+            ).pipe(timeout(5000)));
+            const units = Number(response.data?.data?.addon_units);
+            if (response.data?.success !== true || !response.data?.data?.subscription_id || !Number.isSafeInteger(units) || units < 0) {
+                throw new Error('Invalid or inactive billing entitlement');
+            }
+            return units;
+        } catch (error) {
+            throw new BadRequestException('Could not verify monitoring add-on entitlement with sub-billing');
+        }
+    }
+
+    private async validateMonitoringExtension(tenantId: string, extension: string): Promise<string> {
+        const tenant = await this.prisma.tenant.findUnique({
+            where: { id: tenantId }, select: { customerCode: true },
+        });
+        const prefix = tenant?.customerCode;
+        if (!prefix || !extension.startsWith(prefix) || !/^\d{2}$/.test(extension.slice(prefix.length)) || extension.slice(-2) === '00') {
+            throw new BadRequestException('Monitoring extension must use the customer code followed by 01–99');
+        }
+        return prefix;
+    }
 
     // Helper to create audit log
     private async createAuditLog(
@@ -345,23 +382,23 @@ export class UsersService {
         if (monitoringEnabled && (!extension || !secret)) {
             throw new BadRequestException('Monitoring extension and SIP password are required');
         }
-        if (monitoringEnabled && targetUser.monitoringEnabled && extension !== targetUser.monitoringExtension) {
-            throw new BadRequestException('Monitoring extension number cannot be changed; remove and recreate the seat');
-        }
         if (monitoringEnabled) {
-            const tenant = await this.prisma.tenant.findUnique({
-                where: { id: targetUser.tenantId }, select: { customerCode: true },
-            });
-            const prefix = tenant?.customerCode;
-            if (!prefix || !extension!.startsWith(prefix) || !/^\d+$/.test(extension!.slice(prefix.length))) {
-                throw new BadRequestException('Monitoring extension must use this tenant customer code and a numeric suffix');
-            }
+            await this.validateMonitoringExtension(targetUser.tenantId, extension!);
         }
+
+        // Resolve billing entitlement before taking the tenant advisory lock.
+        const addonUnits = monitoringEnabled && !targetUser.monitoringEnabled
+            ? await this.monitoringAddonUnits(targetUser.tenantId) : 0;
 
         const updatedUser = await this.prisma.$transaction(async tx => {
             // Serialize seat changes for this tenant so concurrent Admin requests cannot exceed the plan.
             if (extension) await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`monitor-extension:${extension}`}))`;
             await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`monitor-tenant:${targetUser.tenantId}`}))`;
+            const currentUser = await tx.user.findUnique({ where: { id: targetUserId } });
+            if (!currentUser || currentUser.monitoringEnabled !== targetUser.monitoringEnabled ||
+                currentUser.monitoringExtension !== targetUser.monitoringExtension) {
+                throw new BadRequestException('Monitoring seat changed; refresh and try again');
+            }
             if (monitoringEnabled && !targetUser.monitoringEnabled) {
                 const subscription = await tx.subscription.findFirst({
                     where: { tenantId: targetUser.tenantId!, status: 'ACTIVE' },
@@ -370,7 +407,7 @@ export class UsersService {
                 });
                 if (!subscription) throw new BadRequestException('An active package is required before assigning monitoring extensions');
                 const assigned = await tx.user.count({ where: { tenantId: targetUser.tenantId!, monitoringEnabled: true } });
-                const limit = subscription.plan.maxMonitoringExtensions;
+                const limit = subscription.plan.maxMonitoringExtensions + addonUnits;
                 if (assigned >= limit) throw new BadRequestException(`Monitoring extension quota reached (${assigned}/${limit})`);
             }
             if (monitoringEnabled) {
@@ -395,22 +432,32 @@ export class UsersService {
         try {
             if (monitoringEnabled) {
                 await this.kamailioService.syncSubscriber(extension!, secret!, true);
+                if (targetUser.monitoringExtension && targetUser.monitoringExtension !== extension) {
+                    await this.kamailioService.deleteSubscriber(targetUser.monitoringExtension, true);
+                }
             } else if (targetUser.monitoringExtension) {
                 await this.kamailioService.deleteSubscriber(targetUser.monitoringExtension, true);
             }
         } catch (error) {
+            if (monitoringEnabled && extension && extension !== targetUser.monitoringExtension) {
+                try { await this.kamailioService.deleteSubscriber(extension, true); } catch (_) { /* best effort */ }
+            }
+            if (targetUser.monitoringEnabled && targetUser.monitoringExtension && targetUser.monitoringSecret) {
+                try { await this.kamailioService.syncSubscriber(targetUser.monitoringExtension, targetUser.monitoringSecret, true); } catch (_) { /* best effort */ }
+            }
             await this.prisma.user.update({
                 where: { id: targetUserId },
                 data: {
                     monitoringEnabled: targetUser.monitoringEnabled,
                     monitoringExtension: targetUser.monitoringExtension,
                     monitoringSecret: targetUser.monitoringSecret,
+                    name: targetUser.name,
                 },
             });
             throw new BadRequestException('Could not synchronize the monitoring SIP extension; the change was reverted');
         }
 
-        if (!monitoringEnabled) {
+        if (!monitoringEnabled || targetUser.monitoringExtension !== updatedUser.monitoringExtension) {
             try {
                 await this.redisClient.publish('monitor_seat_changes', JSON.stringify({ userId: targetUserId }));
             } catch (error) {
@@ -432,10 +479,86 @@ export class UsersService {
         };
     }
 
+    async reassignMonitoring(actorId: string, dto: ReassignMonitoringDto) {
+        if (dto.fromUserId === dto.toUserId) throw new BadRequestException('Select a different user for reassignment');
+        const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { role: true, tenantId: true } });
+        if (actor?.role !== Role.ADMIN || !actor.tenantId) throw new ForbiddenException('Admin access required');
+        const extension = dto.monitoringExtension.trim();
+        await this.validateMonitoringExtension(actor.tenantId, extension);
+        const original = await this.prisma.$transaction(async tx => {
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`monitor-tenant:${actor.tenantId}`}))`;
+            // Lock both rows in a stable order, then validate their current state under the lock.
+            const ids = [dto.fromUserId, dto.toUserId].sort();
+            await tx.$queryRaw`SELECT id FROM users WHERE id IN (${ids[0]}, ${ids[1]}) ORDER BY id FOR UPDATE`;
+            const [from, to] = await Promise.all([
+                tx.user.findUnique({ where: { id: dto.fromUserId } }),
+                tx.user.findUnique({ where: { id: dto.toUserId } }),
+            ]);
+            if (!from || !to || from.tenantId !== actor.tenantId || to.tenantId !== actor.tenantId) {
+                throw new ForbiddenException('Both users must belong to your tenant');
+            }
+            if (!from.monitoringEnabled || !from.monitoringExtension || !from.monitoringSecret) {
+                throw new BadRequestException('Source user does not have an active monitoring seat');
+            }
+            if (to.monitoringEnabled || to.monitoringExtension) throw new BadRequestException('Destination user already has a monitoring seat');
+            if (to.status !== UserStatus.ACTIVE || (to.role !== Role.ADMIN && to.role !== Role.SUPPORT)) {
+                throw new BadRequestException('Destination must be an active Admin or Support user');
+            }
+            const [otherUser, regularExtension] = await Promise.all([
+                tx.user.findFirst({ where: { monitoringExtension: extension, id: { notIn: [from.id, to.id] } } }),
+                tx.extension.findFirst({ where: { extensionNumber: extension } }),
+            ]);
+            if (otherUser || regularExtension) throw new BadRequestException(`Extension ${extension} is already in use`);
+            const secret = dto.monitoringSecret?.trim() || from.monitoringSecret;
+            await tx.user.update({ where: { id: from.id }, data: {
+                monitoringEnabled: false, monitoringExtension: null, monitoringSecret: null,
+            } });
+            await tx.user.update({ where: { id: to.id }, data: {
+                monitoringEnabled: true, monitoringExtension: extension, monitoringSecret: secret,
+                name: dto.name === undefined ? undefined : dto.name,
+            } });
+            return { from, to, secret };
+        });
+
+        try {
+            await this.kamailioService.syncSubscriber(extension, original.secret, true);
+            if (original.from.monitoringExtension !== extension) {
+                await this.kamailioService.deleteSubscriber(original.from.monitoringExtension!, true);
+            }
+        } catch (error) {
+            // Kamailio is external to the PBX DB: compensate both stores on failure.
+            await this.prisma.$transaction(async tx => {
+                await tx.user.update({ where: { id: original.to.id }, data: {
+                    monitoringEnabled: original.to.monitoringEnabled,
+                    monitoringExtension: original.to.monitoringExtension,
+                    monitoringSecret: original.to.monitoringSecret,
+                    name: original.to.name,
+                } });
+                await tx.user.update({ where: { id: original.from.id }, data: {
+                    monitoringEnabled: original.from.monitoringEnabled,
+                    monitoringExtension: original.from.monitoringExtension,
+                    monitoringSecret: original.from.monitoringSecret,
+                } });
+            });
+            if (extension !== original.from.monitoringExtension) {
+                try { await this.kamailioService.deleteSubscriber(extension, true); } catch (_) { /* best effort */ }
+            }
+            try { await this.kamailioService.syncSubscriber(original.from.monitoringExtension!, original.from.monitoringSecret!, true); } catch (_) { /* best effort */ }
+            throw new BadRequestException('Could not synchronize the reassigned SIP extension; the transfer was reverted');
+        }
+        try { await this.redisClient.publish('monitor_seat_changes', JSON.stringify({ userId: original.from.id })); }
+        catch (error) { console.error('Failed to revoke old monitor session', error); }
+        await this.createAuditLog(actorId, original.to.id, UserAuditAction.UPDATE_USER, {
+            field: 'monitoringSeatReassignment', fromUserId: original.from.id,
+            toUserId: original.to.id, oldExtension: original.from.monitoringExtension, monitoringExtension: extension,
+        });
+        return { fromUserId: original.from.id, toUserId: original.to.id, monitoringExtension: extension };
+    }
+
     async getMonitoringSeats(actorId: string) {
         const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { tenantId: true, role: true } });
         if (actor?.role !== Role.ADMIN || !actor.tenantId) throw new ForbiddenException('Admin access required');
-        const [subscription, users, used] = await Promise.all([
+        const [subscription, users, used, tenant] = await Promise.all([
             this.prisma.subscription.findFirst({
                 where: { tenantId: actor.tenantId, status: 'ACTIVE' },
                 include: { plan: { select: { maxMonitoringExtensions: true } } },
@@ -447,9 +570,13 @@ export class UsersService {
                 orderBy: { email: 'asc' },
             }),
             this.prisma.user.count({ where: { tenantId: actor.tenantId, monitoringEnabled: true } }),
+            this.prisma.tenant.findUnique({ where: { id: actor.tenantId }, select: { customerCode: true } }),
         ]);
-        const limit = subscription?.plan.maxMonitoringExtensions ?? 0;
-        return { users, used, limit, remaining: Math.max(0, limit - used), hasActivePlan: !!subscription };
+        const planLimit = subscription?.plan.maxMonitoringExtensions ?? 0;
+        const addonUnits = subscription ? await this.monitoringAddonUnits(actor.tenantId) : 0;
+        const limit = planLimit + addonUnits;
+        return { users, used, limit, planLimit, addonUnits, customerCode: tenant?.customerCode,
+            remaining: Math.max(0, limit - used), hasActivePlan: !!subscription };
     }
 
     async deleteUser(actorId: string, targetUserId: string) {

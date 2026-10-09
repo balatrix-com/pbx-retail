@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Hash, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import api from '../../services/api';
 
 const MonitoringExtensionModal = ({
@@ -12,15 +12,16 @@ const MonitoringExtensionModal = ({
     initialName = '',
     initialUserId = '',
     users = [],
-    tenantId
+    tenantId,
+    customerCode = ''
 }) => {
-    const [extension, setExtension] = useState(initialExtension);
+    const [suffix, setSuffix] = useState(initialExtension && customerCode && initialExtension.startsWith(customerCode)
+        ? initialExtension.slice(customerCode.length) : '');
     const [secret, setSecret] = useState(initialSecret);
     const [name, setName] = useState(initialName);
     const [selectedUserId, setSelectedUserId] = useState(initialUserId);
     const [userList, setUserList] = useState(users);
     const [error, setError] = useState('');
-    const [fetching, setFetching] = useState(true);
 
     // Fetch users if not passed via props (runs once on mount or when tenantId changes)
     React.useEffect(() => {
@@ -55,44 +56,26 @@ const MonitoringExtensionModal = ({
         return () => { isMounted = false; };
     }, [tenantId]);
 
-    // Fetch next available extension
-    React.useEffect(() => {
-        if (isEditing || initialExtension) return;
-
-        const fetchNextExtension = async () => {
-            try {
-                setFetching(true);
-                const params = tenantId ? { tenantId } : {};
-                const res = await api.get('/telecom/extensions/next-number', { params });
-                if (res.data.nextExtensionNumber) {
-                    setExtension(res.data.nextExtensionNumber.toString());
-                }
-            } catch (err) {
-                console.error("Failed to fetch next extension number", err);
-            } finally {
-                setFetching(false);
-            }
-        };
-
-        fetchNextExtension();
-    }, [isEditing, initialExtension, tenantId]);
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
-        if (!selectedUserId && !isEditing) {
+        if (!selectedUserId) {
             setError('Please select a user');
             return;
         }
 
-        if (!extension || (!secret && !isEditing)) {
-            setError('Extension and SIP password are required');
+        if (!customerCode || !/^(0[1-9]|[1-9][0-9])$/.test(suffix)) {
+            setError('Enter a two-digit monitoring suffix from 01 to 99');
+            return;
+        }
+        if (!secret && !isEditing) {
+            setError('SIP password is required');
             return;
         }
 
         onSubmit({
-            monitoringExtension: extension,
+            monitoringExtension: `${customerCode}${suffix}`,
             monitoringSecret: secret,
             name,
             userId: selectedUserId
@@ -112,7 +95,7 @@ const MonitoringExtensionModal = ({
                 </p>
 
                 {error && (
-                    <div className="mb-4 bg-red-50 text-red-600 p-2 rounded text-sm border border-red-200">
+                    <div role="alert" className="mb-4 bg-red-50 text-red-600 p-2 rounded text-sm border border-red-200">
                         {error}
                     </div>
                 )}
@@ -120,19 +103,17 @@ const MonitoringExtensionModal = ({
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* User Selection Dropdown */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Select User</label>
+                        <label htmlFor="monitoring-user" className="block text-sm font-medium text-gray-700 mb-1">Select User</label>
                         <select
-                            className={`w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-primary-500 outline-none ${isEditing ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'}`}
+                            id="monitoring-user"
+                            className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-primary-500 outline-none bg-white"
                             value={selectedUserId}
                             onChange={e => {
                                 const uid = e.target.value;
                                 setSelectedUserId(uid);
                                 const selected = userList.find(u => u.id === uid);
-                                if (selected && !name) {
-                                    setName(selected.name || selected.email);
-                                }
+                                if (selected) setName(selected.name || selected.email);
                             }}
-                            disabled={isEditing}
                             required
                         >
                             <option value="" disabled>Select a user...</option>
@@ -146,31 +127,27 @@ const MonitoringExtensionModal = ({
                                 );
                             })}
                         </select>
-                        {isEditing && <p className="text-xs text-gray-500 mt-1">User cannot be changed once assigned.</p>}
+                        {isEditing && <p className="text-xs text-gray-500 mt-1">Choosing another user transfers this monitoring seat.</p>}
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Monitoring Extension</label>
-                        <div className="relative">
+                        <label htmlFor="monitoring-suffix" className="block text-sm font-medium text-gray-700 mb-1">Monitoring Extension</label>
+                        <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 rounded border border-gray-300 bg-gray-100 px-3 py-2 font-mono text-gray-700" title="Customer code cannot be changed"><Lock size={14} />{customerCode || 'Loading'}</span>
                             <input
                                 type="text"
-                                className={`w-full border rounded p-2 pl-9 focus:ring-2 focus:ring-primary-500 outline-none ${isEditing ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200' : 'border-gray-300'}`}
-                                value={extension}
-                                onChange={e => !isEditing && setExtension(e.target.value)}
-                                placeholder="e.g. 5001"
-                                disabled={isEditing || fetching}
+                                id="monitoring-suffix"
+                                inputMode="numeric"
+                                pattern="[0-9]{2}"
+                                maxLength={2}
+                                className="w-20 border border-gray-300 rounded p-2 font-mono focus:ring-2 focus:ring-primary-500 outline-none"
+                                value={suffix}
+                                onChange={e => setSuffix(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                                placeholder="01"
                                 required
                             />
-                            <div className="absolute left-3 top-2.5 text-gray-400">
-                                <Hash size={16} />
-                            </div>
-                            {isEditing && (
-                                <div className="absolute right-3 top-2.5 text-gray-400" title="Extension number cannot be changed">
-                                    <Lock size={16} />
-                                </div>
-                            )}
                         </div>
-                        {isEditing && <p className="text-xs text-gray-500 mt-1">Extension number cannot be changed once assigned.</p>}
+                        <p className="text-xs text-gray-500 mt-1">Enter 01–99. The customer code stays locked.</p>
                     </div>
 
                     <div>
