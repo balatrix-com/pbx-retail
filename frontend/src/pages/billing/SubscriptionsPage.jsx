@@ -41,7 +41,7 @@ export default function SubscriptionsPage() {
   },[activation?.plan_id,activation?.duration_unit,activation?.duration_count,tenantId]);
   useEffect(() => {
     subscriptionService.getPlans().then(setPlans).catch(() => {});
-    if (superAdmin) api.get('/tenants', { params: { limit: 1000 } }).then(r => setTenants(r.data?.data || r.data?.items || r.data || [])).catch(e => setError(e.response?.data?.message || 'Could not load tenants'));
+    if (superAdmin) api.get('/tenants', { params: { limit: 1000, status: 'ALL' } }).then(r => setTenants(r.data?.data || r.data?.items || r.data || [])).catch(e => setError(e.response?.data?.message || 'Could not load tenants'));
   }, [superAdmin]);
   async function load() {
     if (!tenantId) { setSubscriptions([]); return; }
@@ -69,9 +69,11 @@ export default function SubscriptionsPage() {
   const summary = resource => ({ total: active.reduce((n,s) => n + Number(s.entitlement_snapshot[resource] || 0),0), used: active.reduce((n,s) => n + Number(s.usage[resource] || 0),0) });
   const numbers = summary('numbers'), monitoring = summary('monitoring_extensions');
   const currentPlan = plans.find(p => p.plan_id === activation?.plan_id);
+  const customerArchived = tenants.some(t => t.id === tenantId && (t.status === 'ARCHIVED' || t.archiveJob));
   return <div className="p-6 space-y-6 text-gray-900 dark:text-slate-100">
     <header className="flex flex-wrap justify-between gap-4"><div><h1 className="text-2xl font-bold">Subscriptions</h1><p className="text-gray-500">Manage base and capacity plans, renewals, and the assets each subscription owns.</p></div>
-      <button className={buttonClass} disabled={!tenantId || busy} onClick={() => { setOperationKey(crypto.randomUUID()); setActivation({ plan_id: '', duration_unit: 'months', duration_count: 1, auto_renew: false, payment_mode: 'wallet' }); }}>Activate a plan</button></header>
+      <button className={buttonClass} disabled={!tenantId || busy || customerArchived} onClick={() => { setOperationKey(crypto.randomUUID()); setActivation({ plan_id: '', duration_unit: 'months', duration_count: 1, auto_renew: false, payment_mode: 'wallet' }); }}>Activate a plan</button></header>
+    {customerArchived && <p className="p-3 rounded-lg bg-gray-100 dark:bg-slate-800">This customer is archiving or archived. Subscription and financial history are retained; new activation is disabled.</p>}
     {superAdmin && <label className="block max-w-lg">Tenant<select className={inputClass} value={tenantId} onChange={e => setTenantId(e.target.value)}><option value="">Select tenant</option>{Array.isArray(tenants) && tenants.map(t => <option key={t.id} value={t.id}>{t.name} ({t.customerCode})</option>)}</select></label>}
     {error && <div role="alert" className="rounded-lg border border-red-300 bg-red-50 text-red-800 p-4">{error}<button className="ml-4 underline" onClick={load}>Refresh</button></div>}
     <div className="grid sm:grid-cols-3 gap-4">{[['Base subscription', active.find(s => s.subscription_type === 'base')?.status || 'No active base'], ['Numbers', `${numbers.used} / ${numbers.total} assigned`], ['Monitoring extensions', `${monitoring.used} / ${monitoring.total} assigned`]].map(([label,value]) => <div key={label} className="border rounded-xl p-4"><p className="text-gray-500">{label}</p><p className="text-lg font-semibold">{value}</p></div>)}</div>

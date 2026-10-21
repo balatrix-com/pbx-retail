@@ -70,7 +70,7 @@ const PhoneNumbersPage = () => {
         try {
             const [numbersData, walletData, quotaData] = await Promise.all([
                 telecomService.getPhoneNumbers(),
-                user?.tenantId ? walletService.getWallet(user.tenantId).catch(() => ({ balance: 0 })) : Promise.resolve({ balance: 0 }),
+                user?.tenantId ? walletService.getBalance(user.tenantId).catch(() => ({ balance: 0 })) : Promise.resolve({ balance: 0 }),
                 isAdmin ? telecomService.getNumberQuota() : Promise.resolve(null),
             ]);
 

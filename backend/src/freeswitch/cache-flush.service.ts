@@ -34,6 +34,7 @@ export class CacheFlushService {
         try {
             const response = await lastValueFrom(
                 this.httpService.post(url, data.toString(), {
+                    timeout: 5000,
                     headers: {
                         'X-Cache-Token': this.apiToken,
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -64,6 +65,7 @@ export class CacheFlushService {
         try {
             const response = await lastValueFrom(
                 this.httpService.post(url, data.toString(), {
+                    timeout: 5000,
                     headers: {
                         'X-Cache-Token': this.apiToken,
                         'Content-Type': 'application/x-www-form-urlencoded',

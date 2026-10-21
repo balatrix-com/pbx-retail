@@ -14,6 +14,7 @@ import * as bcrypt from 'bcrypt';
 
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { assertTenantServiceAccess } from './tenant-service-access';
 
 @Injectable()
 export class AuthService {
@@ -42,6 +43,7 @@ export class AuthService {
         console.log(`Password match: ${isMatch}`);
 
         if (isMatch) {
+            await assertTenantServiceAccess(this.prisma, user);
             const { password, ...result } = user;
             return result;
         }
@@ -113,6 +115,7 @@ export class AuthService {
     }
 
     async login(user: User) {
+        await assertTenantServiceAccess(this.prisma, user);
         const userVar = user as any;
         const tokens = await this.getTokens(userVar.id, userVar.email, userVar.role, userVar.tenantId, userVar.forcePasswordChange, userVar.monitoringEnabled);
         await this.updateRefreshToken(userVar.id, tokens.refreshToken);
@@ -172,6 +175,8 @@ export class AuthService {
             user.refreshToken,
         );
         if (!refreshTokenMatches) throw new UnauthorizedException('Access Denied');
+
+        await assertTenantServiceAccess(this.prisma, user);
 
         const userVar = user as any;
         const tokens = await this.getTokens(userVar.id, userVar.email, userVar.role, userVar.tenantId, userVar.forcePasswordChange, userVar.monitoringEnabled);

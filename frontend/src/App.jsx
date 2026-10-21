@@ -30,6 +30,7 @@ import CdrsPage from './pages/telecom/CdrsPage';
 import DIDForwardsPage from './pages/telecom/did-forwards/DIDForwardsPage';
 import DIDForwardForm from './pages/telecom/did-forwards/DIDForwardForm';
 import RevenuePage from './pages/admin/RevenuePage';
+import SipTracesPage from './pages/admin/SipTracesPage';
 
 import UserManagement from './pages/admin/UserManagement';
 import SuperAdminUsers from './pages/admin/SuperAdminUsers';
@@ -161,6 +162,7 @@ function App() {
 
                                             <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
                                                 <Route path="/telecom/trunks" element={<CarriersGatewaysPage />} />
+                                                <Route path="/telecom/sip-traces" element={<SipTracesPage tenantMode />} />
                                             </Route>
 
 
@@ -177,6 +179,7 @@ function App() {
                                                 <Route path="/super-admin/plans/new" element={<CreatePlanPage />} />
                                                 <Route path="/tenants" element={<TenantsPage />} />
                                                 <Route path="/revenue" element={<RevenuePage />} />
+                                                <Route path="/super-admin/sip-traces" element={<SipTracesPage />} />
                                                 <Route path="/admin/extension-status" element={<ExtensionStatus />} />
                                             </Route>
                                         </Route>

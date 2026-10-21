@@ -46,6 +46,7 @@ export class SubscriptionsService {
     return s;
   }
   async activate(tenantId: string, input: any, actor: string) {
+    await this.assertMutable(tenantId);
     const t = await this.tenant(tenantId);
     const result = await this.request('activate', 'POST', { customer_id: t.subBillingCustomerId || t.customerCode,
       plan_id: input.plan_id, duration_unit: input.duration_unit, duration_count: input.duration_count,
@@ -53,6 +54,7 @@ export class SubscriptionsService {
     await this.reconcile(tenantId); return result;
   }
   async action(tenantId: string, id: string, action: string, method: string, body?: any) {
+    if (method !== 'GET') await this.assertMutable(tenantId);
     const s = await this.owned(tenantId, id);
     const result = await this.request(`${s.id}/${action}`, method, body);
     if (method !== 'GET') await this.reconcile(tenantId);
@@ -66,6 +68,7 @@ export class SubscriptionsService {
     await this.reconcile(tenantId); return result;
   }
   async capacity(tenantId: string, resource: string, selected?: string) {
+    await this.assertMutable(tenantId);
     const rows = (await this.list(tenantId)).filter(s => ['active', 'grace'].includes(s.status));
     const eligible = rows.filter(s => Number(s.entitlement_snapshot[resource] || 0) > Number(s.usage[resource] || 0));
     const s = selected ? eligible.find(s => s.id === selected) : eligible[0];
@@ -73,6 +76,7 @@ export class SubscriptionsService {
     return s;
   }
   async assignMonitoring(tenantId: string, user: any, selected?: string) {
+    await this.assertMutable(tenantId);
     const rows = await this.list(tenantId);
     const existing = rows.find(s => s.assets.some((a: any) => a.type === 'monitoring' && a.value === user.id && a.status === 'active'));
     const s = selected ? await this.owned(tenantId, selected) : existing || await this.capacity(tenantId, 'monitoring_extensions');
@@ -128,7 +132,13 @@ export class SubscriptionsService {
       await this.reconcileLocked(tenantId);
     }, { timeout: 120000 });
   }
+  private async assertMutable(tenantId: string) {
+    const jobs = await this.prisma.$queryRawUnsafe<any[]>('SELECT tenant_id FROM tenant_archive_jobs WHERE tenant_id=$1', tenantId);
+    if (jobs.length) throw new BadRequestException('Customer is archiving or archived; only historical access is allowed');
+  }
   private async reconcileLocked(tenantId: string) {
+    const archival = await this.prisma.$queryRawUnsafe<any[]>('SELECT tenant_id FROM tenant_archive_jobs WHERE tenant_id=$1', tenantId);
+    if (archival.length) return; // Never recreate SIP assets after archive has begun.
     // Re-read authoritative state: delayed/replayed events must never restore stale ownership.
     let rows = await this.list(tenantId);
     for (const s of rows.filter(s => s.subscription_type === 'base')) {

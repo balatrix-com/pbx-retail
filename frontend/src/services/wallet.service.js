@@ -1,6 +1,16 @@
 import api from './api';
 
 export const walletService = {
+    getBalance: async () => {
+        const response = await api.get('/wallet');
+        return response.data;
+    },
+
+    getTransactions: async () => {
+        const response = await api.get('/wallet/transactions');
+        return response.data;
+    },
+
     getWallet: async () => {
         const [wallet, transactions] = await Promise.all([
             api.get('/wallet'),

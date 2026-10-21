@@ -15,6 +15,7 @@ import type { RedisClientType } from 'redis';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { MonitoringAccessService } from './monitoring-access.service';
+import { assertTenantServiceAccess } from '../auth/tenant-service-access';
 
 const ANALYTICS_INTERVAL_MS = 30_000; // 30 seconds
 
@@ -32,6 +33,7 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
     /** tenantId → set of socket IDs currently in that room */
     private readonly tenantRooms = new Map<string, Set<string>>();
     private analyticsTimer?: ReturnType<typeof setInterval>;
+    private serviceStateTimer?: ReturnType<typeof setInterval>;
 
     constructor(
         @Inject(REDIS_SUBSCRIBER) private readonly redisSubscriber: RedisClientType,
@@ -100,6 +102,9 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
                     this.logger.warn('Could not process monitoring seat change');
                 }
             });
+            await this.redisSubscriber.subscribe('tenant:service-state-changed', async () => {
+                await this.disconnectBlockedSockets();
+            });
             this.logger.log('Subscribed to calls_stream successfully');
         } catch (err) {
             this.logger.error('Failed to subscribe to Redis:', err);
@@ -107,6 +112,25 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
 
         // Start the analytics snapshot ticker
         this.startAnalyticsTicker();
+        this.serviceStateTimer = setInterval(() => void this.disconnectBlockedSockets(), 5000);
+        this.serviceStateTimer.unref();
+    }
+
+    private async disconnectBlockedSockets() {
+        try {
+            const sockets = await this.server.fetchSockets();
+            const tenantIds = new Set(sockets.filter(s => s.data.user?.role !== 'SUPER_ADMIN').map(s => s.data.user?.tenantId).filter(Boolean));
+            for (const tenantId of tenantIds) {
+                const tenant = await this.prismaService.tenant.findUnique({ where: { id: tenantId }, select: { serviceBlocked: true } });
+                if (tenant && !tenant.serviceBlocked) continue;
+                for (const socket of sockets) if (socket.data.user?.tenantId === tenantId && socket.data.user?.role !== 'SUPER_ADMIN') socket.disconnect(true);
+            }
+        } catch (error) { this.logger.warn(`Tenant socket state check failed: ${error.message}`); }
+    }
+
+    onModuleDestroy() {
+        if (this.analyticsTimer) clearInterval(this.analyticsTimer);
+        if (this.serviceStateTimer) clearInterval(this.serviceStateTimer);
     }
 
     // ---------------------------------------------------------------------------
@@ -220,6 +244,7 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
             }
 
             const payload = this.jwtService.verify(token);
+            await assertTenantServiceAccess(this.prismaService, payload);
 
             // Check permissions
             try {
@@ -259,6 +284,9 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
             client.emit('error', { message: 'Unauthorized' });
             return;
         }
+
+        try { await assertTenantServiceAccess(this.prismaService, user); }
+        catch { client.disconnect(true); return; }
 
         this.logger.log(`User attempting join: ${user.sub}, Role: ${user.role}, UserTenant: ${user.tenantId}, ReqTenant: ${tenantId}`); // DEBUG
 

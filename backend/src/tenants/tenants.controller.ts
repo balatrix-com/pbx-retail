@@ -1,5 +1,5 @@
 
-import { Controller, Get, Post, Delete, Body, Patch, Param, UseGuards, Query, Put, Req, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Patch, Param, UseGuards, Query, Put, Req, ForbiddenException, BadRequestException, HttpCode } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -7,11 +7,12 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { UpdateTenantDetailsDto } from './dto/update-tenant-details.dto';
 import { Audit } from '../audit/audit.decorator';
+import { TenantArchiveService } from './tenant-archive.service';
 
 @Controller('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantsController {
-    constructor(private readonly tenantsService: TenantsService) { }
+    constructor(private readonly tenantsService: TenantsService, private readonly archives: TenantArchiveService) { }
 
     @Get('profile/details')
     @Roles(Role.SUPER_ADMIN, Role.ADMIN)
@@ -30,12 +31,14 @@ export class TenantsController {
         const page = query.page ? parseInt(query.page) : 1;
         const limit = query.limit ? parseInt(query.limit) : 100;
         const blocked = query.blocked === 'true' ? true : query.blocked === 'false' ? false : undefined;
+        if (query.status && !['ACTIVE','SUSPENDED','ARCHIVED','ALL'].includes(query.status)) throw new BadRequestException('Invalid tenant status');
 
         return this.tenantsService.listTenants({
             page,
             limit,
             search: query.search,
-            blocked
+            blocked,
+            status: query.status
         });
     }
 
@@ -105,11 +108,26 @@ export class TenantsController {
 
 
     @Delete(':id')
+    @HttpCode(202)
     @Roles(Role.SUPER_ADMIN)
-    @Audit('TENANT_DELETED', 'USER_MANAGEMENT')
-    deleteTenant(@Param('id') id: string) {
-        return this.tenantsService.deleteTenant(id);
+    @Audit('TENANT_ARCHIVE_REQUESTED', 'USER_MANAGEMENT')
+    deleteTenant(@Param('id') id: string, @Req() req: any) {
+        return this.tenantsService.deleteTenant(id, req.user.id);
     }
+
+    @Get(':id/archive')
+    @Roles(Role.SUPER_ADMIN)
+    getArchive(@Param('id') id: string) { return this.archives.status(id); }
+
+    @Post(':id/archive/retry')
+    @HttpCode(202)
+    @Roles(Role.SUPER_ADMIN)
+    retryArchive(@Param('id') id: string, @Req() req: any) { return this.archives.request(id, req.user.id); }
+
+    @Post(':id/archive/release-numbers')
+    @Roles(Role.SUPER_ADMIN)
+    @Audit('TENANT_NUMBERS_RELEASED', 'USER_MANAGEMENT')
+    releaseNumbers(@Param('id') id: string, @Req() req: any, @Body() input: any) { return this.archives.releaseNumbers(id, req.user.id, input); }
 
     @Post()
     @Roles(Role.SUPER_ADMIN)

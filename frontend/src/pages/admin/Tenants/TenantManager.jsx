@@ -60,6 +60,18 @@ const TenantManager = ({ tenantId, onClose }) => {
 
     if (!tenant) return null;
 
+    if (tenant.status === 'ARCHIVED' || tenant.archiveJob) return (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div role="dialog" aria-modal="true" aria-label="Archived customer" className="bg-white rounded-2xl p-6 max-w-lg space-y-4">
+                <h2 className="text-xl font-bold">{tenant.name} — {tenant.status === 'ARCHIVED' ? 'Archived' : 'Archive in progress'}</h2>
+                {tenant.archiveJob?.last_error && <p role="alert" className="text-red-700">{tenant.archiveJob.last_error}</p>}
+                <p>Customer ID: {tenant.customerCode || tenant.id}. Calls and logins are disabled. Financial and call history are retained; numbers remain held until explicitly released.</p>
+                <a className="text-primary-700 underline" href={`/super-admin/subscriptions?tenantId=${encodeURIComponent(tenant.id)}`}>View subscription history</a>
+                <button onClick={onClose} className="block rounded-xl border p-3">Close</button>
+            </div>
+        </div>
+    );
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>

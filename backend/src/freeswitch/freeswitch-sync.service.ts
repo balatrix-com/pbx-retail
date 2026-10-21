@@ -408,7 +408,7 @@ export class FreeSwitchSyncService {
     /**
      * Bulk delete all routing data for a tenant from FreeSWITCH
      */
-    async bulkDeleteTenantData(customerCode: string): Promise<void> {
+    async bulkDeleteTenantData(customerCode: string, strict = false): Promise<void> {
         if (!customerCode) return;
         
         try {
@@ -430,6 +430,7 @@ export class FreeSwitchSyncService {
             }
         } catch (error) {
             this.logger.error(`Failed bulk FreeSWITCH cleanup for ${customerCode}: ${error.message}`);
+            if (strict) throw error;
         }
     }
 

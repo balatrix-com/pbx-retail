@@ -1,5 +1,6 @@
 import { Module, Global, Injectable, Inject, Logger } from '@nestjs/common';
 import { createClient } from 'redis';
+import { OnModuleInit, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -8,13 +9,70 @@ import { PrismaService } from '../prisma/prisma.service';
 export const LOOKUP_REDIS_CLIENT = 'LOOKUP_REDIS_CLIENT';
 
 @Injectable()
-export class LookupRedisService {
+export class LookupRedisService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(LookupRedisService.name);
+    private stateTimer?: ReturnType<typeof setInterval>;
+    private stateSyncRunning = false;
 
     constructor(
         @Inject(LOOKUP_REDIS_CLIENT) private readonly redisClient: any,
         private prisma: PrismaService,
     ) { }
+
+    async onModuleInit() {
+        await this.retryServiceStates();
+        this.stateTimer = setInterval(() => void this.retryServiceStates(), 5000);
+        this.stateTimer.unref();
+    }
+
+    onModuleDestroy() { if (this.stateTimer) clearInterval(this.stateTimer); }
+
+    private async retryServiceStates() {
+        if (this.stateSyncRunning || !this.redisClient.isReady) return;
+        this.stateSyncRunning = true;
+        try {
+            const rows = await this.prisma.$queryRawUnsafe<any[]>(
+                `SELECT DISTINCT ON (customer_code) * FROM tenant_service_state_events
+                 WHERE customer_code IN (SELECT customer_code FROM tenant_service_state_events WHERE delivered_at IS NULL)
+                 ORDER BY customer_code,version DESC LIMIT 100`);
+            for (const row of rows) await this.deliverServiceState(row);
+        } catch (error) {
+            this.logger.warn(`Tenant service state delivery pending: ${error.message}`);
+        } finally { this.stateSyncRunning = false; }
+    }
+
+    private async deliverServiceState(row: any) {
+        if (!this.redisClient.isReady) throw new Error('Lookup Redis is unavailable');
+        const payload = JSON.stringify({ tenant_id: row.tenant_id, customer_id: row.customer_code,
+            state: row.state, version: String(row.version), updated_at: row.created_at });
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+        await Promise.race([this.redisClient.eval(`
+            local current = redis.call('GET', KEYS[1])
+            if current then
+              local ok, old = pcall(cjson.decode, current)
+              if ok and tonumber(old.version or '0') > tonumber(ARGV[2]) then return 0 end
+            end
+            redis.call('SET', KEYS[1], ARGV[1])
+            if ARGV[3] == 'ACTIVE' then redis.call('EXPIRE', KEYS[1], 60) end
+            redis.call('PUBLISH', 'tenant:service-state-changed', ARGV[1])
+            return 1`, { keys: [`tenant:service-state:${row.customer_code}`], arguments: [payload, String(row.version), row.state] }),
+            new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error('Redis service-state write timed out')), 3000); })]);
+        } finally { if (timeout) clearTimeout(timeout); }
+        await this.prisma.$executeRawUnsafe('UPDATE tenant_service_state_events SET delivered_at=now() WHERE customer_code=$1 AND version<=$2::bigint AND delivered_at IS NULL', row.customer_code, String(row.version));
+    }
+
+    async syncTenantServiceState(customerCode: string) {
+        try {
+            const rows = await this.prisma.$queryRawUnsafe<any[]>(
+                'SELECT * FROM tenant_service_state_events WHERE customer_code=$1 ORDER BY version DESC LIMIT 1', customerCode);
+            if (!rows.length) throw new Error('Tenant service state migration is required');
+            await this.deliverServiceState(rows[0]);
+        } catch (error) {
+            this.logger.error(`Service state saved in DB but Redis delivery pending: ${error.message}`);
+            throw new ServiceUnavailableException('Service state saved; call-control synchronization is pending. Retry the operation.');
+        }
+    }
 
     /**
      * Normalize phone numbers (DIDs/TFNs) to exclude country code.
@@ -119,7 +177,8 @@ export class LookupRedisService {
         }
     }
 
-    async deleteTenantLookups(tenantId: string) {
+    async deleteTenantLookups(tenantId: string, strict = false) {
+        if (strict && !this.redisClient.isReady) throw new Error('Lookup Redis is unavailable');
         try {
             const tenant = await this.prisma.tenant.findUnique({
                 where: { id: tenantId },
@@ -148,6 +207,7 @@ export class LookupRedisService {
             this.logger.log(`Deleted all lookups for tenant ${tenantId} (${tenant.customerCode})`);
         } catch (err) {
             this.logger.error(`Failed to delete lookups for tenant ${tenantId}: ${err.message}`);
+            if (strict) throw err;
         }
     }
 
