@@ -196,9 +196,13 @@ export class SipTraceService implements OnModuleDestroy {
         : Number.isFinite(parsed) ? parsed
           : epoch > 1e15 ? epoch / 1000 : epoch > 1e12 ? epoch : epoch * 1000;
       const method = String(detail.method || item.method || raw.split(/\r?\n/, 1)[0] || 'SIP');
+      const responseCode = /^[1-6]\d\d$/.test(method) ? Number(method) : null;
+      const cseqMethod = raw.match(/^CSeq:\s*\d+\s+([A-Z]+)\b/im)?.[1] || null;
+      const hasSdp = /^Content-Type:\s*application\/sdp\b/im.test(raw);
       return { id: String(item.id || item.uuid || `${callId}-${timestampMs}-${index}`), callId,
         timestamp: Number.isFinite(timestampMs) && timestampMs > 0 ? new Date(timestampMs).toISOString() : null,
-        timestampMs, method, src: `${protocol.src_ip || item.src_ip || '?'}:${protocol.src_port || item.src_port || '?'}`,
+        timestampMs, method, responseCode, cseqMethod, hasSdp,
+        src: `${protocol.src_ip || item.src_ip || '?'}:${protocol.src_port || item.src_port || '?'}`,
         dst: `${protocol.dst_ip || item.dst_ip || '?'}:${protocol.dst_port || item.dst_port || '?'}`,
         captureId: Number(protocol.capture_id ?? item.capture_id ?? 0), raw };
     }).filter((item): item is NonNullable<typeof item> => item !== null)

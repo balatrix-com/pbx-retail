@@ -27,6 +27,29 @@ describe('SipTraceService', () => {
     expect(result.messages[0]).not.toHaveProperty('raw');
   });
 
+  it('includes SIP response, CSeq and SDP labels without exposing packet bodies in the flow', async () => {
+    const originalBase = process.env.HOMER_API_BASE_URL;
+    const originalToken = process.env.HOMER_API_TOKEN;
+    process.env.HOMER_API_BASE_URL = 'http://127.0.0.1:9088';
+    process.env.HOMER_API_TOKEN = 'test-token';
+    jest.spyOn(service as any, 'event').mockResolvedValue(event);
+    jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ data: [{
+      id: 'packet-1', protocol_header: { time_seconds: 1792576800, src_ip: '10.0.0.1', src_port: 5060, dst_ip: '10.0.0.2', dst_port: 5080 },
+      data_header: { call_id: 'a@test', method: '200' },
+      raw: 'SIP/2.0 200 OK\r\nCSeq: 123 INVITE\r\nContent-Type: application/sdp\r\nAuthorization: Digest secret',
+    }] }) } as Response);
+    try {
+      const result = await service.flow(event.session_uuid);
+      expect(result.messages[0]).toMatchObject({ method: '200', responseCode: 200, cseqMethod: 'INVITE', hasSdp: true });
+      expect(result.messages[0]).not.toHaveProperty('raw');
+    } finally {
+      if (originalBase === undefined) delete process.env.HOMER_API_BASE_URL;
+      else process.env.HOMER_API_BASE_URL = originalBase;
+      if (originalToken === undefined) delete process.env.HOMER_API_TOKEN;
+      else process.env.HOMER_API_TOKEN = originalToken;
+    }
+  });
+
   it('restricts raw message retrieval to the selected event and redacts credentials', async () => {
     jest.spyOn(service as any, 'event').mockResolvedValue(event);
     jest.spyOn(service as any, 'messages').mockResolvedValue([

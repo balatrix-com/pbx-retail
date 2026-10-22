@@ -1,0 +1,114 @@
+.pbx-sip-detail-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  padding: 12px;
+  background: rgba(15, 23, 42, .72);
+  backdrop-filter: blur(3px);
+}
+
+.pbx-sip-detail-shell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .35);
+}
+
+.pbx-sip-detail-header {
+  min-height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.pbx-sip-detail-header p { margin: 0; color: #64748b; font: 600 11px/1.3 var(--font-mono, monospace); letter-spacing: .12em; }
+.pbx-sip-detail-header h2 { margin: 4px 0; font-size: 20px; font-weight: 700; }
+.pbx-sip-detail-header span { display: block; overflow-wrap: anywhere; color: #2563eb; font: 12px var(--font-mono, monospace); }
+.pbx-sip-detail-header button { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 8px; color: #475569; }
+.pbx-sip-detail-header button:hover { background: #e2e8f0; color: #0f172a; }
+
+.pbx-sip-summary { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr; gap: 1px; border-bottom: 1px solid #cbd5e1; background: #cbd5e1; }
+.pbx-sip-summary > div { min-width: 0; min-height: 63px; display: flex; align-items: center; gap: 12px; padding: 10px 16px; color: #0284c7; background: #fff; }
+.pbx-sip-summary span { min-width: 0; display: flex; flex-direction: column; gap: 3px; color: #64748b; font-size: 11px; }
+.pbx-sip-summary strong { overflow: hidden; color: #172554; font: 600 12px var(--font-mono, monospace); text-overflow: ellipsis; white-space: nowrap; }
+
+.pbx-sip-tabs { display: flex; gap: 4px; min-height: 51px; overflow-x: auto; padding: 4px 12px 0; border-bottom: 1px solid #cbd5e1; }
+.pbx-sip-tabs button { display: flex; align-items: center; gap: 8px; min-width: max-content; min-height: 44px; padding: 0 14px; border-bottom: 3px solid transparent; color: #475569; font-size: 13px; }
+.pbx-sip-tabs button:hover { background: #eaf5ff; color: #0369a1; }
+.pbx-sip-tabs button[aria-selected="true"] { border-bottom-color: #0284c7; color: #0369a1; font-weight: 700; }
+
+.pbx-sip-detail-body { flex: 1; min-height: 0; overflow: auto; }
+.pbx-sip-inspector, .pbx-sip-raw-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 34%); min-height: 100%; }
+.pbx-sip-raw-layout { grid-template-columns: minmax(250px, 330px) minmax(0, 1fr); }
+
+.pbx-sip-ladder-scroll { min-width: 0; overflow: auto; padding: 12px; background: #f9fbff; }
+.pbx-sip-ladder-scroll svg { display: block; font-family: var(--font-mono, monospace); }
+.pbx-sip-ladder-party { fill: #1e293b; font-size: 11px; font-weight: 700; }
+.pbx-sip-ladder-party-sub { fill: #64748b; font-size: 10px; }
+.pbx-sip-ladder-life { stroke: #cbd5e1; stroke-width: 1; stroke-dasharray: 2 3; }
+.pbx-sip-ladder-hit { fill: transparent; stroke: transparent; }
+.pbx-sip-ladder-message { cursor: pointer; outline: none; }
+.pbx-sip-ladder-message:hover .pbx-sip-ladder-hit, .pbx-sip-ladder-message:focus .pbx-sip-ladder-hit { fill: #e0f2fe; stroke: #bae6fd; }
+.pbx-sip-ladder-message.is-selected .pbx-sip-ladder-hit { fill: #dbeafe; stroke: #93c5fd; }
+.pbx-sip-ladder-time { fill: #475569; font-size: 10px; }
+.pbx-sip-ladder-method { font-size: 11px; font-weight: 700; }
+.pbx-sip-ladder-cseq { fill: #64748b; font-size: 9px; }
+.pbx-sip-ladder-message--request .pbx-sip-ladder-arrow { stroke: #7c3aed; }
+.pbx-sip-ladder-message--terminate .pbx-sip-ladder-arrow { stroke: #b45309; }
+.pbx-sip-ladder-message--response .pbx-sip-ladder-arrow { stroke: #0891b2; stroke-dasharray: 5 4; }
+.pbx-sip-ladder-message--error .pbx-sip-ladder-arrow { stroke: #e11d48; stroke-dasharray: 5 4; }
+.pbx-sip-ladder-arrow { stroke-width: 1.7; }
+.pbx-sip-ladder-message--request .pbx-sip-ladder-method { fill: #6d28d9; }
+.pbx-sip-ladder-message--terminate .pbx-sip-ladder-method { fill: #92400e; }
+.pbx-sip-ladder-message--response .pbx-sip-ladder-method { fill: #0e7490; }
+.pbx-sip-ladder-message--error .pbx-sip-ladder-method { fill: #be123c; }
+
+.pbx-sip-raw-panel { min-width: 0; overflow: auto; border-left: 1px solid #cbd5e1; background: #fff; }
+.pbx-sip-raw-heading { position: sticky; top: 0; z-index: 1; min-height: 51px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #cbd5e1; background: #fff; }
+.pbx-sip-raw-heading > span:first-child { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.pbx-sip-raw-meta { margin: 0; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; }
+.pbx-sip-raw-meta > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; padding: 5px 0; font-size: 12px; }
+.pbx-sip-raw-meta dt { color: #64748b; }
+.pbx-sip-raw-meta dd { margin: 0; overflow-wrap: anywhere; color: #334155; font-family: var(--font-mono, monospace); }
+.pbx-sip-raw-panel pre { margin: 0; min-height: 150px; padding: 16px; overflow-wrap: anywhere; white-space: pre-wrap; color: #1e293b; background: #f8fafc; font: 12px/1.55 var(--font-mono, monospace); }
+.pbx-sip-detail-notice, .pbx-sip-detail-status { padding: 24px; color: #475569; font-size: 14px; }
+.pbx-sip-detail-status { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; flex: 1; }
+.pbx-sip-detail-status button, .pbx-sip-detail-notice button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 12px; border: 1px solid #93c5fd; border-radius: 8px; color: #1d4ed8; }
+
+.pbx-sip-message-list { overflow: auto; border-right: 1px solid #cbd5e1; background: #fff; }
+.pbx-sip-message-list button { display: grid; width: 100%; min-height: 72px; grid-template-columns: auto 1fr; align-items: center; gap: 6px 8px; padding: 9px 12px; border-bottom: 1px solid #e2e8f0; color: #475569; text-align: left; }
+.pbx-sip-message-list button:hover, .pbx-sip-message-list button.is-selected { background: #eff6ff; }
+.pbx-sip-message-list time { justify-self: end; font: 11px var(--font-mono, monospace); }
+.pbx-sip-message-list small { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 10px var(--font-mono, monospace); }
+.pbx-sip-raw-layout .pbx-sip-raw-panel { border-left: 0; }
+.pbx-sip-method { display: inline-flex; align-items: center; gap: 5px; width: max-content; padding: 3px 7px; border-radius: 5px; font: 600 11px var(--font-mono, monospace); }
+.pbx-sip-method small { font-size: 9px; }
+.pbx-sip-method--request { background: #ede9fe; color: #6d28d9; }
+.pbx-sip-method--response { background: #cffafe; color: #0e7490; }
+.pbx-sip-method--error { background: #ffe4e6; color: #be123c; }
+.pbx-sip-method--terminate { background: #fef3c7; color: #92400e; }
+
+.pbx-sip-detail-layer button:focus-visible, .pbx-sip-ladder-message:focus-visible .pbx-sip-ladder-hit { outline: 3px solid #2563eb; outline-offset: 2px; }
+
+@media (max-width: 800px) {
+  .pbx-sip-detail-layer { padding: 0; }
+  .pbx-sip-detail-shell { border-radius: 0; }
+  .pbx-sip-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pbx-sip-inspector, .pbx-sip-raw-layout { grid-template-columns: minmax(0, 1fr); }
+  .pbx-sip-ladder-scroll { min-height: 420px; max-height: 55vh; }
+  .pbx-sip-raw-panel { border-left: 0; border-top: 1px solid #cbd5e1; }
+  .pbx-sip-message-list { max-height: 38vh; border-right: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pbx-sip-detail-layer { backdrop-filter: none; }
+}
