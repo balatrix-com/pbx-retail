@@ -149,56 +149,44 @@ const UserManagement = () => {
             </div>
 
             {/* Quick Stats Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                    <Shield className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2.5 mb-2">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                                <Shield className="h-4 w-4 stroke-[2.2]" />
-                            </div>
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Admins</p>
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">{users.filter(u => u.role === 'ADMIN').length}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                        <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span>Admins</span>
+                    </div>
+                    <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                        {users.filter(u => u.role === 'ADMIN').length}
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                    <Users className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2.5 mb-2">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                                <Users className="h-4 w-4 stroke-[2.2]" />
-                            </div>
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Support Team</p>
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">{users.filter(u => u.role === 'SUPPORT').length}</div>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                        <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span>Support Team</span>
+                    </div>
+                    <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                        {users.filter(u => u.role === 'SUPPORT').length}
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                    <UserPlus className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2.5 mb-2">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                                <UserPlus className="h-4 w-4 stroke-[2.2]" />
-                            </div>
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Now</p>
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">{users.filter(u => u.status === 'ACTIVE').length}</div>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                        <UserPlus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span>Active Now</span>
+                    </div>
+                    <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                        {users.filter(u => u.status === 'ACTIVE').length}
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                    <Ban className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2.5 mb-2">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                                <Ban className="h-4 w-4 stroke-[2.2]" />
-                            </div>
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Suspended</p>
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">{users.filter(u => u.status === 'SUSPENDED').length}</div>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                        <Ban className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span>Suspended</span>
+                    </div>
+                    <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                        {users.filter(u => u.status === 'SUSPENDED').length}
                     </div>
                 </div>
             </div>

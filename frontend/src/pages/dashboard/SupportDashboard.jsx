@@ -103,17 +103,13 @@ const SupportDashboard = () => {
                 {stats.map((stat) => {
                     const Icon = stat.icon;
                     return (
-                        <div key={stat.label} className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 transition-all hover:shadow-md hover:ring-gray-300 group">
-                            <dt className="truncate text-sm font-bold uppercase tracking-widest text-gray-500">
-                                {stat.label}
-                            </dt>
-                            <dd className={`mt-2 text-3xl font-extrabold tracking-tight text-gray-900 font-mono ${stat.label === 'System Status' && stat.value === 'Healthy' ? 'text-green-600' : ''}`}>
+                        <div key={stat.label} className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200">
+                            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                                <Icon size={16} className="text-blue-600 dark:text-blue-400" />
+                                <span>{stat.label}</span>
+                            </div>
+                            <div className={`mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight ${stat.label === 'System Status' && stat.value === 'Healthy' ? 'text-emerald-500' : 'text-slate-900 dark:text-white'}`}>
                                 {stat.value}
-                            </dd>
-                            <div className="absolute right-4 bottom-4 transform transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-12">
-                                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.bg} ${stat.ring} ring-1 ring-inset`}>
-                                    <Icon className={stat.color} size={24} />
-                                </div>
                             </div>
                         </div>
                     );

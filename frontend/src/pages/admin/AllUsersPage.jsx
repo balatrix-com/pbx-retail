@@ -182,7 +182,7 @@ const AllUsersPage = () => {
             </div>
 
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                     { label: 'Total Users', value: stats.total, icon: Users },
                     { label: 'Active Users', value: users.filter(u => u.status === 'ACTIVE').length + '+', icon: UserCheck },
@@ -191,16 +191,13 @@ const AllUsersPage = () => {
                 ].map((stat, i) => {
                     const Icon = stat.icon;
                     return (
-                        <div key={i} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                            <Icon className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                            <div className="relative z-10">
-                                <div className="flex items-center gap-2.5 mb-2">
-                                    <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                                        <Icon className="h-4 w-4 stroke-[2.2]" />
-                                    </div>
-                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{stat.label}</p>
-                                </div>
-                                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">{stat.value}</div>
+                        <div key={i} className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                                <Icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span>{stat.label}</span>
+                            </div>
+                            <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                                {stat.value}
                             </div>
                         </div>
                     );

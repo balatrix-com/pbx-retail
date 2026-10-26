@@ -12,7 +12,7 @@ const Header = ({ onMenuClick }) => {
     const { isDark, toggleTheme } = useTheme();
 
     return (
-        <header className="flex h-16 w-full items-center justify-between border-b border-gray-200/80 bg-white/90 backdrop-blur-xl px-4 md:px-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.05)] sticky top-0 z-40 transition-all">
+        <header className="flex h-16 w-full items-center justify-between bg-white/90 backdrop-blur-xl px-4 md:px-6 sticky top-0 z-40 transition-all">
             <div className="flex items-center">
                 {/* Mobile Menu Toggle */}
                 <button

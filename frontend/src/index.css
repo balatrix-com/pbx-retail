@@ -39,9 +39,6 @@
     --color-card-bg: #1e293b;
     --color-text: #f8fafc;
     --color-muted: #64748b;
-    /* Primary and accent adjusted for dark mode contrast */
-    --color-primary: #60a5fa;
-    --color-secondary: #93c5fd;
   }
 
   html,
@@ -155,26 +152,11 @@ html.dark {
 
 html.dark :root,
 html.dark {
-  --color-primary: #818cf8;
-  --color-secondary: #6366f1;
-  --color-accent: #f59e0b;
-  --color-muted: #94a3b8;
   --color-card-bg: #0c0d12;
   --color-bg: #000000;
   --color-text: #f8fafc;
   --color-surface: rgba(12, 13, 18, 0.95);
-
-  --color-primary-50: #0f111d;
-  --color-primary-100: #181b30;
-  --color-primary-200: #252a4e;
-  --color-primary-300: #373e73;
-  --color-primary-400: #4f58a3;
-  --color-primary-500: #6366f1;
-  --color-primary-600: #818cf8;
-  --color-primary-700: #a5b4fc;
-  --color-primary-800: #c7d2fe;
-  --color-primary-900: #e0e7ff;
-  --color-primary-950: #f0f3ff;
+  --color-muted: #94a3b8;
 
   --color-success: #10b981;
   --color-warning: #fbbf24;
@@ -213,19 +195,19 @@ html.dark body::after {
 
 /* Dark card styling & glassmorphism */
 html.dark .card-glow,
-html.dark .bg-white.rounded-xl,
-html.dark .bg-white.rounded-2xl,
-html.dark .bg-white.rounded-3xl,
-html.dark .bg-white {
+html.dark div.bg-white.rounded-xl:not(button):not(a),
+html.dark div.bg-white.rounded-2xl:not(button):not(a),
+html.dark div.bg-white.rounded-3xl:not(button):not(a),
+html.dark div.bg-white:not(button):not(a):not(nav) {
   background-color: #0c0d12 !important;
   border-color: rgba(255, 255, 255, 0.07) !important;
   box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.7) !important;
 }
 
 html.dark .card-glow:hover,
-html.dark .bg-white.rounded-xl:hover,
-html.dark .bg-white.rounded-2xl:hover,
-html.dark .bg-white.rounded-3xl:hover {
+html.dark div.bg-white.rounded-xl:not(button):not(a):hover,
+html.dark div.bg-white.rounded-2xl:not(button):not(a):hover,
+html.dark div.bg-white.rounded-3xl:not(button):not(a):hover {
   border-color: rgba(129, 140, 248, 0.25) !important;
   box-shadow: 0 12px 32px -8px rgba(99, 102, 241, 0.15) !important;
 }
@@ -296,24 +278,17 @@ html.dark td {
   border-color: rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Dark Mode Icon Containers & Badges (Soft dark squircle for standalone icon containers, excluding nav links) */
-html.dark div[class*="rounded-"][class*="bg-"]:has(> svg.lucide),
-html.dark span[class*="rounded-"][class*="bg-"]:has(> svg.lucide),
-html.dark div.h-8.w-8:has(> svg.lucide),
-html.dark div.h-10.w-10:has(> svg.lucide),
-html.dark div.h-12.w-12:has(> svg.lucide),
-html.dark div.h-14.w-14:has(> svg.lucide),
-html.dark div.h-16.w-16:has(> svg.lucide) {
+/* Dark Mode Icon Containers & Badges */
+html.dark :not(aside):not(nav) > div[class*="rounded-"][class*="bg-"]:has(> svg.lucide),
+html.dark :not(aside):not(nav) > span[class*="rounded-"][class*="bg-"]:has(> svg.lucide),
+html.dark :not(aside):not(nav) > div.h-8.w-8:has(> svg.lucide),
+html.dark :not(aside):not(nav) > div.h-10.w-10:has(> svg.lucide),
+html.dark :not(aside):not(nav) > div.h-12.w-12:has(> svg.lucide),
+html.dark :not(aside):not(nav) > div.h-14.w-14:has(> svg.lucide),
+html.dark :not(aside):not(nav) > div.h-16.w-16:has(> svg.lucide) {
   background-color: #12141c !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.04), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-}
-
-/* Icon stroke colors in Dark Mode - Vibrant Electric Blue */
-html.dark svg.lucide,
-html.dark .lucide {
-  color: #3b82f6 !important;
-  stroke: #3b82f6 !important;
 }
 
 /* Icons in active selection states */
@@ -328,16 +303,16 @@ html.dark [data-active="true"] svg.lucide {
   stroke: #60a5fa !important;
 }
 
-/* Background Watermark Icons in Dark Mode (Restored for Platform Dashboard stat cards) */
+/* Background Watermark Icons (Hidden for clean unified block design) */
+svg.lucide.absolute.pointer-events-none,
+svg.lucide.pointer-events-none[class*="absolute"],
+.group svg.lucide[class*="-bottom-"],
+.group svg.lucide[class*="-right-"],
 html.dark svg.lucide.absolute.pointer-events-none,
 html.dark svg.lucide.pointer-events-none[class*="absolute"],
 html.dark .group svg.lucide[class*="-bottom-"],
 html.dark .group svg.lucide[class*="-right-"] {
-  display: block !important;
-  opacity: 0.15 !important;
-  color: #3b82f6 !important;
-  stroke: #3b82f6 !important;
-  pointer-events: none;
+  display: none !important;
 }
 
 /* Status functional icon colors */
@@ -362,15 +337,15 @@ html.dark svg.lucide[class*="text-yellow"] {
 /* Dark button overrides */
 html.dark button[class*="bg-primary"],
 html.dark button[class*="bg-indigo"] {
-  background-color: #4f46e5 !important;
+  background-color: var(--color-primary-600, var(--color-primary, #4f46e5)) !important;
   color: #ffffff !important;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
 }
 
 html.dark button[class*="bg-primary"]:hover,
 html.dark button[class*="bg-indigo"]:hover {
-  background-color: #4338ca !important;
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45) !important;
+  background-color: var(--color-primary-700, #4338ca) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45) !important;
 }
 
 html.dark button[class*="bg-white"] {
@@ -415,48 +390,96 @@ html.dark .text-slate-400 {
   color: #748eb4 !important;
 }
 
-/* Sidebar Dark Mode Clean Flat Overrides (No box borders on unselected items) */
-html.dark nav button:not([class*="bg-indigo-50"]),
-html.dark nav a:not([class*="bg-indigo-50"]) {
+/* Sidebar Modern Tech Design */
+.sidebar-stepper {
+  background-color: var(--color-bg) !important;
+}
+
+/* Ensure sidebar items never get block card borders or backgrounds from global CSS rules */
+.app-sidebar nav a,
+.app-sidebar nav button,
+html.dark .app-sidebar nav a,
+html.dark .app-sidebar nav button {
   background-color: transparent !important;
   border-color: transparent !important;
   box-shadow: none !important;
-  color: #cbd5e1 !important;
 }
 
-html.dark nav button:not([class*="bg-indigo-50"]):hover,
-html.dark nav a:not([class*="bg-indigo-50"]):hover {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+html.dark .app-sidebar nav a:hover,
+html.dark .app-sidebar nav button:hover {
+  background-color: transparent !important;
   border-color: transparent !important;
   box-shadow: none !important;
-  color: #f8fafc !important;
 }
 
-html.dark nav button:not([class*="bg-indigo-50"]) svg.lucide,
-html.dark nav a:not([class*="bg-indigo-50"]) svg.lucide {
-  color: #3b82f6 !important;
-  stroke: #3b82f6 !important;
+/* Platform Command Center Dashboard Custom Theming */
+.platform-banner-amber {
+  background-color: #fefce8;
+  border: 1px solid #fef08a;
+  color: #854d0e;
+}
+html.dark .platform-banner-amber {
+  background-color: #17140b !important;
+  border: 1px solid rgba(234, 179, 8, 0.22) !important;
+  color: #fef08a !important;
 }
 
-html.dark nav .bg-indigo-50\/90,
-html.dark nav a[class*="bg-indigo-50"],
-html.dark nav button[class*="bg-indigo-50"] {
-  background-color: #161a2e !important;
-  border-color: rgba(129, 140, 248, 0.25) !important;
-  color: #f8fafc !important;
+.platform-card-blue {
+  background-color: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #1e40af;
+}
+html.dark .platform-card-blue {
+  background: linear-gradient(145deg, #162038 0%, #11182c 100%) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5) !important;
 }
 
-html.dark nav .bg-indigo-50\/90 span,
-html.dark nav a[class*="bg-indigo-50"] span,
-html.dark nav button[class*="bg-indigo-50"] span {
-  color: #f8fafc !important;
+.platform-card-amber {
+  background-color: #fffbeb;
+  border: 1px solid #fef3c7;
+}
+html.dark .platform-card-amber {
+  background-color: #1c180d !important;
+  border: 1px solid rgba(217, 119, 6, 0.2) !important;
 }
 
-html.dark nav .bg-indigo-50\/90 svg,
-html.dark nav a[class*="bg-indigo-50"] svg,
-html.dark nav button[class*="bg-indigo-50"] svg {
-  color: #818cf8 !important;
-  stroke: #818cf8 !important;
+.platform-card-green {
+  background-color: #f0fdf4;
+  border: 1px solid #dcfce7;
+}
+html.dark .platform-card-green {
+  background-color: #0b1a13 !important;
+  border: 1px solid rgba(34, 197, 94, 0.2) !important;
+}
+
+.platform-panel-dark,
+.stat-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+html.dark .platform-panel-dark,
+html.dark .stat-card {
+  background-color: #0c0e15 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+.platform-card-step {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+html.dark .platform-card-step {
+  background-color: #10131c !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.platform-card-step-dashed {
+  background-color: #f8fafc;
+  border: 1px dashed #cbd5e1;
+}
+html.dark .platform-card-step-dashed {
+  background-color: #10131c !important;
+  border: 1px dashed rgba(255, 255, 255, 0.18) !important;
 }
 
 /* Modal Sidebar & Dialog Tab Overrides (Clean & Flat, no box borders around unselected items) */
@@ -513,12 +536,12 @@ html.dark .bg-white\/90 {
 }
 
 html.dark .bg-primary-50 {
-  background-color: rgba(99, 102, 241, 0.15) !important;
-  color: #a5b4fc !important;
+  background-color: var(--color-primary-950, rgba(99, 102, 241, 0.15)) !important;
+  color: var(--color-primary-300, #a5b4fc) !important;
 }
 
 html.dark .text-primary-700 {
-  color: #a5b4fc !important;
+  color: var(--color-primary-300, #a5b4fc) !important;
 }
 
 /* Subtle sub-panels, empty-states, inner cards and container backgrounds */

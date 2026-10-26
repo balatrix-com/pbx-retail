@@ -18,7 +18,10 @@ import {
     Ban,
     CheckCircle,
     Eye,
-    Settings
+    Settings,
+    AlertTriangle,
+    Headphones,
+    ArrowRight
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../services/api';
@@ -141,107 +144,300 @@ const PlatformDashboard = () => {
         <div className="max-w-7xl mx-auto pb-12 space-y-8 px-4 sm:px-0">
             <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">Platform Command Center</h1>
-                    <p className="text-gray-500 mt-1 font-medium text-sm md:text-base">Overview of all organizations and system health</p>
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">Platform Command Center</h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium text-sm md:text-base">Overview of all organizations and system health</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                     <Link
                         to="/analytics"
-                        className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-bold shadow-sm bg-primary-600 text-white hover:bg-primary-700 transition-all active:scale-95 w-full sm:w-auto"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm bg-purple-600/90 hover:bg-purple-600 text-white dark:bg-[#a855f7]/90 dark:hover:bg-[#a855f7] transition-all active:scale-95 w-full sm:w-auto"
                     >
                         <BarChart3 className="h-4 w-4" />
-                        Global Analytics
+                        Global analytics
                     </Link>
                 </div>
             </header>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <StatCard
-                    icon={Building2}
-                    label="Total Tenants"
-                    value={stats.totalTenants}
-                    color="blue"
-                />
-                <StatCard
-                    icon={Users}
-                    label="Total Users"
-                    value={stats.totalUsers}
-                    color="purple"
-                />
-                <StatCard
-                    icon={Wallet}
-                    label="Wallet Float"
-                    value={`$${Number(stats.totalWalletBalance).toFixed(2)}`}
-                    color="green"
-                />
-            </div>
+            {/* Top Metric Cards: Revenue Highlight (Left) + 4 Stat Tiles Grid (Right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                {/* Left Large Card: Monthly telecom revenue */}
+                <div className="platform-card-blue lg:col-span-6 rounded-2xl p-6 sm:p-7 flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-300 text-xs sm:text-sm font-medium">
+                            <CreditCard className="h-4 w-4" />
+                            <span>Monthly telecom revenue</span>
+                        </div>
+                        <div className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-extrabold text-blue-700 dark:text-blue-300 tracking-tight">
+                            ${Number(stats.telecom.monthlyRevenue || 0).toFixed(2)}
+                        </div>
+                    </div>
+                    <p className="mt-4 text-xs sm:text-sm text-blue-700/80 dark:text-blue-200/80 font-medium">
+                        from {stats.telecom.activeTenants || 0} active telecom tenants
+                    </p>
+                </div>
 
-            {/* Telecom Stats Section */}
-            {stats.telecom.totalDIDs > 0 && (
-                <div className="space-y-4">
-                    <h2 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-blue-500" />
-                        Telecom Overview
-                    </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <StatCard
-                            icon={Phone}
-                            label="Total DIDs"
-                            value={stats.telecom.totalDIDs}
-                            color="blue"
-                        />
-                        <StatCard
-                            icon={Phone}
-                            label="Total TFNs"
-                            value={stats.telecom.totalTFNs}
-                            color="blue"
-                        />
-                        <StatCard
-                            icon={Users}
-                            label="Total Extensions"
-                            value={stats.telecom.totalExtensions}
-                            color="blue"
-                        />
-                        <StatCard
-                            icon={Database}
-                            label="Available Extensions"
-                            value={`${stats.telecom.availableExtensions} / ${stats.telecom.limitExtensions}`}
-                            color="blue"
-                        />
-                        <StatCard
-                            icon={Users}
-                            label="Ring Groups"
-                            value={stats.telecom.totalRingGroups}
-                            color="blue"
-                        />
-                        <StatCard
-                            icon={PhoneCall}
-                            label="IVR Menus"
-                            value={stats.telecom.totalIVRs}
-                            color="blue"
-                        />
-                        <StatCard
-                            icon={Clock}
-                            label="Schedules"
-                            value={stats.telecom.totalSchedules}
-                            color="blue"
-                        />
-                        <StatCard
-                            icon={Building2}
-                            label="Active Telecom Tenants"
-                            value={stats.telecom.activeTenants}
-                            color="blue"
-                        />
-                        <StatCard
-                            icon={CreditCard}
-                            label="Monthly Telecom Revenue"
-                            value={`$${Number(stats.telecom.monthlyRevenue).toFixed(2)}`}
-                            color="blue"
-                        />
+                {/* Right 2x2 Tiles Grid - Unified Standard Format */}
+                <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Tenants */}
+                    <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                            <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span>Tenants</span>
+                        </div>
+                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                            {stats.totalTenants}
+                        </div>
+                    </div>
+
+                    {/* Users */}
+                    <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                            <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span>Users</span>
+                        </div>
+                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                            {stats.totalUsers}
+                        </div>
+                    </div>
+
+                    {/* Wallet float */}
+                    <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                            <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span>Wallet float</span>
+                        </div>
+                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                            ${Number(stats.totalWalletBalance || 0).toFixed(2)}
+                        </div>
+                    </div>
+
+                    {/* Active telecom */}
+                    <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                            <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span>Active telecom</span>
+                        </div>
+                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                            {stats.telecom.activeTenants} / {stats.totalTenants}
+                        </div>
                     </div>
                 </div>
-            )}
+            </div>
+
+            {/* Telecom Overview Section Header */}
+            <div className="space-y-4">
+                <h2 className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-blue-500" />
+                    Telecom overview
+                </h2>
+
+                {/* 5 Pipeline Flow Cards with Arrows (DIDs and TFNs separated) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr] gap-3 items-center">
+                    {/* 1. DIDs */}
+                    <div className="platform-card-step rounded-2xl p-4 h-full flex flex-col justify-between">
+                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+                            <Phone className="h-4 w-4" />
+                            <span>DIDs</span>
+                        </div>
+                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
+                            {stats.telecom.totalDIDs || 0}
+                        </div>
+                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            Direct Inward Dialing
+                        </div>
+                    </div>
+
+                    {/* Arrow 1 */}
+                    <div className="hidden lg:flex items-center justify-center text-slate-400 dark:text-slate-600">
+                        <ArrowRight className="h-4 w-4" />
+                    </div>
+
+                    {/* 2. TFNs */}
+                    <div className="platform-card-step rounded-2xl p-4 h-full flex flex-col justify-between">
+                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+                            <PhoneCall className="h-4 w-4" />
+                            <span>Toll-Free (TFNs)</span>
+                        </div>
+                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
+                            {stats.telecom.totalTFNs || 0}
+                        </div>
+                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            Toll-Free Numbers
+                        </div>
+                    </div>
+
+                    {/* Arrow 2 */}
+                    <div className="hidden lg:flex items-center justify-center text-slate-400 dark:text-slate-600">
+                        <ArrowRight className="h-4 w-4" />
+                    </div>
+
+                    {/* 3. IVR menus */}
+                    <div className="platform-card-step-dashed rounded-2xl p-4 h-full flex flex-col justify-between relative">
+                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+                            <PhoneCall className="h-4 w-4" />
+                            <span>IVR menus</span>
+                        </div>
+                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
+                            {stats.telecom.totalIVRs || 0}
+                        </div>
+                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            {(stats.telecom.totalIVRs || 0) === 0 ? 'No menus configured' : `${stats.telecom.totalIVRs} configured`}
+                        </div>
+                    </div>
+
+                    {/* Arrow 3 */}
+                    <div className="hidden lg:flex items-center justify-center text-slate-400 dark:text-slate-600">
+                        <ArrowRight className="h-4 w-4" />
+                    </div>
+
+                    {/* 4. Ring groups */}
+                    <div className="platform-card-step-dashed rounded-2xl p-4 h-full flex flex-col justify-between relative">
+                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+                            <Users className="h-4 w-4" />
+                            <span>Ring groups</span>
+                        </div>
+                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
+                            {stats.telecom.totalRingGroups || 0}
+                        </div>
+                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            {(stats.telecom.totalRingGroups || 0) === 0 ? 'No groups configured' : `${stats.telecom.totalRingGroups} configured`}
+                        </div>
+                    </div>
+
+                    {/* Arrow 4 */}
+                    <div className="hidden lg:flex items-center justify-center text-slate-400 dark:text-slate-600">
+                        <ArrowRight className="h-4 w-4" />
+                    </div>
+
+                    {/* 5. Extensions */}
+                    <div className="platform-card-step rounded-2xl p-4 h-full flex flex-col justify-between">
+                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+                            <Headphones className="h-4 w-4" />
+                            <span>Extensions</span>
+                        </div>
+                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
+                            {stats.telecom.totalExtensions || 0}
+                        </div>
+                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            {stats.telecom.availableExtensions || 0} free
+                        </div>
+                    </div>
+                </div>
+
+                {/* Extension Capacity and Resource Mix Panel */}
+                <div className="platform-panel-dark rounded-2xl p-5 md:p-6 space-y-6">
+                    {/* Extension capacity with Badges/Box style */}
+                    <div>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm font-semibold mb-3">
+                            <span className="text-slate-700 dark:text-slate-300">Extension capacity</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40">
+                                    {stats.telecom.totalExtensions || 0} Used
+                                </span>
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                                    {stats.telecom.availableExtensions || 0} Available
+                                </span>
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10">
+                                    Total: {stats.telecom.limitExtensions || 500}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                            <div
+                                className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                                style={{
+                                    width: `${Math.min(100, Math.max(2, ((stats.telecom.totalExtensions || 0) / (stats.telecom.limitExtensions || 500)) * 100))}%`
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Resource mix */}
+                    <div>
+                        {(() => {
+                            const ext = stats.telecom.totalExtensions || 0;
+                            const tfn = stats.telecom.totalTFNs || 0;
+                            const did = stats.telecom.totalDIDs || 0;
+                            const totalRes = ext + tfn + did || 1;
+                            const extPct = (ext / totalRes) * 100;
+                            const tfnPct = (tfn / totalRes) * 100;
+                            const didPct = (did / totalRes) * 100;
+
+                            return (
+                                <>
+                                    <div className="flex items-center justify-between text-xs sm:text-sm font-semibold mb-2">
+                                        <span className="text-slate-700 dark:text-slate-300">Resource mix</span>
+                                        <span className="text-slate-600 dark:text-slate-400">{ext + tfn + did} total</span>
+                                    </div>
+                                    <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex">
+                                        <div
+                                            className="h-full bg-blue-500 transition-all duration-500"
+                                            style={{ width: `${extPct}%` }}
+                                            title={`Extensions: ${ext}`}
+                                        />
+                                        <div
+                                            className="h-full bg-[#f97316] transition-all duration-500"
+                                            style={{ width: `${tfnPct}%` }}
+                                            title={`TFNs: ${tfn}`}
+                                        />
+                                        <div
+                                            className="h-full bg-[#10b981] transition-all duration-500"
+                                            style={{ width: `${didPct}%` }}
+                                            title={`DIDs: ${did}`}
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-5 mt-3 text-xs text-slate-600 dark:text-slate-400 font-medium">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="h-2.5 w-2.5 rounded-xs bg-blue-500" />
+                                            <span>Extensions {ext}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="h-2.5 w-2.5 rounded-xs bg-[#f97316]" />
+                                            <span>TFNs {tfn}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="h-2.5 w-2.5 rounded-xs bg-[#10b981]" />
+                                            <span>DIDs {did}</span>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+
+                    {/* Schedules Badge Box */}
+                    <div className="border-t border-slate-200 dark:border-white/10 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                                <Clock className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">
+                                    Operational Schedules
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    Time routing rules & holiday calendars
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-200">
+                                {stats.telecom.totalSchedules || 0} Schedules
+                            </span>
+                            {(stats.telecom.totalSchedules || 0) === 0 ? (
+                                <span className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40">
+                                    Not configured
+                                </span>
+                            ) : (
+                                <span className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                                    Active
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* Analytics Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -480,42 +676,15 @@ const WalletModal = ({ tenant, onClose, onSubmit }) => {
 };
 
 
-const StatCard = ({ icon: Icon, label, value, color }) => {
-    const colorMap = {
-        blue: 'text-blue-500 bg-blue-50 ring-1 ring-blue-500/10',
-        purple: 'text-blue-500 bg-blue-50 ring-1 ring-blue-500/10',
-        green: 'text-blue-500 bg-blue-50 ring-1 ring-blue-500/10',
-        orange: 'text-blue-500 bg-blue-50 ring-1 ring-blue-500/10',
-        indigo: 'text-blue-500 bg-blue-50 ring-1 ring-blue-500/10',
-        teal: 'text-blue-500 bg-blue-50 ring-1 ring-blue-500/10',
-        emerald: 'text-blue-500 bg-blue-50 ring-1 ring-blue-500/10'
-    };
-    const iconColorMap = {
-        blue: 'text-blue-400/30',
-        purple: 'text-blue-400/30',
-        green: 'text-blue-400/30',
-        orange: 'text-blue-400/30',
-        indigo: 'text-blue-400/30',
-        teal: 'text-blue-400/30',
-        emerald: 'text-blue-400/30'
-    };
-
-    const scheme = colorMap[color] || 'text-blue-500 bg-blue-50 ring-1 ring-blue-500/10';
-    const watermark = iconColorMap[color] || 'text-blue-400/30';
-
+const StatCard = ({ icon: Icon, label, value }) => {
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-all duration-300">
-            <Icon className={`absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2] ${watermark}`} />
-            <div className="relative z-10">
-                <div className="flex items-center gap-2.5 mb-2">
-                    <div className={`p-1.5 rounded-lg ${scheme} flex items-center justify-center`}>
-                        <Icon className="h-4 w-4 stroke-[2.2]" />
-                    </div>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</p>
-                </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">
-                    {value}
-                </div>
+        <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                {Icon && <Icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                <span>{label}</span>
+            </div>
+            <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+                {value}
             </div>
         </div>
     );
