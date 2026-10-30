@@ -17,6 +17,7 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { GetUser } from '../../auth/decorators/get-user.decorator';
 import { RequireFeature } from '../../auth/decorators/feature.decorator';
 import { Role } from '@prisma/client';
+import { resolveTenantScope } from '../../auth/tenant-scope';
 
 @Controller('telecom/ivrs')
 @UseGuards(JwtAuthGuard, RolesGuard, FeatureGuard)
@@ -31,7 +32,7 @@ export class IVRsController {
     @Get()
     @Roles(Role.ADMIN, Role.SUPPORT)
     findAll(@GetUser() user: any) {
-        return this.ivrsService.findAll(user.tenantId);
+        return this.ivrsService.findAll(resolveTenantScope(user));
     }
 
     /**
@@ -41,7 +42,7 @@ export class IVRsController {
     @Get(':id')
     @Roles(Role.ADMIN, Role.SUPPORT)
     findOne(@GetUser() user: any, @Param('id') id: string) {
-        return this.ivrsService.findOne(user.tenantId, id);
+        return this.ivrsService.findOne(resolveTenantScope(user), id);
     }
 
     /**
@@ -51,7 +52,7 @@ export class IVRsController {
     @Post()
     @Roles(Role.ADMIN, Role.SUPPORT, Role.SUPER_ADMIN)
     create(@GetUser() user: any, @Body() dto: CreateIVRDto) {
-        return this.ivrsService.create(user.tenantId, dto);
+        return this.ivrsService.create(resolveTenantScope(user), dto);
     }
 
     /**
@@ -65,7 +66,7 @@ export class IVRsController {
         @Param('id') id: string,
         @Body() dto: UpdateIVRDto,
     ) {
-        return this.ivrsService.update(user.tenantId, id, dto);
+        return this.ivrsService.update(resolveTenantScope(user), id, dto);
     }
 
     /**
@@ -75,6 +76,7 @@ export class IVRsController {
     @Delete(':id')
     @Roles(Role.ADMIN, Role.SUPPORT, Role.SUPER_ADMIN)
     remove(@GetUser() user: any, @Param('id') id: string) {
-        return this.ivrsService.remove(user.tenantId, id);
+        return this.ivrsService.remove(resolveTenantScope(user), id);
     }
 }
+

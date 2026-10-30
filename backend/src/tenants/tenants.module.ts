@@ -12,11 +12,12 @@ import { ExtensionsModule } from '../telecom/extensions/extensions.module';
 import { CustomerIdentityController } from './customer-identity.controller';
 import { TenantArchiveService } from './tenant-archive.service';
 import { HttpModule } from '@nestjs/axios';
+import { InternalServiceGuard } from '../auth/guards/internal-service.guard';
 
 @Module({
     imports: [FreeswitchModule, AdminModule, LookupRedisModule, WalletModule, MailModule, ExtensionsModule, HttpModule],
     controllers: [TenantsController, CustomerIdentityController],
-    providers: [TenantsService, PrismaService, TenantArchiveService],
+    providers: [TenantsService, PrismaService, TenantArchiveService, InternalServiceGuard],
     exports: [TenantsService],
 })
 export class TenantsModule { }

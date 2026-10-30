@@ -17,6 +17,7 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { GetUser } from '../../auth/decorators/get-user.decorator';
 import { RequireFeature } from '../../auth/decorators/feature.decorator';
 import { Role } from '@prisma/client';
+import { resolveTenantScope } from '../../auth/tenant-scope';
 
 @Controller('telecom/ring-groups')
 @UseGuards(JwtAuthGuard, RolesGuard, FeatureGuard)
@@ -31,7 +32,7 @@ export class RingGroupsController {
     @Get()
     @Roles(Role.ADMIN, Role.SUPPORT)
     findAll(@GetUser() user: any) {
-        return this.ringGroupsService.findAll(user.tenantId);
+        return this.ringGroupsService.findAll(resolveTenantScope(user));
     }
 
     /**
@@ -41,7 +42,7 @@ export class RingGroupsController {
     @Get(':id')
     @Roles(Role.ADMIN, Role.SUPPORT)
     findOne(@GetUser() user: any, @Param('id') id: string) {
-        return this.ringGroupsService.findOne(user.tenantId, id);
+        return this.ringGroupsService.findOne(resolveTenantScope(user), id);
     }
 
     /**
@@ -51,7 +52,7 @@ export class RingGroupsController {
     @Post()
     @Roles(Role.ADMIN, Role.SUPPORT, Role.SUPER_ADMIN)
     create(@GetUser() user: any, @Body() dto: CreateRingGroupDto) {
-        return this.ringGroupsService.create(user.tenantId, dto);
+        return this.ringGroupsService.create(resolveTenantScope(user), dto);
     }
 
     /**
@@ -65,7 +66,7 @@ export class RingGroupsController {
         @Param('id') id: string,
         @Body() dto: UpdateRingGroupDto,
     ) {
-        return this.ringGroupsService.update(user.tenantId, id, dto);
+        return this.ringGroupsService.update(resolveTenantScope(user), id, dto);
     }
 
     /**
@@ -75,7 +76,7 @@ export class RingGroupsController {
     @Delete(':id')
     @Roles(Role.ADMIN, Role.SUPPORT, Role.SUPER_ADMIN)
     remove(@GetUser() user: any, @Param('id') id: string) {
-        return this.ringGroupsService.remove(user.tenantId, id);
+        return this.ringGroupsService.remove(resolveTenantScope(user), id);
     }
 
     /**
@@ -89,7 +90,7 @@ export class RingGroupsController {
         @Param('id') id: string,
         @Body() dto: AddMemberDto,
     ) {
-        return this.ringGroupsService.addMember(user.tenantId, id, dto);
+        return this.ringGroupsService.addMember(resolveTenantScope(user), id, dto);
     }
 
     /**
@@ -103,7 +104,7 @@ export class RingGroupsController {
         @Param('id') id: string,
         @Param('memberId') memberId: string,
     ) {
-        return this.ringGroupsService.removeMember(user.tenantId, id, memberId);
+        return this.ringGroupsService.removeMember(resolveTenantScope(user), id, memberId);
     }
 
     /**
@@ -118,7 +119,7 @@ export class RingGroupsController {
         @Param('memberId') memberId: string,
         @Body() dto: UpdateMemberDto,
     ) {
-        return this.ringGroupsService.updateMember(user.tenantId, id, memberId, dto);
+        return this.ringGroupsService.updateMember(resolveTenantScope(user), id, memberId, dto);
     }
 
     /**
@@ -132,6 +133,7 @@ export class RingGroupsController {
         @Param('id') id: string,
         @Body() dto: ReorderMembersDto,
     ) {
-        return this.ringGroupsService.reorderMembers(user.tenantId, id, dto.orders);
+        return this.ringGroupsService.reorderMembers(resolveTenantScope(user), id, dto.orders);
     }
 }
+

@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Headers, Post, Param, BadRequestException, ConflictException } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Param, BadRequestException, ConflictException, UseGuards } from '@nestjs/common';
+import { InternalServiceGuard } from '../auth/guards/internal-service.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Controller('internal/customer-identities')
+@UseGuards(InternalServiceGuard)
 export class CustomerIdentityController {
     constructor(private prisma: PrismaService, private subscriptions: SubscriptionsService) {}
 

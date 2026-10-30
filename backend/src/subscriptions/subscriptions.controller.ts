@@ -6,6 +6,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { SubscriptionsService } from './subscriptions.service';
+import { InternalServiceGuard } from '../auth/guards/internal-service.guard';
 
 @Controller('subscriptions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,6 +43,7 @@ export class SubscriptionsController {
 
 @Public()
 @Controller('internal/subscriptions')
+@UseGuards(InternalServiceGuard)
 export class SubscriptionEventsController {
   constructor(private readonly service: SubscriptionsService) {}
   @Post('events') event(@Headers('x-subscription-token') token: string, @Body() body: any) {
