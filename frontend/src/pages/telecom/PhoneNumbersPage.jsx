@@ -243,44 +243,36 @@ const PhoneNumbersPage = () => {
 
             {/* Quick Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-[#0d0e13] border border-gray-200/80 dark:border-white/[0.08] rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Total Numbers</span>
-                        <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
-                            <Layers className="w-4 h-4" />
-                        </div>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                        <Layers size={16} className="text-blue-600 dark:text-blue-400" />
+                        <span>Total Numbers</span>
                     </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{summary.total}</div>
+                    <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{summary.total}</div>
                 </div>
 
-                <div className="bg-white dark:bg-[#0d0e13] border border-gray-200/80 dark:border-white/[0.08] rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Local (DID)</span>
-                        <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400">
-                            <Hash className="w-4 h-4" />
-                        </div>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                        <Hash size={16} className="text-blue-600 dark:text-blue-400" />
+                        <span>Local (DID)</span>
                     </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{summary.localDids}</div>
+                    <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{summary.localDids}</div>
                 </div>
 
-                <div className="bg-white dark:bg-[#0d0e13] border border-gray-200/80 dark:border-white/[0.08] rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Toll-Free (TFN)</span>
-                        <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
-                            <PhoneCall className="w-4 h-4" />
-                        </div>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                        <PhoneCall size={16} className="text-blue-600 dark:text-blue-400" />
+                        <span>Toll-Free (TFN)</span>
                     </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{summary.tollFree}</div>
+                    <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{summary.tollFree}</div>
                 </div>
 
-                <div className="bg-white dark:bg-[#0d0e13] border border-gray-200/80 dark:border-white/[0.08] rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Active Numbers</span>
-                        <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="w-4 h-4" />
-                        </div>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                        <CheckCircle2 size={16} className="text-blue-600 dark:text-blue-400" />
+                        <span>Active Numbers</span>
                     </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{summary.active}</div>
+                    <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{summary.active}</div>
                 </div>
             </div>
 

@@ -26,14 +26,14 @@ const PrivateLayout = ({ allowedRoles }) => {
             <div className="flex h-screen bg-gray-50 overflow-hidden">
                 {/* Overlay for mobile */}
                 {isSidebarOpen && (
-                    <div 
+                    <div
                         className="fixed inset-0 z-40 bg-gray-600/50 backdrop-blur-sm lg:hidden transition-opacity duration-300"
                         onClick={() => setIsSidebarOpen(false)}
                     />
                 )}
-                
+
                 <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-                
+
                 <div className="flex flex-1 flex-col overflow-hidden w-full">
                     <Header onMenuClick={() => setIsSidebarOpen(true)} />
                     <main className="flex-1 overflow-y-auto p-4 md:p-6 font-sans">

@@ -17,11 +17,12 @@ const TABS = [
     { id: 'customize', label: 'Customize', icon: Palette }
 ];
 
-const TenantManager = ({ tenantId, onClose }) => {
+const TenantManager = ({ tenantId, initialTenant, onClose }) => {
     const [activeTab, setActiveTab] = useState('overview');
-    const [tenant, setTenant] = useState(null);
+    const [tenant, setTenant] = useState(initialTenant || null);
     const [subscription, setSubscription] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!initialTenant);
+    const [error, setError] = useState(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Fetch tenant details on mount and refresh
@@ -30,18 +31,29 @@ const TenantManager = ({ tenantId, onClose }) => {
     }, [tenantId, refreshTrigger]);
 
     const fetchTenantDetails = async () => {
-        setLoading(true);
+        if (!tenant) setLoading(true);
+        setError(null);
 
         try {
-            const [tenantRes, subscriptionRes] = await Promise.all([
+            const [tenantRes, subscriptionRes] = await Promise.allSettled([
                 api.get(`/tenants/${tenantId}`),
                 subscriptionService.getSubscription(tenantId)
             ]);
 
-            setTenant(tenantRes.data);
-            setSubscription(subscriptionRes);
+            if (tenantRes.status === 'fulfilled' && tenantRes.value.data) {
+                setTenant(tenantRes.value.data);
+            } else if (!initialTenant) {
+                throw tenantRes.reason || new Error('Tenant not found');
+            }
+
+            if (subscriptionRes.status === 'fulfilled') {
+                setSubscription(subscriptionRes.value);
+            } else {
+                setSubscription(null);
+            }
         } catch (err) {
             console.error('Failed to fetch tenant details:', err);
+            setError(err.response?.data?.message || err.message || 'Failed to load tenant details');
             setSubscription(null);
         } finally {
             setLoading(false);
@@ -52,13 +64,37 @@ const TenantManager = ({ tenantId, onClose }) => {
 
     if (loading && !tenant) {
         return (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div className="bg-white p-6 rounded-lg shadow-xl"><Loader className="animate-spin" /></div>
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl flex items-center gap-3">
+                    <Loader className="animate-spin text-blue-600" />
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Loading tenant details...</span>
+                </div>
             </div>
         );
     }
 
-    if (!tenant) return null;
+    if (!tenant && error) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+                <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 max-w-md w-full ring-1 ring-gray-200 dark:ring-slate-700">
+                    <div className="flex items-center gap-3 text-rose-600 mb-3">
+                        <ShieldAlert className="h-6 w-6" />
+                        <h3 className="font-bold text-lg">Unable to Load Tenant</h3>
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{error}</p>
+                    <div className="flex justify-end">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-sm transition-colors"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (tenant.status === 'ARCHIVED' || tenant.archiveJob) return (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

@@ -200,29 +200,28 @@ const AdminDashboard = () => {
             )}
 
             {/* Elevated KPI Cards */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
                 {/* Billing Health Card */}
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
-                    <ShieldCheck className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10 flex items-center justify-between">
-                        <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                            <ShieldCheck className="h-4 w-4 stroke-[2.2]" />
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                            <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span>System Health</span>
                         </div>
-                        <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${intelligence.health.status === 'SAFE' ? 'text-green-700 bg-green-50 border-green-200' :
-                            intelligence.health.status === 'WARNING' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' : 'text-red-700 bg-red-50 border-red-200'
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${intelligence.health.status === 'SAFE' ? 'text-green-700 bg-green-50 border-green-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40' :
+                            intelligence.health.status === 'WARNING' ? 'text-yellow-700 bg-yellow-50 border-yellow-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/40' : 'text-red-700 bg-red-50 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800/40'
                             }`}>
                             {intelligence.health.status}
                         </span>
                     </div>
-                    <div className="relative z-10 mt-4">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">System Health</h3>
-                        <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                    <div className="mt-3">
+                        <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                             {intelligence.health.status === 'SAFE' ? 'Operational' : 'Action Needed'}
-                        </p>
+                        </div>
                         {intelligence.financial.runwayDays < 30 && (
-                            <p className="mt-2 flex items-center text-sm font-medium text-red-600 bg-red-50 inline-flex px-2 py-1 rounded-md">
-                                <AlertTriangle className="mr-1.5 h-4 w-4" />
+                            <p className="mt-2 flex items-center text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 inline-flex px-2 py-1 rounded-md">
+                                <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
                                 {intelligence.financial.runwayDays > 900 ? 'Stable runway' : `~${intelligence.financial.runwayDays} days runway left`}
                             </p>
                         )}
@@ -230,66 +229,57 @@ const AdminDashboard = () => {
                 </div>
 
                 {/* Wallet Balance Card */}
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
-                    <Wallet className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10 flex items-center justify-between">
-                        <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                            <Wallet className="h-4 w-4 stroke-[2.2]" />
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                            <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span>Available Balance</span>
                         </div>
+                        <button
+                            onClick={() => refreshWallet()}
+                            disabled={refreshing}
+                            className={`p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 ${refreshing ? 'animate-spin' : ''}`}
+                            title="Refresh balance"
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                        </button>
                     </div>
-                    <div className="relative z-10 mt-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Available Balance</h3>
-                            <button
-                                onClick={() => refreshWallet()}
-                                disabled={refreshing}
-                                className={`p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-primary-600 ${refreshing ? 'animate-spin' : ''}`}
-                                title="Refresh balance"
-                            >
-                                <RefreshCw className="h-4 w-4" />
-                            </button>
+                    <div className="mt-3">
+                        <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                            ${Number(wallet?.balance || 0).toFixed(2)}
                         </div>
-                        <div className="mt-2 flex flex-col">
-                            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                                ${Number(wallet?.balance || 0).toFixed(2)}
+                        {wallet?.creditLimit !== undefined && (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                                Credit Limit: ${Number(wallet.creditLimit).toFixed(2)}
                             </span>
-                            {wallet?.creditLimit !== undefined && (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-500 mt-2">
-                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-500"></span>
-                                    Credit Limit: ${Number(wallet.creditLimit).toFixed(2)}
-                                </span>
-                            )}
-                        </div>
-                        <p className="mt-2 text-sm font-medium text-gray-500 flex items-center">
-                            <TrendingUp className="mr-1.5 h-4 w-4 text-green-500" />
+                        )}
+                        <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center">
+                            <TrendingUp className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
                             Burn: ~${intelligence.financial.burnRate.toFixed(2)}/day
                         </p>
                     </div>
                 </div>
 
                 {/* Total Usage Card */}
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
-                    <Phone className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10 flex items-center justify-between">
-                        <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                            <Phone className="h-4 w-4 stroke-[2.2]" />
-                        </div>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                        <Phone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span>Free Minutes Usage</span>
                     </div>
-                    <div className="relative z-10 mt-4">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Free Minutes Usage</h3>
-                        <p className="mt-2 flex items-baseline gap-x-2">
-                            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                    <div className="mt-3">
+                        <p className="flex items-baseline gap-x-2">
+                            <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                                 {intelligence.usage.usedMins}
                             </span>
-                            <span className="text-sm font-bold text-gray-400 uppercase">/ {intelligence.usage.totalMins} min</span>
+                            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">/ {intelligence.usage.totalMins} min</span>
                         </p>
-                        <div className="mt-3 w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
+                        <div className="mt-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
                             <div
-                                className={`h-full transition-all duration-1000 ${intelligence.usage.usedPercent > 90 ? 'bg-red-500' : intelligence.usage.usedPercent > 75 ? 'bg-amber-500' : 'bg-primary-600'}`}
+                                className={`h-full transition-all duration-1000 ${intelligence.usage.usedPercent > 90 ? 'bg-red-500' : intelligence.usage.usedPercent > 75 ? 'bg-amber-500' : 'bg-blue-600 dark:bg-blue-500'}`}
                                 style={{ width: `${intelligence.usage.usedPercent}%` }}
                             ></div>
                         </div>
-                        <p className="mt-2 text-[10px] font-extrabold text-gray-400 uppercase tracking-widest flex justify-between">
+                        <p className="mt-2 text-[10px] font-bold text-slate-400 dark:text-slate-500 flex justify-between">
                             <span>{intelligence.usage.usedPercent.toFixed(1)}% Consumed</span>
                             <span>{intelligence.usage.totalMins - intelligence.usage.usedMins} mins left</span>
                         </p>
@@ -298,30 +288,26 @@ const AdminDashboard = () => {
 
                 {/* Tenant Settings Card */}
                 {recordingAllowed && (
-                    <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
-                        <Mic className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                        <div className="relative z-10 flex items-center justify-between">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                                <Mic className="h-4 w-4 stroke-[2.2]" />
+                    <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                                <Mic className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span>Global Settings</span>
                             </div>
                             <button
                                 onClick={handleToggleRecording}
                                 disabled={toggling}
-                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 ${recordingEnabled ? 'bg-primary-600' : 'bg-gray-200'} ${toggling ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${recordingEnabled ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'} ${toggling ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${recordingEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${recordingEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
                             </button>
                         </div>
-                        <div className="relative z-10 mt-4">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Global Settings</h3>
-                            <div className="mt-1">
-                                <p className="text-sm font-extrabold text-gray-900">Call Recording</p>
-                                <p className="text-xs text-gray-500 mt-1">Record all inbound and outbound calls</p>
-                            </div>
+                        <div className="mt-3">
+                            <p className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Call Recording</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Record all inbound and outbound calls</p>
                         </div>
                     </div>
                 )}
-
 
             </div>
 

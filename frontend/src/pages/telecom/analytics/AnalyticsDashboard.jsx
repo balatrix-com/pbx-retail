@@ -396,23 +396,23 @@ const AnalyticsDashboard = () => {
 
 const KPICard = ({ title, value, icon: Icon, trend, isUp, subtitle }) => {
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col relative overflow-hidden group hover:shadow-md transition-all duration-300">
-            <Icon className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-
-            <div className="flex items-center justify-between mb-2 relative z-10">
-                <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                    <Icon className="h-4 w-4 stroke-[2.2]" />
+        <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                    {Icon && <Icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                    <span>{title}</span>
                 </div>
-                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black uppercase ${isUp ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                    {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                    {trend}
-                </div>
+                {trend && (
+                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase ${isUp ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'}`}>
+                        {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {trend}
+                    </div>
+                )}
             </div>
 
-            <div className="relative z-10">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{title}</h3>
-                <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight tabular-nums mt-2">{value}</p>
-                {subtitle && <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">{subtitle}</p>}
+            <div className="mt-3">
+                <p className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight tabular-nums">{value}</p>
+                {subtitle && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{subtitle}</p>}
             </div>
         </div>
     );

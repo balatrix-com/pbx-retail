@@ -151,29 +151,26 @@ const WalletPage = () => {
                 </div>
             </header>
 
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {/* Subscription Card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative group hover:shadow-md transition-all duration-300">
-                    <div className="p-5 relative z-10">
-                        <div className="flex items-center gap-2.5 mb-2">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-400 ring-1 ring-blue-500/10 dark:ring-blue-400/20 flex items-center justify-center">
-                                <RefreshCw className="h-4 w-4 stroke-[2.2]" />
-                            </div>
-                            <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Plan</dt>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200">
+                    <div>
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                            <RefreshCw size={16} className="text-blue-600 dark:text-blue-400" />
+                            <span>Active Plan</span>
                         </div>
-                        <dd className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-2 truncate">
+                        <div className="mt-3 text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight truncate">
                             {subscription?.plan_name || 'No Active Plan'}
-                        </dd>
-                    </div>
-                    <div className="bg-purple-50/50 dark:bg-purple-950/40 px-6 py-3 border-t border-purple-100 dark:border-purple-900/40 relative z-10">
-                        <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
-                            <span>{subscription?.limits?.extensions || 0} Extensions</span>
-                            <div className="h-1 w-1 bg-purple-400 dark:bg-purple-500 rounded-full"></div>
-                            <span>{intelligence.usage.usedMins} / {intelligence.usage.totalMins} Mins Used</span>
                         </div>
-                        <div className="mt-2 w-full bg-purple-100/60 dark:bg-purple-900/50 rounded-full h-1 overflow-hidden">
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/[0.08]">
+                        <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                            <span>{subscription?.limits?.extensions || 0} Exts</span>
+                            <span>{intelligence.usage.usedMins} / {intelligence.usage.totalMins} Mins</span>
+                        </div>
+                        <div className="mt-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
                             <div
-                                className="h-full bg-purple-600 dark:bg-purple-400 transition-all duration-1000"
+                                className="h-full bg-blue-600 dark:bg-blue-400 transition-all duration-1000"
                                 style={{ width: `${intelligence.usage.usedPercent}%` }}
                             ></div>
                         </div>
@@ -181,87 +178,72 @@ const WalletPage = () => {
                 </div>
 
                 {/* Balance Card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative group hover:shadow-md transition-all duration-300">
-                    <div className="p-5 relative z-10">
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200">
+                    <div>
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5 mb-2">
-                                <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-400 ring-1 ring-blue-500/10 dark:ring-blue-400/20 flex items-center justify-center">
-                                    <Wallet className="h-4 w-4 stroke-[2.2]" />
-                                </div>
-                                <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Current Balance</dt>
+                            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                                <Wallet size={16} className="text-blue-600 dark:text-blue-400" />
+                                <span>Current Balance</span>
                             </div>
                             <button
                                 onClick={() => { refreshWallet(); fetchPaymentDetails(); }}
                                 disabled={walletRefreshing}
-                                className={`p-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-gray-400 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 ${walletRefreshing ? 'animate-spin' : ''}`}
+                                className={`p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 ${walletRefreshing ? 'animate-spin' : ''}`}
                                 title="Refresh balance"
                             >
                                 <RefreshCw size={14} />
                             </button>
                         </div>
-                        <div className="flex flex-col mt-2">
-                            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                                ${Number(wallet?.balance || 0).toFixed(2)}
-                            </span>
-                            {wallet?.creditLimit !== undefined && (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-500 dark:text-slate-400 mt-1.5">
-                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-500"></span>
-                                    Credit Limit: ${Number(wallet.creditLimit).toFixed(2)}
-                                </span>
-                            )}
+                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                            ${Number(wallet?.balance || 0).toFixed(2)}
                         </div>
+                        {wallet?.creditLimit !== undefined && (
+                            <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                                Credit Limit: ${Number(wallet.creditLimit).toFixed(2)}
+                            </div>
+                        )}
                     </div>
-                    <div className={`px-6 py-3 border-t border-gray-100 dark:border-white/[0.08] relative z-10 ${wallet?.autoRecharge?.enabled ? 'bg-green-50/50 dark:bg-emerald-950/40' : 'bg-red-50/50 dark:bg-red-950/40'}`}>
-                        <div className="flex items-center justify-between">
-                            <span className={`text-[11px] font-bold uppercase tracking-wider ${wallet?.autoRecharge?.enabled ? 'text-green-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                                Auto-recharge: {wallet?.autoRecharge?.enabled ? 'ON' : 'OFF'}
-                            </span>
-                            {!wallet?.autoRecharge?.enabled ? (
-                                <AlertTriangle className="h-4 w-4 text-red-500 dark:text-red-400" />
-                            ) : (
-                                <CheckCircle className="h-4 w-4 text-green-600 dark:text-emerald-400" />
-                            )}
-                        </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/[0.08] flex items-center justify-between">
+                        <span className={`text-[11px] font-semibold ${wallet?.autoRecharge?.enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                            Auto-recharge: {wallet?.autoRecharge?.enabled ? 'ON' : 'OFF'}
+                        </span>
+                        {!wallet?.autoRecharge?.enabled ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                        ) : (
+                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                        )}
                     </div>
                 </div>
 
                 {/* Burn Rate Card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative group hover:shadow-md transition-all duration-300">
-                    <div className="p-5 relative z-10">
-                        <div className="flex items-center gap-2.5 mb-2">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-400 ring-1 ring-blue-500/10 dark:ring-blue-400/20 flex items-center justify-center">
-                                <TrendingDown className="h-4 w-4 stroke-[2.2]" />
-                            </div>
-                            <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Daily Burn Rate</dt>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200">
+                    <div>
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                            <TrendingDown size={16} className="text-blue-600 dark:text-blue-400" />
+                            <span>Daily Burn Rate</span>
                         </div>
-                        <dd className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-2 flex items-baseline">
-                            ~${intelligence.financial.burnRate.toFixed(2)} <span className="text-sm font-sans font-medium text-gray-500 dark:text-slate-400 ml-1">/ day</span>
-                        </dd>
+                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-baseline">
+                            ~${intelligence.financial.burnRate.toFixed(2)} <span className="text-xs font-normal text-slate-400 ml-1.5">/ day</span>
+                        </div>
                     </div>
-                    <div className="bg-gray-50/50 dark:bg-slate-900/40 px-6 py-3 border-t border-gray-100 dark:border-white/[0.08] relative z-10">
-                        <div className="text-[11px] font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider">
-                            Based on last 7 days of activity
-                        </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/[0.08] text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        Based on last 7 days activity
                     </div>
                 </div>
 
                 {/* Runway Card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative group hover:shadow-md transition-all duration-300">
-                    <div className="p-5 relative z-10">
-                        <div className="flex items-center gap-2.5 mb-2">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-400 ring-1 ring-blue-500/10 dark:ring-blue-400/20 flex items-center justify-center">
-                                <Clock className="h-4 w-4 stroke-[2.2]" />
-                            </div>
-                            <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Estimated Runway</dt>
+                <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200">
+                    <div>
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+                            <Clock size={16} className="text-blue-600 dark:text-blue-400" />
+                            <span>Estimated Runway</span>
                         </div>
-                        <dd className={`text-2xl sm:text-3xl font-extrabold tracking-tight mt-2 ${intelligence.financial.runwayDays < 7 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+                        <div className={`mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight ${intelligence.financial.runwayDays < 7 ? 'text-amber-500' : 'text-slate-900 dark:text-white'}`}>
                             {intelligence.financial.runwayDays > 365 ? '> 1 Year' : `~${intelligence.financial.runwayDays} Days`}
-                        </dd>
-                    </div>
-                    <div className={`px-6 py-3 border-t border-gray-100 dark:border-white/[0.08] relative z-10 ${intelligence.financial.runwayDays < 7 ? 'bg-red-50/50 dark:bg-red-950/40' : 'bg-gray-50/50 dark:bg-slate-900/40'}`}>
-                        <div className={`text-[11px] font-bold uppercase tracking-wider ${intelligence.financial.runwayDays < 7 ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>
-                            {intelligence.financial.runwayDays < 7 ? 'Top-up required immediately' : 'Funds are sufficient'}
                         </div>
+                    </div>
+                    <div className={`mt-4 pt-3 border-t border-slate-100 dark:border-white/[0.08] text-[11px] font-medium ${intelligence.financial.runwayDays < 7 ? 'text-amber-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                        {intelligence.financial.runwayDays < 7 ? 'Top-up required soon' : 'Funds are sufficient'}
                     </div>
                 </div>
             </div>

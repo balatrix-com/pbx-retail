@@ -1,7 +1,7 @@
 import api from './api';
 
 export const notificationService = {
-    getNotifications: async (limit = 50) => {
+    getNotifications: async (limit = 18000) => {
         const response = await api.get('/notifications', { params: { limit } });
         return response.data;
     },

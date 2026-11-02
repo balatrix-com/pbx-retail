@@ -60,7 +60,7 @@ const SuperAdminDashboard = () => {
                     </h3>
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{balances.length} Total Tenants</span>
                 </div>
-                
+
                 {loading ? (
                     <div className="p-12 text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
