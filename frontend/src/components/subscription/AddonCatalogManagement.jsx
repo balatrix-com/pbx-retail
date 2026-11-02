@@ -10,6 +10,7 @@ import {
     Phone, 
     Hash, 
     ShieldCheck, 
+    Headphones,
     AlertCircle, 
     DollarSign,
     Layers,
@@ -41,6 +42,11 @@ const RESOURCE_TYPE_CONFIG = {
         label: 'Supervisor Seat',
         icon: ShieldCheck,
         badgeClass: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+    },
+    monitoring_extension: {
+        label: 'Monitoring Extension',
+        icon: Headphones,
+        badgeClass: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
     }
 };
 
@@ -139,6 +145,7 @@ const AddonCatalogManagement = () => {
                         <option value="tfn">Toll-Free (TFN)</option>
                         <option value="did">DIDs</option>
                         <option value="supervisor">Supervisors</option>
+                        <option value="monitoring_extension">Monitoring Extensions</option>
                     </select>
                 </div>
 

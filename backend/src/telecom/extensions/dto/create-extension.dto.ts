@@ -1,6 +1,9 @@
 import { IsString, IsNotEmpty, IsBoolean, IsOptional, IsInt, Min, Max, Matches, MinLength } from 'class-validator';
 
 export class CreateExtensionDto {
+    @IsOptional()
+    @IsString()
+    subscriptionId?:string;
     @IsString()
     @IsOptional()
     @Matches(/^[a-zA-Z0-9]{3,10}$/, { message: 'Extension number must be 3-10 alphanumeric characters' })

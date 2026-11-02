@@ -100,6 +100,19 @@ export class RingGroupsService {
                 }
             }
 
+            const memberIds = dto.members?.map(member => member.extensionId) || [];
+            if (memberIds.length > 0) {
+                if (new Set(memberIds).size !== memberIds.length) {
+                    throw new BadRequestException('Duplicate ring group member');
+                }
+                const ownedExtensions = await prisma.extension.count({
+                    where: { id: { in: memberIds }, tenantId },
+                });
+                if (ownedExtensions !== memberIds.length) {
+                    throw new BadRequestException('Ring group members must belong to this tenant');
+                }
+            }
+
             // Find next sequence ID
             const last = await prisma.ringGroup.findFirst({
                 where: { tenantId },
@@ -354,8 +367,12 @@ export class RingGroupsService {
         }
 
         // Update member
+        const ownedMember = await this.prisma.ringGroupMember.findFirst({
+            where: { id: memberId, ringGroupId }, select: { id: true },
+        });
+        if (!ownedMember) throw new NotFoundException('Ring group member not found');
         const member = await this.prisma.ringGroupMember.update({
-            where: { id: memberId },
+            where: { id: memberId, ringGroupId },
             data: {
                 priority: data.priority,
                 position: data.position,

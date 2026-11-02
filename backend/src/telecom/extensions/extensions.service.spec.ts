@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExtensionsService } from './extensions.service';
+import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FreeSwitchSyncService } from '../../freeswitch/freeswitch-sync.service';
 import { LookupRedisService } from '../../redis/lookup-redis.module';
@@ -64,6 +65,7 @@ describe('ExtensionsService (Kamailio & Sub-Billing Auto-Sync)', () => {
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
+                { provide: SubscriptionsService, useValue: { assertEditable: jest.fn() } },
                 ExtensionsService,
                 { provide: PrismaService, useValue: prisma },
                 { provide: FreeSwitchSyncService, useValue: freeSwitchSync },
@@ -136,8 +138,8 @@ describe('ExtensionsService (Kamailio & Sub-Billing Auto-Sync)', () => {
                 of({
                     data: {
                         extensions: [
-                            { extension_number: '00601', extension_name: 'Legacy Truncated 1' },
-                            { extension_number: '00602', extension_name: 'Legacy Truncated 2' }
+                            { extension_number: '00601', extension_name: 'Legacy Truncated 1', status: 'active' },
+                            { extension_number: '00602', extension_name: 'Legacy Truncated 2', status: 'active' }
                         ]
                     }
                 })
@@ -156,6 +158,11 @@ describe('ExtensionsService (Kamailio & Sub-Billing Auto-Sync)', () => {
     });
 
     describe('findAll', () => {
+        it('does not recreate frozen or released billing extensions',async()=>{
+            httpService.get.mockReturnValueOnce(of({data:{extensions:[{extension_number:'100601',status:'frozen'},{extension_number:'100602',status:'released'}]}}));
+            await service.syncMissingExtensionsFromSubBilling('tenant-uuid-1');
+            expect(prisma.extension.create).not.toHaveBeenCalled();
+        });
         it('should query and return extensions for the tenant', async () => {
             prisma.extension.findMany.mockResolvedValue([
                 { id: 'ext-1', extensionNumber: '100601', tenantId: 'tenant-uuid-1' }

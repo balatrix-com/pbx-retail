@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { walletService } from '../../services/wallet.service';
 import { usageService } from '../../services/usage.service';
 import { useBillingIntelligence } from '../../hooks/useBillingIntelligence';
-import { useWalletQuery, useSubscriptionQuery, useUsageSummaryQuery, useServiceStateQuery, useWalletActions } from '../../hooks/useBillingQueries';
+import { useWalletQuery, useWalletTransactionsQuery, useSubscriptionQuery, useUsageSummaryQuery, useServiceStateQuery, useWalletActions } from '../../hooks/useBillingQueries';
 import {
     Wallet,
     Phone,
@@ -28,6 +28,7 @@ const AdminDashboard = () => {
 
     // Queries
     const { data: wallet, isLoading: walletLoading, isFetching: refreshing } = useWalletQuery();
+    const { data: transactions = [] } = useWalletTransactionsQuery();
     const { data: subscription, isLoading: subLoading } = useSubscriptionQuery();
     const { data: usageSummary, isLoading: usageLoading } = useUsageSummaryQuery();
     const { data: serviceState, isLoading: stateLoading } = useServiceStateQuery();
@@ -320,7 +321,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="px-6">
                     <ul className="divide-y divide-gray-100">
-                        {(wallet?.transactions || []).slice(0, 5).map((tx) => (
+                        {(transactions || wallet?.transactions || []).slice(0, 5).map((tx) => (
                             <li key={tx.id} className="py-5 hover:bg-gray-50/50 -mx-6 px-6 transition-colors group cursor-default">
                                 <div className="flex items-center space-x-4">
                                     <div className="flex-shrink-0">
@@ -348,7 +349,7 @@ const AdminDashboard = () => {
                                 </div>
                             </li>
                         ))}
-                        {(wallet?.transactions || []).length === 0 && (
+                        {(transactions || wallet?.transactions || []).length === 0 && (
                             <li className="py-8 text-center text-sm font-medium text-gray-500">
                                 No recent transactions found.
                             </li>

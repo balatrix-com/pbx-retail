@@ -56,10 +56,12 @@ export class WalletController {
         @Body('planId') planId: string,
         @Body('immediate') immediate: boolean
     ) {
+        if (![Role.SUPER_ADMIN, Role.ADMIN].includes(user.role as any)) throw new ForbiddenException('Only administrators can activate subscriptions');
+        if (targetTenantId && user.role !== Role.SUPER_ADMIN && targetTenantId !== user.tenantId) throw new ForbiddenException('Cannot activate another tenant subscription');
         const tenantId = targetTenantId || user.tenantId;
         if (!tenantId) throw new BadRequestException('Tenant ID is required');
         if (!planId) throw new BadRequestException('Plan ID is required');
-        return this.walletService.switchSubscriptionPlan(tenantId, planId, immediate ?? true);
+        return this.walletService.switchSubscriptionPlan(tenantId, planId, immediate ?? true, user.id);
     }
 
     @Get('cards')

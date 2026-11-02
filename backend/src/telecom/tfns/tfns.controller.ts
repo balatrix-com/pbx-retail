@@ -8,7 +8,6 @@ import {
     Put,
     UseGuards,
     Request,
-    Query,
 } from '@nestjs/common';
 import { TFNsService } from './tfns.service';
 import { CreateTFNDto, UpdateTFNDto } from './dto';
@@ -23,47 +22,31 @@ export class TFNsController {
     constructor(private readonly tfnsService: TFNsService) { }
 
     @Get()
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.SUPPORT)
-    findAll(@Request() req: any, @Query('tenantId') tenantId?: string) {
-        const user = req.user;
-        const targetTenantId = (user.role === Role.SUPER_ADMIN || user.role === Role.SUPPORT) && tenantId
-            ? tenantId
-            : user.tenantId;
-        return this.tfnsService.findAll(targetTenantId);
+    @Roles(Role.ADMIN, Role.SUPPORT)
+    findAll(@Request() req: any) {
+        return this.tfnsService.findAll(req.user.tenantId);
     }
 
     @Get('mine')
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+    @Roles(Role.ADMIN)
     findMine(@Request() req: any) {
         return this.tfnsService.findAll(req.user.tenantId);
     }
 
-    @Get('available')
-    @Roles(Role.SUPER_ADMIN)
-    findAvailable() {
-        return this.tfnsService.findAvailable();
-    }
-
-    @Post(':id/assign')
-    @Roles(Role.SUPER_ADMIN)
-    assign(@Param('id') id: string, @Body('tenantId') tenantId: string) {
-        return this.tfnsService.assign(id, tenantId);
-    }
-
     @Get(':id')
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.SUPPORT)
+    @Roles(Role.ADMIN, Role.SUPPORT)
     findOne(@Request() req: any, @Param('id') id: string) {
         return this.tfnsService.findOne(req.user.tenantId, id);
     }
 
     @Post()
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+    @Roles(Role.ADMIN)
     create(@Request() req: any, @Body() createTFNDto: CreateTFNDto) {
         return this.tfnsService.create(req.user.tenantId, createTFNDto);
     }
 
     @Put(':id')
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+    @Roles(Role.ADMIN)
     update(
         @Request() req: any,
         @Param('id') id: string,
@@ -73,7 +56,7 @@ export class TFNsController {
     }
 
     @Delete(':id')
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+    @Roles(Role.ADMIN)
     remove(@Request() req: any, @Param('id') id: string) {
         return this.tfnsService.remove(req.user.tenantId, id);
     }

@@ -30,6 +30,7 @@ import CdrsPage from './pages/telecom/CdrsPage';
 import DIDForwardsPage from './pages/telecom/did-forwards/DIDForwardsPage';
 import DIDForwardForm from './pages/telecom/did-forwards/DIDForwardForm';
 import RevenuePage from './pages/admin/RevenuePage';
+import SipTracesPage from './pages/admin/SipTracesPage';
 
 import UserManagement from './pages/admin/UserManagement';
 import SuperAdminUsers from './pages/admin/SuperAdminUsers';
@@ -37,12 +38,12 @@ import AllUsersPage from './pages/admin/AllUsersPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
 import TenantsPage from './pages/admin/Tenants/TenantsPage';
 import RateCardsPage from './pages/admin/RateCardsPage';
-import NumbersManagement from './pages/admin/NumbersManagement';
 import PackagesPage from './pages/admin/PackagesPage';
 import CarriersGatewaysPage from './pages/admin/CarriersGatewaysPage';
 import BrandingSettingsPage from './pages/admin/BrandingSettingsPage';
 import ExtensionStatus from './pages/admin/ExtensionStatus';
 import PlansPage from './pages/admin/PlansPage';
+import SubscriptionsPage from './pages/billing/SubscriptionsPage';
 import CreatePlanPage from './pages/admin/CreatePlanPage';
 import OnboardingLayout from './pages/onboarding/OnboardingLayout';
 import TfnOnboardingPage from './pages/onboarding/TfnOnboardingPage';
@@ -149,7 +150,7 @@ function App() {
                                                     </MonitoringRoute>
                                                 } />
                                                 <Route path="/cdrs" element={<CdrsPage />} />
-                                                <Route path="/subscriptions" element={<PlansPage />} />
+                                                <Route path="/subscriptions" element={<SubscriptionsPage />} />
                                                 <Route path="/subscriptions/plans/new" element={<CreatePlanPage />} />
                                             </Route>
 
@@ -161,6 +162,7 @@ function App() {
 
                                             <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
                                                 <Route path="/telecom/trunks" element={<CarriersGatewaysPage />} />
+                                                <Route path="/telecom/sip-traces" element={<SipTracesPage tenantMode />} />
                                             </Route>
 
 
@@ -171,13 +173,13 @@ function App() {
                                                 <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
                                                 <Route path="/super-admin/users" element={<SuperAdminUsers />} />
                                                 <Route path="/super-admin/rate-cards" element={<RateCardsPage />} />
-                                                <Route path="/super-admin/numbers" element={<NumbersManagement />} />
                                                 <Route path="/super-admin/packages" element={<PackagesPage />} />
-                                                <Route path="/super-admin/subscriptions" element={<PlansPage />} />
+                                                <Route path="/super-admin/subscriptions" element={<SubscriptionsPage />} />
                                                 <Route path="/super-admin/plans" element={<PlansPage />} />
                                                 <Route path="/super-admin/plans/new" element={<CreatePlanPage />} />
                                                 <Route path="/tenants" element={<TenantsPage />} />
                                                 <Route path="/revenue" element={<RevenuePage />} />
+                                                <Route path="/super-admin/sip-traces" element={<SipTracesPage />} />
                                                 <Route path="/admin/extension-status" element={<ExtensionStatus />} />
                                             </Route>
                                         </Route>

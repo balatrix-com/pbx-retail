@@ -11,6 +11,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { FreeSwitchSyncService } from '../../freeswitch/freeswitch-sync.service';
 import { CreateDIDDto, UpdateDIDDto } from './dto';
 import { LookupRedisService } from '../../redis/lookup-redis.module';
+import { Prisma } from '@prisma/client';
+import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 
 @Injectable()
 export class DIDsService {
@@ -22,45 +24,44 @@ export class DIDsService {
         private lookupRedis: LookupRedisService,
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
+        private readonly subscriptions: SubscriptionsService,
     ) { }
 
-    private async assertNumberQuota(tenantId: string) {
-        const subscription = await this.prisma.subscription.findFirst({
-            where: { tenantId, status: 'ACTIVE' },
-            include: { plan: { select: { maxNumbers: true } } },
-            orderBy: { createdAt: 'desc' },
-        });
-        if (!subscription) {
-            throw new BadRequestException('An active package is required before assigning numbers.');
-        }
-        const [tfns, dids] = await Promise.all([
-            this.prisma.tFN.count({ where: { tenantId } }),
-            this.prisma.dID.count({ where: { tenantId } }),
-        ]);
-        const used = tfns + dids;
-        const limit = subscription.plan.maxNumbers;
-        if (used >= limit) {
-            throw new BadRequestException(`Numbers quota reached (${used}/${limit}). TFNs and DIDs share this limit.`);
-        }
+    private async assertNumberQuota(tenantId: string, db: PrismaService | Prisma.TransactionClient = this.prisma) {
+        await this.subscriptions.capacity(tenantId, 'numbers');
     }
 
-    private async syncAssetsToSubBilling(tenantId: string, assets: { tfns?: string[], dids?: string[] }) {
+    private async syncAssetsToSubBilling(tenantId: string, assets: { tfns?: string[], dids?: string[] }, selected?: string) {
         try {
-            const subscription = await this.prisma.subscription.findFirst({
-                where: { tenantId },
-                orderBy: { createdAt: 'desc' }
-            });
-
-            const targetId = subscription?.subBillingSubscriptionId || tenantId;
+            const subscription = await this.subscriptions.capacity(tenantId, 'numbers', selected);
+            const targetId = subscription.id;
             const subBilling = this.configService.get<any>('subBilling');
             const apiUrl = subBilling?.apiUrl || process.env.SUB_BILLING_API_URL;
-            if (!apiUrl) return;
+            if (!apiUrl) throw new Error('Sub-billing API URL is not configured');
 
-            const endpoint = `${apiUrl}/pbx/sync-assets/${targetId}`;
-            await lastValueFrom(this.httpService.post(endpoint, assets));
+            const endpoint = `${apiUrl}/pbx/sync-assets/${encodeURIComponent(targetId)}`;
+            const response = await lastValueFrom(this.httpService.post(endpoint, assets));
+            if (response.data?.success === false) throw new Error(response.data?.error || 'Sub-billing rejected the number');
             this.logger.log(`Successfully synced DID assets for tenant ${tenantId} to sub-billing`);
         } catch (error: any) {
             this.logger.error(`Failed to sync DID assets to sub-billing for tenant ${tenantId}: ${error.message}`);
+            throw new BadRequestException(error.response?.data?.error || error.message);
+        }
+    }
+
+    private async unassignFromSubBilling(tenantId: string, number: string) {
+        try {
+            const subBilling = this.configService.get<any>('subBilling');
+            const apiUrl = subBilling?.apiUrl || process.env.SUB_BILLING_API_URL;
+            const owner = (await this.subscriptions.list(tenantId)).find(s => s.assets.some((a: any) => a.type === 'did' && a.value === number && a.status !== 'released'));
+            if (!owner) throw new BadRequestException('Number has no subscription owner; reconcile before removing it');
+            const targetId = owner.id;
+            if (!apiUrl) throw new Error('Sub-billing API URL is not configured');
+            const response = await lastValueFrom(this.httpService.post(`${apiUrl}/pbx/unassign-assets/${encodeURIComponent(targetId)}`, { dids: [number] }));
+            if (response.data?.success === false) throw new Error(response.data?.error || 'Sub-billing rejected the unassignment');
+        } catch (error: any) {
+            this.logger.error(`Failed to unassign DID ${number} in sub-billing: ${error.message}`);
+            throw new BadRequestException(error.response?.data?.error || error.message);
         }
     }
 
@@ -126,7 +127,7 @@ export class DIDsService {
      * Includes routing validation
      */
     async create(tenantId: string, dto: CreateDIDDto) {
-        await this.assertNumberQuota(tenantId);
+        await this.subscriptions.capacity(tenantId, 'numbers', dto.subscriptionId);
         // Enforce system limits
         const limitStr = process.env.SYSTEM_LIMIT_DIDS;
         if (limitStr) {
@@ -139,15 +140,6 @@ export class DIDsService {
             }
         }
 
-        // Check if DID number already exists
-        const existing = await this.prisma.dID.findUnique({
-            where: { number: dto.didNumber },
-        });
-
-        if (existing) {
-            throw new BadRequestException('DID number already exists');
-        }
-
         // Validate route destination exists if routeType is provided and not forward
         if (dto.routeType && dto.routeType !== 'forward') {
             await this.validateRouteDestination(tenantId, dto.routeType, dto.routeDestinationId);
@@ -158,23 +150,60 @@ export class DIDsService {
             throw new BadRequestException('Forward number is required for forward route type');
         }
 
-        // Create DID
-        const last = await this.prisma.dID.findFirst({
-            where: { tenantId },
-            orderBy: { sequenceId: 'desc' }
+        // Claim an unassigned inventory number or create a new one under the same quota lock.
+        const { did, claimed } = await this.prisma.$transaction(async tx => {
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`number:${dto.didNumber}`}))`;
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`numbers:${tenantId}`}))`;
+            if (await tx.tFN.findUnique({ where: { number: dto.didNumber } })) {
+                throw new BadRequestException('Number already exists as a Toll-Free number');
+            }
+            const last = await tx.dID.findFirst({ where: { tenantId }, orderBy: { sequenceId: 'desc' } });
+            const sequenceId = (last?.sequenceId || 0) + 1;
+            const existing = await tx.dID.findUnique({ where: { number: dto.didNumber } });
+            if (existing) {
+                if (existing.tenantId) {
+                    throw new BadRequestException('DID number is already assigned');
+                }
+                const did = await tx.dID.update({
+                    where: { id: existing.id },
+                    data: {
+                        tenantId,
+                        sequenceId,
+                        routeType: dto.routeType,
+                        routeTargetId: dto.routeDestinationId,
+                        forwardEnabled: dto.routeType === 'forward',
+                        forwardNumber: dto.forwardNumber,
+                    },
+                });
+                return { did, claimed: true };
+            }
+            const did = await tx.dID.create({
+                data: {
+                    tenantId,
+                    sequenceId,
+                    number: dto.didNumber,
+                    routeType: dto.routeType,
+                    routeTargetId: dto.routeDestinationId,
+                    forwardNumber: dto.forwardNumber,
+                },
+            });
+            return { did, claimed: false };
         });
-        const sequenceId = (last?.sequenceId || 0) + 1;
 
-        const did = await this.prisma.dID.create({
-            data: {
-                tenantId,
-                sequenceId,
-                number: dto.didNumber,
-                routeType: dto.routeType,
-                routeTargetId: dto.routeDestinationId,
-                forwardNumber: dto.forwardNumber,
-            },
-        });
+        // Mirror the assignment before publishing it to call routing.
+        try {
+            await this.syncAssetsToSubBilling(tenantId, { dids: [did.number] }, dto.subscriptionId);
+        } catch (error) {
+            if (claimed) {
+                await this.prisma.dID.update({ where: { id: did.id }, data: {
+                    tenantId: null, sequenceId: 0, routeType: null, routeTargetId: null,
+                    forwardEnabled: false, forwardNumber: null,
+                } });
+            } else {
+                await this.prisma.dID.delete({ where: { id: did.id } });
+            }
+            throw error;
+        }
 
         // Trigger FreeSWITCH sync
         try {
@@ -187,9 +216,6 @@ export class DIDsService {
         // Update Redis Lookup DB
         await this.lookupRedis.updateNumberLookup(did.number, tenantId);
 
-        // Sync to Sub-Billing
-        await this.syncAssetsToSubBilling(tenantId, { dids: [did.number] });
-
         return did;
     }
 
@@ -197,6 +223,7 @@ export class DIDsService {
      * Update DID routing
      */
     async update(tenantId: string, id: string, dto: UpdateDIDDto) {
+        await this.subscriptions.assertEditable('did', id);
         // Verify ownership
         const existing = await this.prisma.dID.findFirst({
             where: { id, tenantId },
@@ -217,16 +244,16 @@ export class DIDsService {
             throw new BadRequestException('Forward number is required for forward route type');
         }
 
-        // If the number is being changed, handle Redis lookup cleanup
+        // A number is an assigned billing asset. Renaming it here would leave the
+        // original assignment behind in sub-billing; use remove/create instead.
         if (dto.didNumber && dto.didNumber !== existing.number) {
-            await this.lookupRedis.deleteNumberLookup(existing.number);
+            throw new BadRequestException('A DID number cannot be changed; remove it and add the new number');
         }
 
         // Update
         const updated = await this.prisma.dID.update({
             where: { id },
             data: {
-                number: dto.didNumber,
                 routeType: dto.routeType,
                 routeTargetId: dto.routeDestinationId,
                 forwardNumber: dto.forwardNumber,
@@ -260,6 +287,8 @@ export class DIDsService {
         if (!did) {
             throw new NotFoundException('DID not found');
         }
+
+        await this.unassignFromSubBilling(tenantId, did.number);
 
         // Delete
         await this.prisma.dID.delete({ where: { id } });

@@ -12,11 +12,15 @@ export class RecordingStorageService {
      * Maps `/recordings/...` to the configured `basePath`.
      */
     private getLocalPath(remotePath: string): string {
-        if (remotePath.startsWith('/recordings')) {
-            // Replace /recordings with basePath
-            return path.join(this.basePath, remotePath.substring('/recordings'.length));
+        const base = path.resolve(this.basePath);
+        const relative = remotePath.startsWith('/recordings/')
+            ? remotePath.substring('/recordings/'.length)
+            : remotePath;
+        const resolved = path.resolve(base, relative);
+        if (!resolved.startsWith(base + path.sep)) {
+            throw new Error('Recording path is outside the recording directory');
         }
-        return path.isAbsolute(remotePath) ? remotePath : path.join(this.basePath, remotePath);
+        return resolved;
     }
 
     /**

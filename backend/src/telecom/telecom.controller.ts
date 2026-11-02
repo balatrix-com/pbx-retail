@@ -1,14 +1,10 @@
 import { Controller, Post, Get, Body, UseGuards, Query, Param, Res } from '@nestjs/common';
 import { TelecomService } from './telecom.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { Role, type User } from '@prisma/client';
-
-class PurchaseTFNDto {
-    number: string;
-}
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('telecom')
 @UseGuards(JwtAuthGuard)
@@ -27,30 +23,8 @@ export class TelecomController {
         return this.telecomService.listTFNs(user.tenantId!);
     }
 
-    @Post('tfns/purchase')
-    @Roles(Role.SUPER_ADMIN)
-    @UseGuards(RolesGuard)
-    purchaseTFN(@GetUser() user: User, @Body() body: PurchaseTFNDto & { targetTenantId?: string }) {
-        const tenantId = (user.role === Role.SUPER_ADMIN) && body.targetTenantId
-            ? body.targetTenantId
-            : user.tenantId!;
-
-        return this.telecomService.purchaseTFN(tenantId, body.number);
-    }
-
     // Extensions - Managed by ExtensionsController
     // Removed duplicate listExtensions and createExtension endpoints
-
-    // Monitoring
-    @Get('monitoring/live')
-    getMonitoring(@GetUser() user: User) {
-        return this.telecomService.getMonitoringStatus(user.tenantId!);
-    }
-
-    @Post('monitoring/purchase')
-    purchaseMonitoring(@GetUser() user: User) {
-        return this.telecomService.purchaseMonitoring(user.tenantId!);
-    }
 
     // --- Call Recording Endpoints ---
 
@@ -60,6 +34,8 @@ export class TelecomController {
     }
 
     @Post('recording/toggle')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
     toggleRecording(@GetUser() user: User, @Body() body: { enabled: boolean }) {
         return this.telecomService.toggleRecording(user.tenantId!, body.enabled);
     }
@@ -83,6 +59,8 @@ export class TelecomController {
     }
 
     @Post('tfns/:id/routing') // Using Post or Patch
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
     updateTFNRouting(
         @GetUser() user: User,
         @Param('id') id: string,

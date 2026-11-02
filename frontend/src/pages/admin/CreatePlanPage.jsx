@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { subscriptionService } from '../../services/subscription.service';
 import { useToast } from '../../context/ToastContext';
+import PlanValidityFields from '../../components/subscription/PlanValidityFields';
+import { planDurationPayload } from '../../utils/planDuration';
 import {
     Plus,
     ArrowLeft,
@@ -25,7 +27,8 @@ const CreatePlanPage = () => {
         name: '',
         amount: 49.99,
         currency: 'usd',
-        validity_months: 1,
+        duration_count: 1,
+        duration_unit: 'months',
         numbers: 3,
         extensions: 5,
         monitoring_extensions: 1,
@@ -53,6 +56,7 @@ const CreatePlanPage = () => {
         try {
             const payload = {
                 ...formData,
+                ...planDurationPayload(formData),
                 plan_id: planId
             };
             const res = await subscriptionService.createPlan(payload);
@@ -60,7 +64,7 @@ const CreatePlanPage = () => {
             navigate('/subscriptions');
         } catch (err) {
             console.error('Failed to create plan:', err);
-            addToast('error', err.response?.data?.message || 'Failed to create new plan');
+            addToast('error', err.response?.data?.message || err.message || 'Failed to create new plan');
         } finally {
             setSubmitting(false);
         }
@@ -197,21 +201,8 @@ const CreatePlanPage = () => {
                             </select>
                         </div>
 
-                        {/* Validity Months */}
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5">
-                                Validity (Months)
-                            </label>
-                            <input
-                                type="number"
-                                min="1"
-                                name="validity_months"
-                                value={formData.validity_months}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                            />
-                        </div>
                     </div>
+                    <PlanValidityFields formData={formData} onChange={handleChange} />
                 </div>
 
                 {/* Section 3: Resource Limits & Allocation */}

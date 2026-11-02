@@ -4,7 +4,12 @@ import {
     BadRequestException,
     NotFoundException,
     ConflictException,
+    Inject,
+    Optional,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import type { RedisClientType } from 'redis';
+import { REDIS_CLIENT } from '../redis/redis.module';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,6 +19,7 @@ import * as bcrypt from 'bcrypt';
 
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { assertTenantServiceAccess } from './tenant-service-access';
 
 @Injectable()
 export class AuthService {
@@ -23,8 +29,25 @@ export class AuthService {
         private configService: ConfigService,
         private enforcementService: EnforcementService,
         private mailService: MailService,
-        private notificationsService: NotificationsService
+        private notificationsService: NotificationsService,
+        @Optional() @Inject(REDIS_CLIENT) private readonly redisClient?: RedisClientType,
     ) { }
+
+    async createImpersonationTicket(tokens: { accessToken: string; refreshToken: string }): Promise<string> {
+        if (!this.redisClient) throw new Error('Impersonation ticket store unavailable');
+        const ticket = randomUUID();
+        await this.redisClient.set(`impersonate_ticket:${ticket}`, JSON.stringify(tokens), { EX: 60 });
+        return ticket;
+    }
+
+    async exchangeImpersonationTicket(ticket: string) {
+        if (!this.redisClient || !/^[0-9a-f-]{36}$/i.test(ticket || '')) {
+            throw new BadRequestException('Invalid impersonation ticket');
+        }
+        const serialized = await this.redisClient.getDel(`impersonate_ticket:${ticket}`);
+        if (!serialized) throw new BadRequestException('Invalid or expired impersonation ticket');
+        return JSON.parse(serialized) as { accessToken: string; refreshToken: string };
+    }
 
     async validateUser(email: string, pass: string): Promise<any> {
         console.log(`Attempting login for: ${email}`);
@@ -42,6 +65,7 @@ export class AuthService {
         console.log(`Password match: ${isMatch}`);
 
         if (isMatch) {
+            await assertTenantServiceAccess(this.prisma, user);
             const { password, ...result } = user;
             return result;
         }
@@ -113,8 +137,9 @@ export class AuthService {
     }
 
     async login(user: User) {
+        await assertTenantServiceAccess(this.prisma, user);
         const userVar = user as any;
-        const tokens = await this.getTokens(userVar.id, userVar.email, userVar.role, userVar.tenantId, userVar.monitoringEnabled);
+        const tokens = await this.getTokens(userVar.id, userVar.email, userVar.role, userVar.tenantId, userVar.forcePasswordChange, userVar.monitoringEnabled);
         await this.updateRefreshToken(userVar.id, tokens.refreshToken);
 
         const fullUser = await this.prisma.user.findUnique({
@@ -172,6 +197,8 @@ export class AuthService {
             user.refreshToken,
         );
         if (!refreshTokenMatches) throw new UnauthorizedException('Access Denied');
+
+        await assertTenantServiceAccess(this.prisma, user);
 
         const userVar = user as any;
         const tokens = await this.getTokens(userVar.id, userVar.email, userVar.role, userVar.tenantId, userVar.forcePasswordChange, userVar.monitoringEnabled);
@@ -244,7 +271,7 @@ export class AuthService {
         // Get enforcement state
         const enforcement = await this.enforcementService.getUserEnforcementState(userId);
 
-        const { password, refreshToken, partnerId, partner: userPartner, ...result } = user;
+        const { password, refreshToken, monitoringSecret, partnerId, partner: userPartner, ...result } = user;
 
         let tenantFeatures = null;
         if (user.tenant) {
@@ -258,7 +285,6 @@ export class AuthService {
                 didForwardEnabled: true,
                 didForwardLimit: 10,
                 monitorEnabled: true,
-                monitorLimit: 10,
             };
         }
 
@@ -322,6 +348,8 @@ export class AuthService {
             data: {
                 actorId: originalUserId,
                 targetId: user.sub,
+                actorSnapshotId: originalUserId,
+                targetSnapshotId: user.sub,
                 action: 'END_IMPERSONATION' as any,
                 metadata: {
                     targetEmail: user.email
@@ -438,6 +466,8 @@ export class AuthService {
                 password: hashedPassword,
                 resetToken: null,
                 resetTokenExpiry: null,
+                refreshToken: null,
+                forcePasswordChange: false,
             },
         });
 

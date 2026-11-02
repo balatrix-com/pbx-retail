@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
 import { LookupRedisService } from '../redis/lookup-redis.module';
+import { mirrorSubBillingPlan } from '../plans/plan-mirror';
 
 @Injectable()
 export class AdminService {
@@ -52,6 +53,7 @@ export class AdminService {
     }
 
     private handleProxyError(error: any, context: string) {
+        if (error instanceof HttpException) throw error;
         const status = error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
         const message = error.response?.data?.message || error.message;
         this.logger.error(`[${context}] Billing proxy error: ${message}`, error.response?.data);
@@ -64,6 +66,10 @@ export class AdminService {
     async getAllPackages() {
         try {
             const response = await lastValueFrom(this.httpService.get(`${this.subBillingUrl}/plans`));
+            const plans = response.data?.data;
+            if (Array.isArray(plans)) {
+                for (const plan of plans) await mirrorSubBillingPlan(this.prisma, plan);
+            }
             return response.data;
         } catch (error: any) {
             this.handleProxyError(error, 'getAllPackages');
@@ -73,6 +79,7 @@ export class AdminService {
     async getPackage(id: string) {
         try {
             const response = await lastValueFrom(this.httpService.get(`${this.subBillingUrl}/plans/${id}`));
+            if (response.data?.data) await mirrorSubBillingPlan(this.prisma, response.data.data);
             return response.data;
         } catch (error: any) {
             this.handleProxyError(error, 'getPackage');
@@ -83,6 +90,7 @@ export class AdminService {
         try {
             const response = await lastValueFrom(this.httpService.post(`${this.subBillingUrl}/plans`, data));
             if (response.data.success) {
+                await mirrorSubBillingPlan(this.prisma, response.data.data);
                 await this.triggerCacheRefresh();
             }
             return response.data;
@@ -93,8 +101,26 @@ export class AdminService {
 
     async updatePackage(id: string, data: any) {
         try {
+            const local = await this.prisma.plan.findUnique({ where: { subBillingPlanId: id } });
+            if (local && (data.numbers !== undefined || data.monitoring_extensions !== undefined)) {
+                const subscribers = await this.prisma.subscription.findMany({
+                    where: { planId: local.id, status: 'ACTIVE' }, select: { tenantId: true },
+                });
+                for (const { tenantId } of subscribers) {
+                    const [tfns, dids, seats] = await Promise.all([
+                        this.prisma.tFN.count({ where: { tenantId } }),
+                        this.prisma.dID.count({ where: { tenantId } }),
+                        this.prisma.user.count({ where: { tenantId, monitoringEnabled: true } }),
+                    ]);
+                    if (tfns + dids > Number(data.numbers ?? local.maxNumbers) ||
+                        seats > Number(data.monitoring_extensions ?? local.maxMonitoringExtensions)) {
+                        throw new HttpException('Remove excess assigned numbers or monitoring seats before lowering this plan limit', HttpStatus.BAD_REQUEST);
+                    }
+                }
+            }
             const response = await lastValueFrom(this.httpService.put(`${this.subBillingUrl}/plans/${id}`, data));
             if (response.data.success) {
+                await mirrorSubBillingPlan(this.prisma, response.data.data);
                 await this.triggerCacheRefresh();
             }
             return response.data;
@@ -105,8 +131,14 @@ export class AdminService {
 
     async deletePackage(id: string) {
         try {
+            const local = await this.prisma.plan.findUnique({ where: { subBillingPlanId: id } });
+            if (local) {
+                const active = await this.prisma.subscription.count({ where: { planId: local.id, status: 'ACTIVE' } });
+                if (active > 0) throw new HttpException('Cannot delete a plan with active PBX subscriptions', HttpStatus.CONFLICT);
+            }
             const response = await lastValueFrom(this.httpService.delete(`${this.subBillingUrl}/plans/${id}`));
             if (response.data.success) {
+                if (local) await this.prisma.plan.delete({ where: { id: local.id } });
                 await this.triggerCacheRefresh();
             }
             return response.data;
@@ -415,258 +447,6 @@ export class AdminService {
             monthlyFee: monthlyFee.toFixed(2),
         };
     }
-    /**
-     * Number Management (TFN & DID)
-     */
-    async getAllNumbers() {
-        const [tfns, dids] = await Promise.all([
-            this.prisma.tFN.findMany({
-                include: { tenant: { select: { id: true, name: true, customerCode: true } } },
-                orderBy: { createdAt: 'desc' }
-            }),
-            this.prisma.dID.findMany({
-                include: { tenant: { select: { id: true, name: true, customerCode: true } } },
-                orderBy: { createdAt: 'desc' }
-            })
-        ]);
-
-        return {
-            tfns: tfns.map(t => ({
-                id: t.id,
-                number: t.number,
-                status: t.status,
-                price: t.price,
-                isDemo: t.isDemo,
-                tenant: t.tenant,
-                purchasedAt: t.purchasedAt,
-                createdAt: t.createdAt
-            })),
-            dids: dids.map(d => ({
-                id: d.id,
-                number: d.number,
-                provider: d.provider,
-                monthlyFee: d.monthlyFee,
-                isActive: d.isActive,
-                tenant: d.tenant,
-                createdAt: d.createdAt
-            }))
-        };
-    }
-
-    async addTFN(data: { number: string; price?: number; isDemo?: boolean }) {
-        return this.prisma.tFN.create({
-            data: {
-                number: data.number,
-                price: data.price || 2.00,
-                status: 'AVAILABLE',
-                isDemo: data.isDemo || false
-            }
-        });
-    }
-
-    async addDID(data: { number: string; monthlyFee?: number; provider?: string }) {
-        return this.prisma.dID.create({
-            data: {
-                number: data.number,
-                monthlyFee: data.monthlyFee || 2.00,
-                provider: data.provider || 'telnyx',
-                isActive: true
-            }
-        });
-    }
-
-    async addTFNBulk(data: { numbers: string[]; price?: number; isDemo?: boolean }) {
-        const payload = data.numbers.map(num => ({
-            number: num,
-            price: data.price || 2.00,
-            status: 'AVAILABLE' as any,
-            isDemo: data.isDemo || false
-        }));
-        return this.prisma.tFN.createMany({
-            data: payload,
-            skipDuplicates: true
-        });
-    }
-
-    async addDIDBulk(data: { numbers: string[]; monthlyFee?: number; provider?: string }) {
-        const payload = data.numbers.map(num => ({
-            number: num,
-            monthlyFee: data.monthlyFee || 2.00,
-            provider: data.provider || 'telnyx',
-            isActive: true
-        }));
-        return this.prisma.dID.createMany({
-            data: payload,
-            skipDuplicates: true
-        });
-    }
-
-    private async syncAssetsToSubBilling(tenantId: string, assets: { tfns?: string[], dids?: string[] }) {
-        try {
-            const subscription = await this.prisma.subscription.findFirst({
-                where: { tenantId },
-                orderBy: { createdAt: 'desc' }
-            });
-
-            const targetId = subscription?.subBillingSubscriptionId || tenantId;
-
-            if (!this.subBillingUrl) {
-                this.logger.warn(`Sub-billing API URL not configured, skipping asset sync`);
-                return;
-            }
-
-            const endpoint = `${this.subBillingUrl}/pbx/sync-assets/${targetId}`;
-            await lastValueFrom(this.httpService.post(endpoint, assets));
-            this.logger.log(`Successfully synced assets for tenant ${tenantId} to sub-billing`);
-        } catch (error: any) {
-            this.logger.error(`Failed to sync assets to sub-billing for tenant ${tenantId}: ${error.message}`);
-        }
-    }
-
-    private async unassignAssetsInSubBilling(assets: { tfns?: string[], dids?: string[] }) {
-        try {
-            if (!this.subBillingUrl) return;
-            const endpoint = `${this.subBillingUrl}/pbx/unassign-assets`;
-            await lastValueFrom(this.httpService.post(endpoint, assets));
-            this.logger.log(`Successfully unassigned assets in sub-billing: ${JSON.stringify(assets)}`);
-        } catch (error: any) {
-            this.logger.error(`Failed to unassign assets in sub-billing: ${error.message}`);
-        }
-    }
-
-    async assignNumber(type: 'TFN' | 'DID', idOrNumber: string, tenantId: string) {
-        if (type === 'TFN') {
-            const tfn = await this.prisma.tFN.findFirst({
-                where: { OR: [{ id: idOrNumber }, { number: idOrNumber }] }
-            });
-            if (!tfn) throw new NotFoundException(`TFN ${idOrNumber} not found`);
-
-            const updated = await this.prisma.tFN.update({
-                where: { id: tfn.id },
-                data: {
-                    tenantId,
-                    status: 'ASSIGNED',
-                    purchasedAt: new Date()
-                }
-            });
-
-            // Sync FreeSWITCH & Redis
-            await this.freeswitchSync.syncTFN(updated.id).catch(err => {
-                this.logger.error(`Failed to sync FreeSWITCH for TFN ${updated.number}: ${err.message}`);
-            });
-            await this.lookupRedis.updateNumberLookup(updated.number, tenantId);
-
-            // Sync to Sub-Billing
-            await this.syncAssetsToSubBilling(tenantId, { tfns: [updated.number] });
-
-            return updated;
-        } else {
-            const did = await this.prisma.dID.findFirst({
-                where: { OR: [{ id: idOrNumber }, { number: idOrNumber }] }
-            });
-            if (!did) throw new NotFoundException(`DID ${idOrNumber} not found`);
-
-            const updated = await this.prisma.dID.update({
-                where: { id: did.id },
-                data: { tenantId }
-            });
-
-            // Update Redis Lookup
-            await this.lookupRedis.updateNumberLookup(updated.number, tenantId);
-
-            // Sync to Sub-Billing
-            await this.syncAssetsToSubBilling(tenantId, { dids: [updated.number] });
-
-            return updated;
-        }
-    }
-
-    async unassignNumber(type: 'TFN' | 'DID', idOrNumber: string) {
-        if (type === 'TFN') {
-            const tfn = await this.prisma.tFN.findFirst({
-                where: { OR: [{ id: idOrNumber }, { number: idOrNumber }] },
-                include: { tenant: true }
-            });
-            if (tfn) {
-                // Cleanup routing in FreeSWITCH
-                await this.freeswitchSync.deleteTFN(tfn).catch(err => {
-                    this.logger.error(`Failed to cleanup FreeSWITCH for TFN ${tfn.number}: ${err.message}`);
-                });
-
-                // Cleanup Redis mapping
-                await this.lookupRedis.deleteNumberLookup(tfn.number);
-
-                // Unassign in Sub-Billing
-                await this.unassignAssetsInSubBilling({ tfns: [tfn.number] });
-
-                return this.prisma.tFN.update({
-                    where: { id: tfn.id },
-                    data: {
-                        tenantId: null,
-                        status: 'AVAILABLE',
-                        routeType: null,
-                        routeTargetId: null,
-                        forwardEnabled: false,
-                        forwardNumber: null
-                    }
-                });
-            }
-            throw new NotFoundException(`TFN ${idOrNumber} not found`);
-        } else {
-            const did = await this.prisma.dID.findFirst({
-                where: { OR: [{ id: idOrNumber }, { number: idOrNumber }] },
-                include: { tenant: true }
-            });
-            if (did) {
-                // Cleanup routing in FreeSWITCH
-                await this.freeswitchSync.deleteDID(did).catch(err => {
-                    this.logger.error(`Failed to cleanup FreeSWITCH for DID ${did.number}: ${err.message}`);
-                });
-
-                // Cleanup Redis mapping
-                await this.lookupRedis.deleteNumberLookup(did.number);
-
-                // Unassign in Sub-Billing
-                await this.unassignAssetsInSubBilling({ dids: [did.number] });
-
-                return this.prisma.dID.update({
-                    where: { id: did.id },
-                    data: {
-                        tenantId: null,
-                        routeType: null,
-                        routeTargetId: null,
-                        forwardEnabled: false,
-                        forwardNumber: null
-                    }
-                });
-            }
-            throw new NotFoundException(`DID ${idOrNumber} not found`);
-        }
-    }
-
-    async deleteNumber(type: 'TFN' | 'DID', id: string) {
-        if (type === 'TFN') {
-            const tfn = await this.prisma.tFN.findUnique({ where: { id }, include: { tenant: true } });
-            if (tfn) {
-                await this.freeswitchSync.deleteTFN(tfn).catch(err => {
-                    this.logger.error(`Failed to cleanup FreeSWITCH for TFN ${tfn.number} on delete: ${err.message}`);
-                });
-            }
-            return this.prisma.tFN.delete({ where: { id } });
-        } else {
-            const did = await this.prisma.dID.findUnique({ where: { id }, include: { tenant: true } });
-            if (did) {
-                await this.freeswitchSync.deleteDID(did).catch(err => {
-                    this.logger.error(`Failed to cleanup FreeSWITCH for DID ${did.number} on delete: ${err.message}`);
-                });
-            }
-            return this.prisma.dID.delete({ where: { id } });
-        }
-    }
-
-    /**
-     * Get statistics and activity for the global support dashboard
-     */
     async getSupportStats() {
         const [totalTenants, totalDIDs, recentLogs] = await Promise.all([
             this.prisma.tenant.count(),

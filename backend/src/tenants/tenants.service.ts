@@ -7,6 +7,7 @@ import { LookupRedisService } from '../redis/lookup-redis.module';
 import { WalletService } from '../wallet/wallet.service';
 import { ExtensionsService } from '../telecom/extensions/extensions.service';
 import { MailService } from '../mail/mail.service';
+import { TenantArchiveService } from './tenant-archive.service';
 
 @Injectable()
 export class TenantsService {
@@ -20,6 +21,7 @@ export class TenantsService {
         private walletService: WalletService,
         private extensionsService: ExtensionsService,
         private mailService: MailService,
+        private archives: TenantArchiveService,
     ) { }
 
     async listTenants(query: {
@@ -27,12 +29,13 @@ export class TenantsService {
         limit?: number;
         search?: string;
         blocked?: boolean;
+        status?: string;
     }) {
         const page = query.page || 1;
         const limit = query.limit || 20;
         const skip = (page - 1) * limit;
 
-        const where: any = {};
+        const where: any = query.status === 'ALL' ? {} : { status: query.status || { not: 'ARCHIVED' } };
         if (query.search) {
             where.OR = [
                 { name: { contains: query.search, mode: 'insensitive' } },
@@ -51,7 +54,7 @@ export class TenantsService {
                 orderBy: { createdAt: 'desc' },
                 include: {
                     _count: {
-                        select: { users: true }
+                        select: { users: { where: { status: { not: 'DELETED' } } } }
                     },
                     wallet: true
                 }
@@ -60,8 +63,10 @@ export class TenantsService {
             this.adminService.getRealTimeBalances()
         ]);
 
+        const archiveJobs = await this.prisma.$queryRawUnsafe<any[]>('SELECT * FROM tenant_archive_jobs WHERE tenant_id = ANY($1::text[])', data.map(t => t.id));
         // Merge real-time balances into the PBX tenant data
         const enrichedData = data.map((tenant: any) => {
+            tenant = { ...tenant, archiveJob: archiveJobs.find(j => j.tenant_id === tenant.id) || null };
             const billingWallet = realTimeBalances.find((b: any) => b.customer_id === tenant.id);
             if (billingWallet) {
                 return {
@@ -94,8 +99,8 @@ export class TenantsService {
             totalWalletBalance,
             totalExtensions
         ] = await Promise.all([
-            this.prisma.tenant.count(),
-            this.prisma.user.count(),
+            this.prisma.tenant.count({ where: { status: { not: 'ARCHIVED' } } }),
+            this.prisma.user.count({ where: { status: { not: 'DELETED' } } }),
             this.adminService.getBillingTotalBalance(),
             this.prisma.extension.count()
         ]);
@@ -115,16 +120,21 @@ export class TenantsService {
     }
 
     async toggleTenantBlock(tenantId: string, blocked: boolean) {
+        if (typeof blocked !== 'boolean') throw new BadRequestException('blocked must be a boolean');
         const tenant = await this.prisma.tenant.findUnique({
             where: { id: tenantId }
         });
 
         if (!tenant) throw new NotFoundException('Tenant not found');
 
-        return this.prisma.tenant.update({
+        if (tenant.status === 'ARCHIVED' || await this.archives.status(tenantId)) throw new BadRequestException('Archive is permanent; this tenant cannot be unblocked');
+
+        const updated = await this.prisma.tenant.update({
             where: { id: tenantId },
-            data: { serviceBlocked: blocked }
+            data: { serviceBlocked: blocked, status: blocked ? 'SUSPENDED' : 'ACTIVE' }
         });
+        if (updated.customerCode) await this.lookupRedis.syncTenantServiceState(updated.customerCode);
+        return updated;
     }
 
     async getGrowthAnalytics(period: '30d' | '12m') {
@@ -232,7 +242,6 @@ export class TenantsService {
             didForwardEnabled: true,
             didForwardLimit: 10,
             monitorEnabled: true,
-            monitorLimit: 10
         };
 
         // Override local wallet with real-time balance and credit limit from billing system
@@ -306,6 +315,7 @@ export class TenantsService {
 
         return {
             ...tenant,
+            archiveJob: await this.archives.status(id),
             wallet: realWallet,
             tenantFeatures: features,
             subscription,
@@ -342,6 +352,7 @@ export class TenantsService {
         });
         if (!tenant) throw new NotFoundException('Tenant not found');
 
+        if (tenant.status === 'ARCHIVED' || await this.archives.status(id)) throw new BadRequestException('Archived customer details are read-only');
         // 1. Update Sub-Billing customer details & Credit limit
         try {
             await this.walletService.updateCustomerDetails(id, dto);
@@ -412,7 +423,6 @@ export class TenantsService {
         didForwardEnabled?: boolean;
         didForwardLimit?: number;
         monitorEnabled?: boolean;
-        monitorLimit?: number;
         recordingAllowed?: boolean;
     }) {
         const tenant = await this.prisma.tenant.findUnique({
@@ -435,7 +445,6 @@ export class TenantsService {
                 didForwardEnabled: dto.didForwardEnabled ?? true,
                 didForwardLimit: dto.didForwardLimit ?? 10,
                 monitorEnabled: dto.monitorEnabled ?? true,
-                monitorLimit: dto.monitorLimit ?? 10,
                 recordingAllowed: dto.recordingAllowed ?? false,
                 recordingEnabled: false,
             },
@@ -449,7 +458,6 @@ export class TenantsService {
                 didForwardEnabled: dto.didForwardEnabled,
                 didForwardLimit: dto.didForwardLimit,
                 monitorEnabled: dto.monitorEnabled,
-                monitorLimit: dto.monitorLimit,
                 recordingAllowed: dto.recordingAllowed,
                 ...(isDisablingRecording ? { recordingEnabled: false } : {}),
             }
@@ -516,54 +524,11 @@ export class TenantsService {
         let localPlanId: string | null = null;
         let freeMinutes = 0;
 
-        // Generate Customer Code (Sequential starting from 1001)
-        // This ensures extensions start at U100101, U100201, etc.
-        // Find the highest existing customer code numerically
-        const allTenants = await this.prisma.tenant.findMany({
-            where: { customerCode: { not: null } },
-            select: { customerCode: true }
-        });
-
-        let nextCode = 1001; // Default start
-
-        if (allTenants.length > 0) {
-            const maxCode = Math.max(
-                ...allTenants
-                    .map(t => {
-                        const match = t.customerCode!.match(/\d+/);
-                        return match ? parseInt(match[0], 10) : 0;
-                    })
-                    .filter(c => !isNaN(c) && c > 0)
-            );
-            if (maxCode >= 1001) {
-                nextCode = maxCode + 1;
-            }
-        }
-
-        // Ensure uniqueness (though sequential should be unique unless race condition or gaps)
-        let customerCode = `U${nextCode}`;
-        let isUnique = false;
-        let retries = 0;
-
-        while (!isUnique && retries < 50) {
-            const exists = await this.prisma.tenant.findUnique({ where: { customerCode } });
-            if (exists) {
-                nextCode++;
-                customerCode = `U${nextCode}`;
-                retries++;
-                continue;
-            }
-
-            const existsInSubBilling = await this.walletService.checkCustomerExists(customerCode);
-            if (existsInSubBilling) {
-                this.logger.warn(`Stale sub-billing record found for ${customerCode}. Cleaning up before re-creation.`);
-                await this.walletService.deleteSubBillingCustomer(customerCode);
-            }
-
-            isUnique = true;
-        }
-
-        if (!isUnique) throw new Error('Failed to generate unique customer code');
+        // One durable authority for PBX and direct billing customer creation.
+        const codes = await this.prisma.$queryRawUnsafe<Array<{ customer_code: string }>>(
+            "SELECT reserve_customer_identity('U') AS customer_code"
+        );
+        const customerCode = codes[0].customer_code;
 
         // Create customer in sub-billing (Always run this for new tenants!)
         const subCustomer = await this.walletService.createSubBillingCustomerExtended({
@@ -601,15 +566,6 @@ export class TenantsService {
                 data: {
                     tenantId: tenant.id,
                     balance: 0.00
-                }
-            });
-
-            // 3. Create Monitoring Addon (Default Active?)
-            await prisma.monitoringAddOn.create({
-                data: {
-                    tenantId: tenant.id,
-                    isActive: true,
-                    price: 5.00
                 }
             });
 
@@ -702,118 +658,7 @@ export class TenantsService {
         return result;
     }
 
-    async deleteTenant(id: string) {
-        // 0. Cleanup external telecom dependencies (FreeSWITCH / Kamailio)
-        // We fetch the entities first before deleting them from Prisma
-
-        const tenant = await this.prisma.tenant.findUnique({ where: { id } });
-        if (!tenant) throw new NotFoundException('Tenant not found');
-
-        const [extensions, ringGroups, ivrs, didForwards, schedules, tfns, dids] = await Promise.all([
-            this.prisma.extension.findMany({ where: { tenantId: id }, include: { tenant: true } }),
-            this.prisma.ringGroup.findMany({ where: { tenantId: id }, include: { tenant: true } }),
-            this.prisma.iVR.findMany({ where: { tenantId: id }, include: { tenant: true } }),
-            this.prisma.dIDForward.findMany({ where: { tenantId: id }, include: { tenant: true } }),
-            this.prisma.operationalSchedule.findMany({ where: { tenantId: id }, include: { tenant: true } }),
-            this.prisma.tFN.findMany({ where: { tenantId: id }, include: { tenant: true } }),
-            this.prisma.dID.findMany({ where: { tenantId: id }, include: { tenant: true } })
-        ]);
-
-        // Clean up individual entities from Kamailio and FreeSWITCH
-        // Note: Individual cleanup ensures Kamailio subscribers and specific XML patterns are removed
-        for (const ext of extensions) await this.freeSwitchSync.deleteExtension(ext).catch(() => { });
-        for (const rg of ringGroups) await this.freeSwitchSync.deleteRingGroup(rg).catch(() => { });
-        for (const ivr of ivrs) await this.freeSwitchSync.deleteIVR(ivr).catch(() => { });
-        for (const fwd of didForwards) await this.freeSwitchSync.deleteDIDForward(fwd).catch(() => { });
-        for (const sched of schedules) await this.freeSwitchSync.deleteSchedule(sched).catch(() => { });
-        for (const tfn of tfns) await this.freeSwitchSync.deleteTFN(tfn).catch(() => { });
-        for (const did of dids) await this.freeSwitchSync.deleteTFN(did).catch(() => { });
-
-        // 0.1 Fail-safe Bulk Cleanup for FreeSWITCH routing tables and XMLs
-        if (tenant.customerCode) {
-            await this.freeSwitchSync.bulkDeleteTenantData(tenant.customerCode);
-        }
-
-        // 0.2 Cleanup Redis lookups
-        await this.lookupRedis.deleteTenantLookups(id);
-
-        // 0.3 Delete sub-billing customer (cascades wallet, subscriptions, assets in bala_billing)
-        if (tenant.subBillingCustomerId) {
-            await this.walletService.deleteSubBillingCustomer(tenant.subBillingCustomerId);
-        } else if (tenant.customerCode) {
-            // Fallback: customerCode doubles as customer_id in sub-billing
-            await this.walletService.deleteSubBillingCustomer(tenant.customerCode);
-        }
-
-        // Proceed to delete local database records via single transaction
-        return this.prisma.$transaction(async (prisma) => {
-            // 1. Release Telephony Assets (TFNs)
-            // TFNs have optional tenantId, so we release them back to pool
-            await prisma.tFN.updateMany({
-                where: { tenantId: id },
-                data: { tenantId: null, status: 'AVAILABLE', routeType: null, routeTargetId: null }
-            });
-
-            // 2. Delete Telephony Configuration
-            // DIDs (tenantId is required, so we must delete them, assuming platform re-provisions if needed)
-            await prisma.dID.deleteMany({ where: { tenantId: id } });
-            await prisma.dIDForward.deleteMany({ where: { tenantId: id } });
-
-            await prisma.ringGroupMember.deleteMany({ where: { extension: { tenantId: id } } }); // Cascade manually if needed
-            await prisma.ringGroup.deleteMany({ where: { tenantId: id } });
-            await prisma.iVR.deleteMany({ where: { tenantId: id } });
-            await prisma.extension.deleteMany({ where: { tenantId: id } });
-            await prisma.operationalSchedule.deleteMany({ where: { tenantId: id } });
-            await prisma.audioFile.deleteMany({ where: { tenantId: id } });
-
-            // 3. Delete Billing Data
-            await prisma.usageRecord.deleteMany({ where: { tenantId: id } });
-            await prisma.subscription.deleteMany({ where: { tenantId: id } });
-            await prisma.paymentMethod.deleteMany({ where: { tenantId: id } });
-
-            // 4. Delete Wallet
-
-            // Delete Transactions before Wallet? 
-            // Wallet relation is 1:1. 
-            // WalletTransaction has `walletId`.
-            // We need to find wallet first to delete transactions?
-            const wallet = await prisma.wallet.findUnique({ where: { tenantId: id } });
-            if (wallet) {
-                await prisma.walletTransaction.deleteMany({ where: { walletId: wallet.id } });
-                await prisma.wallet.delete({ where: { id: wallet.id } });
-            }
-
-            await prisma.monitoringAddOn.deleteMany({ where: { tenantId: id } });
-
-
-
-            // 6. Delete Users & Support Profiles
-            // Support Profiles have explicit relation to User.
-            // If we delete User, SupportProfiles (via `supportUserId`) should be deleted.
-            // But we might need to be careful with foreign keys.
-            // Simplest is to delete Users. If schema cascades, good. If not...
-            // User schema: `supportProfile SupportProfile? @relation("SupportUser")`
-            // SupportProfile schema: `supportUser User @relation(...)`.
-
-            // We should delete SupportProfiles first manually just in case
-            const users = await prisma.user.findMany({ where: { tenantId: id }, select: { id: true } });
-            const userIds = users.map(u => u.id);
-
-            if (userIds.length > 0) {
-                await prisma.supportProfile.deleteMany({ where: { supportUserId: { in: userIds } } });
-                // Also Managed Support Users? 
-                // `managedSupportUsers` is relation "AdminUser". 
-                // If this tenant's users were admins for OTHERS? Unlikely in this system design.
-                await prisma.supportProfile.deleteMany({ where: { adminUserId: { in: userIds } } });
-
-                await prisma.userAuditLog.deleteMany({ where: { actorId: { in: userIds } } });
-                await prisma.userAuditLog.deleteMany({ where: { targetId: { in: userIds } } });
-
-                await prisma.user.deleteMany({ where: { tenantId: id } });
-            }
-
-            // 7. Finally Delete Tenant
-            return prisma.tenant.deleteMany({ where: { id } });
-        }, { timeout: 30000 });
+    async deleteTenant(id: string, actor: string = 'system') {
+        return this.archives.request(id, actor);
     }
 }

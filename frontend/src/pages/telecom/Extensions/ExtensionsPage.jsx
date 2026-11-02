@@ -9,6 +9,8 @@ function ExtensionsPage() {
     const navigate = useNavigate();
     const [extensions, setExtensions] = useState([]);
     const [monitoringUsers, setMonitoringUsers] = useState([]);
+    const [monitoringSeats, setMonitoringSeats] = useState({ users: [], used: 0, limit: 0, remaining: 0 });
+    const [savingMonitoring, setSavingMonitoring] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -17,8 +19,10 @@ function ExtensionsPage() {
     const [showMonitoringModal, setShowMonitoringModal] = useState(false);
     const [selectedMonitoringUser, setSelectedMonitoringUser] = useState(null);
 
-    const { role, user: currentUser } = useAuth(); // Assuming currentUser has tenantId
+    const { role, user: currentUser, refreshUser } = useAuth();
     const canManageExtensions = role === 'SUPER_ADMIN';
+    const canManageMonitoring = role === 'ADMIN';
+    const hasEligibleMonitoringUser = monitoringSeats.users.some(user => !user.monitoringEnabled);
 
     useEffect(() => {
         fetchData();
@@ -27,24 +31,27 @@ function ExtensionsPage() {
     const fetchData = async () => {
         try {
             setLoading(true);
+            let monitoringLoadError = null;
             const extRes = await api.get('/telecom/extensions');
             setExtensions(extRes.data);
 
-            if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+            if (canManageMonitoring) {
                 try {
-                    const usersRes = await api.get('/users?limit=100');
-                    const users = usersRes.data.data || [];
+                    const seatsRes = await api.get('/users/monitoring/seats');
+                    const users = seatsRes.data.users || [];
+                    setMonitoringSeats(seatsRes.data);
                     const monitoring = users.filter(u => u.monitoringEnabled && u.monitoringExtension);
                     setMonitoringUsers(monitoring);
                 } catch (userErr) {
                     console.error('Failed to fetch users for monitoring', userErr);
                     setMonitoringUsers([]);
+                    monitoringLoadError = 'Failed to load monitoring seats. Refresh to try again.';
                 }
             } else {
                 setMonitoringUsers([]);
             }
 
-            setError(null);
+            setError(monitoringLoadError);
         } catch (err) {
             console.error('Failed to fetch data:', err);
             setError(err.response?.data?.message || 'Failed to load data');
@@ -58,21 +65,31 @@ function ExtensionsPage() {
         setShowMonitoringModal(true);
     };
 
-    const handleUpdateMonitoring = async ({ monitoringExtension, monitoringSecret, name }) => {
-        if (!selectedMonitoringUser) return;
+    const handleUpdateMonitoring = async ({ monitoringExtension, monitoringSecret, name, userId: selectedUserId, subscriptionId }) => {
+        const userId = selectedUserId;
+        if (!userId) return;
         try {
-            await api.patch(`/users/${selectedMonitoringUser.id}/permissions`, {
-                monitoringEnabled: true,
-                monitoringExtension,
-                monitoringSecret,
-                name
-            });
+            setSavingMonitoring(true);
+            if (selectedMonitoringUser && selectedMonitoringUser.id !== userId) {
+                await api.post('/users/monitoring/reassign', {
+                    fromUserId: selectedMonitoringUser.id, toUserId: userId,
+                    monitoringExtension, ...(monitoringSecret ? { monitoringSecret } : {}), name,
+                });
+            } else {
+                await api.patch(`/users/${userId}/permissions`, {
+                    monitoringEnabled: true, monitoringExtension, subscriptionId,
+                    ...(monitoringSecret ? { monitoringSecret } : {}), name,
+                });
+            }
             setShowMonitoringModal(false);
             setSelectedMonitoringUser(null);
+            if (userId === currentUser?.id) await refreshUser();
             fetchData(); // Refresh
         } catch (err) {
             console.error("Failed to update monitoring user", err);
             alert("Failed to update: " + (err.response?.data?.message || err.message));
+        } finally {
+            setSavingMonitoring(false);
         }
     };
 
@@ -87,6 +104,7 @@ function ExtensionsPage() {
                 monitoringExtension: null,
                 monitoringSecret: null
             });
+            if (user.id === currentUser?.id) await refreshUser();
             fetchData();
         } catch (err) {
             console.error('Failed to disable monitoring:', err);
@@ -138,6 +156,35 @@ function ExtensionsPage() {
                     </button>
                 )}
             </div>
+
+            {canManageMonitoring && (
+                <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p className="font-bold text-indigo-900">Monitoring Extensions: {monitoringSeats.used} / {monitoringSeats.limit}</p>
+                        <p className="text-sm text-indigo-800">{monitoringSeats.planLimit || 0} base-plan seats + {monitoringSeats.addonUnits || 0} capacity-plan seats.</p>
+                        {!monitoringSeats.hasActivePlan && <p className="text-sm text-indigo-800">An active plan is required before assigning seats.</p>}
+                        {monitoringSeats.remaining > 0 && !hasEligibleMonitoringUser && (
+                            <p className="mt-1 text-sm text-indigo-900">
+                                {monitoringSeats.pendingStaffInvites > 0
+                                    ? 'A seat is available. A staff invitation is pending; assign the seat after they accept it.'
+                                    : 'A seat is available, but every active Admin or Support user already has one. Invite another staff member, then assign the seat after they accept.'}
+                            </p>
+                        )}
+                    </div>
+                    {monitoringSeats.remaining > 0 && !hasEligibleMonitoringUser ? (
+                        <button type="button" onClick={() => navigate('/users')}
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <Plus className="h-4 w-4" /> {monitoringSeats.pendingStaffInvites > 0 ? 'View Staff Invitations' : 'Invite Staff to Use Seat'}
+                        </button>
+                    ) : (
+                        <button type="button" onClick={() => { setSelectedMonitoringUser(null); setShowMonitoringModal(true); }}
+                            disabled={!monitoringSeats.remaining}
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+                            <Plus className="h-4 w-4" /> Add Monitoring Extension
+                        </button>
+                    )}
+                </div>
+            )}
 
             {error && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 font-medium shadow-sm mx-4 sm:mx-0">
@@ -274,7 +321,7 @@ function ExtensionsPage() {
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="inline-flex items-center text-xs font-mono font-medium text-gray-500 bg-gray-50/50 px-2 py-1 rounded border border-gray-100">
                                                     <Key className="h-3 w-3 mr-1 text-gray-400" />
-                                                    {user.monitoringSecret ? '••••••' : 'Not Set'}
+                                                    Configured
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
@@ -285,7 +332,7 @@ function ExtensionsPage() {
                                                     >
                                                         <Edit2 className="h-4 w-4" />
                                                     </button>
-                                                    {canManageExtensions && (
+                                                    {canManageMonitoring && (
                                                         <button
                                                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors focus:outline-none"
                                                             onClick={() => handleDisableMonitoring(user)}
@@ -304,17 +351,21 @@ function ExtensionsPage() {
                 </>
             )}
 
-            {showMonitoringModal && selectedMonitoringUser && (
+            {showMonitoringModal && (
                 <MonitoringExtensionModal
                     onClose={() => {
                         setShowMonitoringModal(false);
                         setSelectedMonitoringUser(null);
                     }}
                     onSubmit={handleUpdateMonitoring}
-                    initialExtension={selectedMonitoringUser.monitoringExtension}
-                    initialSecret={selectedMonitoringUser.monitoringSecret}
-                    initialName={selectedMonitoringUser.name}
-                    isEditing={true}
+                    loading={savingMonitoring}
+                    users={monitoringSeats.users.filter(user => !user.monitoringEnabled || user.id === selectedMonitoringUser?.id)}
+                    customerCode={monitoringSeats.customerCode || ''}
+                    subscriptions={monitoringSeats.subscriptions || []}
+                    initialUserId={selectedMonitoringUser?.id || ''}
+                    initialExtension={selectedMonitoringUser?.monitoringExtension || ''}
+                    initialName={selectedMonitoringUser?.name || ''}
+                    isEditing={!!selectedMonitoringUser}
                 />
             )}
         </div>

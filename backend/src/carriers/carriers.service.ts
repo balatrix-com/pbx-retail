@@ -93,9 +93,16 @@ export class CarriersService {
     const updated = await this.prisma.outboundEndpoint.update({
       where: { id },
       data: {
-        ...data,
         ...(data.name !== undefined ? { name: data.name.trim() } : {}),
         ...(data.sipHost !== undefined ? { sipHost: data.sipHost.trim().toLowerCase() } : {}),
+        ...(data.sipPort !== undefined ? { sipPort: data.sipPort } : {}),
+        ...(data.transport !== undefined ? { transport: data.transport } : {}),
+        ...(data.prefix !== undefined ? { prefix: data.prefix } : {}),
+        ...(data.stripPlus !== undefined ? { stripPlus: data.stripPlus } : {}),
+        ...(data.callerIdMode !== undefined ? { callerIdMode: data.callerIdMode } : {}),
+        ...(data.callerIdNumber !== undefined ? { callerIdNumber: data.callerIdNumber } : {}),
+        ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+        ...(data.priority !== undefined ? { priority: data.priority } : {}),
         isSystemDefault: false,
       },
     });

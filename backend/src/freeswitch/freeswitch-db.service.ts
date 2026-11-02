@@ -19,6 +19,7 @@ export class FreeSwitchDBService {
             user: process.env.FS_DB_USER,
             password: process.env.FS_DB_PASSWORD,
             connectionTimeoutMillis: 5000,
+            query_timeout: 15000,
         });
     }
 
@@ -202,9 +203,9 @@ export class FreeSwitchDBService {
      */
     async deleteDialplansByCustomer(customerCode: string): Promise<void> {
         try {
-            const query = 'DELETE FROM dialplan_xml WHERE dialplan_id LIKE $1';
-            const pattern = `%_${customerCode}`;
-            await this.executeQuery(query, [pattern]);
+            const query = "DELETE FROM dialplan_xml WHERE dialplan_id LIKE $1 ESCAPE '!' OR dialplan_id LIKE $2 ESCAPE '!'";
+            const escaped = customerCode.replace(/!/g, '!!').replace(/%/g, '!%').replace(/_/g, '!_');
+            await this.executeQuery(query, [`%!_${escaped}`, `%!_${escaped}!_!_%`]);
             this.logger.log(`Deleted all dialplan XMLs for customer code: ${customerCode}`);
         } catch (error) {
             this.logger.error(`Failed to delete dialplans for customer code ${customerCode}:`, error.message);

@@ -20,8 +20,9 @@ export class CacheFlushService {
     /**
      * Flush DID cache entry
      */
-    async flushDID(did: string): Promise<void> {
+    async flushDID(did: string, strict = false): Promise<void> {
         if (!this.apiToken) {
+            if (strict) throw new Error('CACHE_FLUSH_TOKEN is required for subscription routing changes');
             this.logger.warn('CACHE_FLUSH_TOKEN is empty. Cache flush skipped.');
             return;
         }
@@ -33,6 +34,7 @@ export class CacheFlushService {
         try {
             const response = await lastValueFrom(
                 this.httpService.post(url, data.toString(), {
+                    timeout: 5000,
                     headers: {
                         'X-Cache-Token': this.apiToken,
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -42,14 +44,16 @@ export class CacheFlushService {
             this.logger.log(`Flushed DID cache for ${did}: ${JSON.stringify(response.data)}`);
         } catch (error: any) {
             this.logger.error(`Failed to flush DID cache for ${did}: ${error.message}`, error.response?.data);
+            if (strict) throw error;
         }
     }
 
     /**
      * Flush Customer cache (dialplans + extensions) using customer code
      */
-    async flushCustomer(customerCode: string): Promise<void> {
+    async flushCustomer(customerCode: string, strict = false): Promise<void> {
         if (!this.apiToken) {
+            if (strict) throw new Error('CACHE_FLUSH_TOKEN is required for subscription routing changes');
             this.logger.warn('CACHE_FLUSH_TOKEN is empty. Cache flush skipped.');
             return;
         }
@@ -61,6 +65,7 @@ export class CacheFlushService {
         try {
             const response = await lastValueFrom(
                 this.httpService.post(url, data.toString(), {
+                    timeout: 5000,
                     headers: {
                         'X-Cache-Token': this.apiToken,
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -70,6 +75,7 @@ export class CacheFlushService {
             this.logger.log(`Flushed Customer cache for ${customerCode}: ${JSON.stringify(response.data)}`);
         } catch (error: any) {
             this.logger.error(`Failed to flush Customer cache for ${customerCode}: ${error.message}`, error.response?.data);
+            if (strict) throw error;
         }
     }
 

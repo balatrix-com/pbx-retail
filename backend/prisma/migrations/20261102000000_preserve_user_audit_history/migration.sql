@@ -1,0 +1,10 @@
+ALTER TABLE "user_audit_logs" DROP CONSTRAINT IF EXISTS "user_audit_logs_actorId_fkey";
+ALTER TABLE "user_audit_logs" DROP CONSTRAINT IF EXISTS "user_audit_logs_targetId_fkey";
+ALTER TABLE "user_audit_logs" ALTER COLUMN "actorId" DROP NOT NULL;
+ALTER TABLE "user_audit_logs" ADD COLUMN "actorSnapshotId" TEXT;
+ALTER TABLE "user_audit_logs" ADD COLUMN "targetSnapshotId" TEXT;
+UPDATE "user_audit_logs" SET "actorSnapshotId" = "actorId", "targetSnapshotId" = "targetId";
+CREATE INDEX "user_audit_logs_actorSnapshotId_idx" ON "user_audit_logs"("actorSnapshotId");
+CREATE INDEX "user_audit_logs_targetSnapshotId_idx" ON "user_audit_logs"("targetSnapshotId");
+ALTER TABLE "user_audit_logs" ADD CONSTRAINT "user_audit_logs_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "user_audit_logs" ADD CONSTRAINT "user_audit_logs_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;

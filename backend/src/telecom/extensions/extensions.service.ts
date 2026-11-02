@@ -14,6 +14,7 @@ import { LookupRedisService } from '../../redis/lookup-redis.module';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
+import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 
 @Injectable()
 export class ExtensionsService {
@@ -25,6 +26,7 @@ export class ExtensionsService {
         private readonly lookupRedis: LookupRedisService,
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
+        private readonly subscriptions: SubscriptionsService,
     ) { }
 
     private async resolveTenantId(tenantId: string): Promise<string> {
@@ -72,6 +74,7 @@ export class ExtensionsService {
         const existingMap = new Map(existingExtensions.map(e => [e.extensionNumber, e]));
 
         for (const extAsset of subBillingAssets.extensions) {
+            if (extAsset.status !== 'active') continue;
             let extNum = String(extAsset.extension_number || extAsset.extensionNumber).trim();
             if (!extNum) continue;
 
@@ -90,7 +93,7 @@ export class ExtensionsService {
                 try {
                     const defaultPassword = 'Password@123';
                     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-                    const sipPasswordPlaintext = '123456';
+                    const sipPasswordPlaintext = crypto.randomBytes(24).toString('base64url');
 
                     const newExt = await this.prisma.extension.create({
                         data: {
@@ -112,7 +115,11 @@ export class ExtensionsService {
                         this.logger.warn(`Failed to sync FreeSWITCH/Kamailio for ${extNum}: ${err.message}`);
                     });
                 } catch (createErr: any) {
-                    this.logger.error(`Error auto-creating extension ${extNum} for ${targetTenantId}: ${createErr.message}`);
+                    if (createErr.code === 'P2002') {
+                        this.logger.debug(`Extension ${extNum} already created concurrently`);
+                    } else {
+                        this.logger.error(`Error auto-creating extension ${extNum} for ${targetTenantId}: ${createErr.message}`);
+                    }
                 }
             } else {
                 // Ensure existing extension is registered in Kamailio subscriber table
@@ -180,6 +187,7 @@ export class ExtensionsService {
      * - Hash password
      */
     async create(tenantId: string, dto: CreateExtensionDto) {
+        await this.subscriptions.capacity(tenantId,'extensions',dto.subscriptionId);
         // Enforce system limits
         const limitStr = process.env.SYSTEM_LIMIT_EXTENSIONS;
         if (limitStr) {
@@ -231,7 +239,7 @@ export class ExtensionsService {
 
         // Generate SIP credentials
         const sipUsername = extensionNumber; // Use extension number as username
-        const sipPasswordPlaintext = '123456';
+        const sipPasswordPlaintext = crypto.randomBytes(24).toString('base64url');
 
         // Note: We are storing the plaintext SIP password in `sipPassword` field as FreeSWITCH needs to know it (or we store hash if using hash auth, but typically plaintext for directory)
         // Actually, freeswitch usually needs the password to authenticate the user. 
@@ -270,6 +278,8 @@ export class ExtensionsService {
         });
 
         this.logger.log(`Created extension ${extension.extensionNumber} for tenant ${tenantId}`);
+        try { await this.subscriptions.assignExtension(tenantId,extension,dto.subscriptionId); }
+        catch(error){await this.prisma.extension.delete({where:{id:extension.id}});throw error;}
 
         // Sync to FreeSWITCH/Kamailio — non-fatal if unreachable
         try {
@@ -292,6 +302,7 @@ export class ExtensionsService {
      * Update extension (cannot change extension number)
      */
     async update(tenantId: string, id: string, dto: UpdateExtensionDto) {
+        await this.subscriptions.assertEditable('extension', id);
         // Verify ownership
         const extension = await this.prisma.extension.findFirst({
             where: { id, tenantId },
@@ -397,12 +408,9 @@ export class ExtensionsService {
             throw new BadRequestException(`Cannot delete extension. It is currently the routing target for DID ${didUsage.number}.`);
         }
 
-        // Sync: Delete from FreeSwitch — non-fatal if unreachable
-        try {
-            await this.freeSwitchSync.deleteExtension(extension);
-        } catch (syncErr) {
-            this.logger.warn(`FreeSWITCH sync failed for deleted extension ${extension.extensionNumber}: ${syncErr.message}`);
-        }
+        // Remove SIP/routing successfully before freeing the paid subscription slot.
+        await this.freeSwitchSync.deleteExtension(extension);
+        await this.subscriptions.unassignExtension(tenantId,extension);
 
         // Delete
         await this.prisma.extension.delete({ where: { id } });

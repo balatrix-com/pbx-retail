@@ -115,8 +115,8 @@ const AllUsersPage = () => {
 
         try {
             const response = await api.post(`/users/impersonate/${userId}`);
-            const { accessToken, refreshToken } = response.data;
-            const url = `/impersonate?token=${accessToken}&refresh=${refreshToken}`;
+            const { ticket } = response.data;
+            const url = `/impersonate?ticket=${encodeURIComponent(ticket)}`;
             window.open(url, '_blank');
         } catch (error) {
             console.error('Impersonation error:', error);

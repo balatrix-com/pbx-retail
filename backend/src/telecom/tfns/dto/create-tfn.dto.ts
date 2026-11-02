@@ -1,8 +1,12 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, Matches } from 'class-validator';
 
 export class CreateTFNDto {
+    @IsOptional()
+    @IsString()
+    subscriptionId?: string;
     @IsString()
     @IsNotEmpty()
+    @Matches(/^\+[1-9]\d{6,14}$/, { message: 'TFN must be in E.164 format, for example +18005551234' })
     tfnNumber: string;
 
     @IsString()

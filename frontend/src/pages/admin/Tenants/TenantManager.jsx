@@ -3,7 +3,6 @@ import { X, Wallet, Phone, Users, Info, Building2, Plus, Trash2, Loader, CreditC
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
-import MonitoringExtensionModal from '../../../components/admin/MonitoringExtensionModal';
 import { formatCustomerId } from '../../../utils/billing.utils';
 import { subscriptionService } from '../../../services/subscription.service';
 import AddonPurchaseModal from '../../../components/subscription/AddonPurchaseModal';
@@ -11,11 +10,10 @@ import AddonPurchaseModal from '../../../components/subscription/AddonPurchaseMo
 const TABS = [
     { id: 'overview', label: 'Overview', icon: Info },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
-    { id: 'numbers', label: 'Numbers', icon: Phone },
     { id: 'extensions', label: 'Extensions', icon: Users },
     { id: 'users', label: 'Users', icon: User },
     { id: 'features', label: 'Feature Controller', icon: Sliders },
-    { id: 'addons', label: 'Add-ons', icon: CreditCard },
+    { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
     { id: 'customize', label: 'Customize', icon: Palette }
 ];
 
@@ -98,6 +96,18 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
         );
     }
 
+    if (tenant.status === 'ARCHIVED' || tenant.archiveJob) return (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div role="dialog" aria-modal="true" aria-label="Archived customer" className="bg-white rounded-2xl p-6 max-w-lg space-y-4">
+                <h2 className="text-xl font-bold">{tenant.name} — {tenant.status === 'ARCHIVED' ? 'Archived' : 'Archive in progress'}</h2>
+                {tenant.archiveJob?.last_error && <p role="alert" className="text-red-700">{tenant.archiveJob.last_error}</p>}
+                <p>Customer ID: {tenant.customerCode || tenant.id}. Calls and logins are disabled. Financial and call history are retained; numbers remain held until explicitly released.</p>
+                <a className="text-primary-700 underline" href={`/super-admin/subscriptions?tenantId=${encodeURIComponent(tenant.id)}`}>View subscription history</a>
+                <button onClick={onClose} className="block rounded-xl border p-3">Close</button>
+            </div>
+        </div>
+    );
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
@@ -148,11 +158,10 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
                     <div className="flex-1 min-h-0 overflow-y-auto p-8 bg-white">
                         {activeTab === 'overview' && (<OverviewTab tenant={tenant} subscription={subscription} />)}
                         {activeTab === 'wallet' && <WalletTab tenant={tenant} onUpdate={handleRefresh} />}
-                        {activeTab === 'numbers' && <NumbersTab tenant={tenant} onUpdate={handleRefresh} />}
                         {activeTab === 'extensions' && <ExtensionsTab tenant={tenant} onUpdate={handleRefresh} />}
                         {activeTab === 'users' && <UsersTab tenant={tenant} />}
                         {activeTab === 'features' && <FeaturesTab tenant={tenant} onUpdate={handleRefresh} />}
-                        {activeTab === 'addons' && <AddonsTab tenant={tenant} onUpdate={handleRefresh} />}
+                        {activeTab === 'subscriptions' && <a className="text-primary-600 underline" href={`/super-admin/subscriptions?tenantId=${encodeURIComponent(tenant.id)}`}>Manage this tenant's subscriptions and allocated assets</a>}
                         {activeTab === 'customize' && <CustomizeTab tenant={tenant} onUpdate={handleRefresh} />}
                     </div>
                 </div>
@@ -422,562 +431,13 @@ const WalletTab = ({ tenant, onUpdate }) => {
     );
 };
 
-const NumbersTab = ({ tenant, onUpdate }) => {
-    const [assets, setAssets] = useState({ tfns: [], dids: [] });
-    const [loading, setLoading] = useState(true);
-    const [assignModal, setAssignModal] = useState(null); // { type: 'tfn' | 'did', item: assetItem }
-    const [editModal, setEditModal] = useState(null); // { type: 'tfn' | 'did', item: assetItem, phoneNumber: string }
-    const [actionLoading, setActionLoading] = useState(false);
-    const [tfnSearch, setTfnSearch] = useState('');
-    const [didSearch, setDidSearch] = useState('');
-    const { addToast } = useToast() || {};
-
-    useEffect(() => {
-        if (tenant?.id) {
-            fetchAssets();
-        }
-    }, [tenant?.id]);
-
-    const fetchAssets = async () => {
-        setLoading(true);
-        try {
-            const res = await api.get(`/wallet/assets?tenantId=${tenant.id}`);
-            setAssets({
-                tfns: Array.isArray(res.data?.tfns) ? res.data.tfns : [],
-                dids: Array.isArray(res.data?.dids) ? res.data.dids : []
-            });
-        } catch (err) {
-            console.error('Failed to fetch assets:', err);
-            // Fallback to subscription endpoints if needed
-            try {
-                const [tfnRes, didRes] = await Promise.all([
-                    api.get(`/subscription/tfns?tenantId=${tenant.id}`),
-                    api.get(`/subscription/dids?tenantId=${tenant.id}`).catch(() => ({ data: [] }))
-                ]);
-                setAssets({
-                    tfns: Array.isArray(tfnRes.data) ? tfnRes.data : [],
-                    dids: Array.isArray(didRes.data) ? didRes.data : []
-                });
-            } catch (fallbackErr) {
-                console.error('Fallback fetch also failed', fallbackErr);
-                setAssets({ tfns: [], dids: [] });
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleUnassign = async (type, number) => {
-        if (!number) return;
-        if (!window.confirm(`Are you sure you want to unassign ${number}?`)) return;
-
-        setActionLoading(true);
-        try {
-            const endpoint = type === 'tfn' ? '/subscription/tfns/unassign' : '/subscription/dids/unassign';
-            await api.post(endpoint, { number });
-            if (addToast) addToast('success', `${number} unassigned successfully`);
-            await fetchAssets();
-            if (onUpdate) onUpdate();
-        } catch (err) {
-            console.error(`Failed to unassign ${type}:`, err);
-            const msg = err.response?.data?.message || `Failed to unassign ${number}`;
-            if (addToast) addToast('error', msg);
-            else alert(msg);
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const renderAssetTable = (title, items, type, numberField, searchValue, setSearchValue) => {
-        const filteredItems = items.filter(item => {
-            if (!searchValue) return true;
-            const query = searchValue.toLowerCase();
-            const phoneNumber = (item[numberField] || item.number || item.phone_number || '').toLowerCase();
-            const sourceId = (item.source_id || item.sourceId || '').toLowerCase();
-            const sourceType = (item.source_type || item.sourceType || '').toLowerCase();
-            return phoneNumber.includes(query) || sourceId.includes(query) || sourceType.includes(query);
-        });
-
-        return (
-            <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 overflow-hidden">
-                <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                        <Phone size={14} className="text-gray-400" /> {title} ({filteredItems.length}{filteredItems.length !== items.length ? ` of ${items.length}` : ''})
-                    </h4>
-                    {/* Search Engine on Top Right */}
-                    <div className="relative w-full sm:w-64">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                            <Search size={14} />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder={`Search ${type === 'tfn' ? 'TFN' : 'DID'} or Source...`}
-                            value={searchValue}
-                            onChange={(e) => setSearchValue(e.target.value)}
-                            className="block w-full pl-9 pr-3 py-1.5 text-xs font-medium rounded-xl border border-gray-200 bg-white placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all shadow-2xs"
-                        />
-                        {searchValue && (
-                            <button
-                                type="button"
-                                onClick={() => setSearchValue('')}
-                                className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400 hover:text-gray-600"
-                            >
-                                <X size={12} />
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                    {filteredItems.length === 0 ? (
-                        <div className="text-center py-10 px-4">
-                            <Phone className="mx-auto h-10 w-10 text-gray-300 mb-2" />
-                            <p className="text-sm font-medium text-gray-500">
-                                {items.length === 0
-                                    ? `No ${title.toLowerCase()} configured for this tenant.`
-                                    : `No matches found for "${searchValue}".`}
-                            </p>
-                        </div>
-                    ) : (
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50/75">
-                                <tr>
-                                    <th scope="col" className="px-5 py-3 text-left text-xs font-extrabold text-gray-500 uppercase tracking-wider">
-                                        Source ID
-                                    </th>
-                                    <th scope="col" className="px-5 py-3 text-left text-xs font-extrabold text-gray-500 uppercase tracking-wider">
-                                        Source Type
-                                    </th>
-                                    <th scope="col" className="px-5 py-3 text-left text-xs font-extrabold text-gray-500 uppercase tracking-wider">
-                                        Phone Number
-                                    </th>
-                                    <th scope="col" className="px-5 py-3 text-right text-xs font-extrabold text-gray-500 uppercase tracking-wider">
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 bg-white">
-                                {filteredItems.map((item, idx) => {
-                                    const phoneNumber = item[numberField] || item.number || item.phone_number || '';
-                                    const isAssigned = !!phoneNumber;
-                                    const sourceType = (item.source_type || item.sourceType || 'PLAN').toUpperCase();
-
-                                    return (
-                                        <tr key={item.id || item.source_id || idx} className="hover:bg-gray-50/80 transition-colors">
-                                            <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-gray-900 font-mono">
-                                                {item.source_id || item.sourceId || 'N/A'}
-                                            </td>
-                                            <td className="px-5 py-4 whitespace-nowrap text-xs">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold tracking-wide uppercase ${sourceType === 'PLAN'
-                                                    ? 'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/20'
-                                                    : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20'
-                                                    }`}>
-                                                    {sourceType}
-                                                </span>
-                                            </td>
-                                            <td className="px-5 py-4 whitespace-nowrap text-sm">
-                                                {isAssigned ? (
-                                                    <span className="font-mono font-bold text-gray-900 flex items-center gap-1.5">
-                                                        <Phone size={13} className="text-primary-600" />
-                                                        {phoneNumber}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-gray-400 italic text-xs font-medium">
-                                                        Unassigned
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-5 py-4 whitespace-nowrap text-right text-xs font-medium">
-                                                <div className="flex items-center justify-end gap-1.5">
-                                                    {isAssigned ? (
-                                                        <>
-                                                            <button
-                                                                type="button"
-                                                                title="Edit Number Details & Routing"
-                                                                onClick={() => setEditModal({ type, item, phoneNumber })}
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 ring-1 ring-inset ring-gray-300 transition-all active:scale-[0.98]"
-                                                            >
-                                                                <Pencil size={12} className="text-gray-600" />
-                                                                Edit
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                disabled={actionLoading}
-                                                                onClick={() => handleUnassign(type, phoneNumber)}
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 ring-1 ring-inset ring-rose-600/20 transition-all active:scale-[0.98] disabled:opacity-50"
-                                                            >
-                                                                <Trash2 size={12} />
-                                                                Unassign
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            disabled={actionLoading}
-                                                            onClick={() => setAssignModal({ type, item })}
-                                                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 ring-1 ring-inset ring-primary-600/20 transition-all active:scale-[0.98] disabled:opacity-50"
-                                                        >
-                                                            <Plus size={13} />
-                                                            Assign Number
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            </div>
-        );
-    };
-
-    return (
-        <div className="space-y-8 w-full">
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                <div>
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Phone Numbers</h3>
-                    <p className="text-sm font-medium text-gray-500 mt-1">Manage DIDs and Toll-Free Numbers assigned to this tenant.</p>
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={fetchAssets}
-                        disabled={loading || actionLoading}
-                        className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none disabled:opacity-50"
-                        title="Refresh numbers"
-                    >
-                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                </div>
-            </div>
-
-            {loading ? (
-                <div className="flex justify-center py-16">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-                </div>
-            ) : (
-                <div className="space-y-6">
-                    {/* TFNs Table */}
-                    {renderAssetTable('Toll-Free Numbers (TFNs)', assets.tfns, 'tfn', 'tfn_number', tfnSearch, setTfnSearch)}
-
-                    {/* DIDs Table */}
-                    {renderAssetTable('Local / Mobile Numbers (DIDs)', assets.dids, 'did', 'did_number', didSearch, setDidSearch)}
-                </div>
-            )}
-
-            {/* Assign Number Modal */}
-            {assignModal && (
-                <AssignNumberModal
-                    type={assignModal.type}
-                    targetItem={assignModal.item}
-                    tenantId={tenant.id}
-                    onClose={() => setAssignModal(null)}
-                    onSuccess={() => {
-                        setAssignModal(null);
-                        fetchAssets();
-                        if (onUpdate) onUpdate();
-                    }}
-                />
-            )}
-
-            {/* Edit Number Routing & Details Modal */}
-            {editModal && (
-                <EditNumberModal
-                    type={editModal.type}
-                    phoneNumber={editModal.phoneNumber}
-                    targetItem={editModal.item}
-                    tenantId={tenant.id}
-                    onClose={() => setEditModal(null)}
-                    onSuccess={() => {
-                        setEditModal(null);
-                        fetchAssets();
-                        if (onUpdate) onUpdate();
-                    }}
-                />
-            )}
-        </div>
-    );
-};
-
-// Modal for editing number details & routing (TFN or DID)
-const EditNumberModal = ({ type, phoneNumber, targetItem, tenantId, onClose, onSuccess }) => {
-    const isTfn = type === 'tfn';
-    const title = isTfn ? 'Toll-Free Number (TFN)' : 'Direct Inward Dialing (DID)';
-
-    const [routeType, setRouteType] = useState('extension');
-    const [routeDestinationId, setRouteDestinationId] = useState('');
-    const [forwardNumber, setForwardNumber] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [destinations, setDestinations] = useState({
-        extensions: [],
-        ringGroups: [],
-        ivrs: [],
-        schedules: []
-    });
-    const { addToast } = useToast() || {};
-
-    useEffect(() => {
-        const fetchInitialData = async () => {
-            setLoading(true);
-            try {
-                // Fetch existing details for this number and available route targets in parallel
-                const [numberRes, extRes, rgRes, ivrRes, schedRes] = await Promise.all([
-                    api.get(`/telecom/${isTfn ? 'tfns' : 'dids'}/${phoneNumber}`, {
-                        params: { tenantId }
-                    }).catch(() => null),
-                    api.get(`/telecom/extensions?tenantId=${tenantId}`).catch(() => ({ data: [] })),
-                    api.get(`/telecom/ring-groups?tenantId=${tenantId}`).catch(() => ({ data: [] })),
-                    api.get(`/telecom/ivrs?tenantId=${tenantId}`).catch(() => ({ data: [] })),
-                    api.get(`/telecom/operational-schedules?tenantId=${tenantId}`).catch(() => ({ data: [] })),
-                ]);
-
-                setDestinations({
-                    extensions: Array.isArray(extRes?.data) ? extRes.data : [],
-                    ringGroups: Array.isArray(rgRes?.data) ? rgRes.data : [],
-                    ivrs: Array.isArray(ivrRes?.data) ? ivrRes.data : [],
-                    schedules: Array.isArray(schedRes?.data) ? schedRes.data : []
-                });
-
-                if (numberRes?.data) {
-                    const data = numberRes.data;
-                    const rType = data.routeType || (data.forwardEnabled ? 'forward' : 'extension');
-                    setRouteType(rType);
-                    setRouteDestinationId(data.routeTargetId || '');
-                    setForwardNumber(data.forwardNumber || '');
-                }
-            } catch (err) {
-                console.error('Failed to fetch number route details:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchInitialData();
-    }, [phoneNumber, tenantId, isTfn]);
-
-    const handleSave = async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        try {
-            const endpoint = `/telecom/${isTfn ? 'tfns' : 'dids'}/${phoneNumber}`;
-            const payload = {
-                tenantId,
-                routeType,
-                routeDestinationId: routeType === 'forward' ? undefined : routeDestinationId,
-                forwardNumber: routeType === 'forward' ? forwardNumber : undefined,
-                ...(isTfn ? { tfnNumber: phoneNumber } : { didNumber: phoneNumber })
-            };
-
-            await api.put(endpoint, payload);
-            if (addToast) addToast('success', `${phoneNumber} routing updated successfully`);
-            onSuccess();
-        } catch (err) {
-            console.error('Failed to update number routing:', err);
-            const msg = err.response?.data?.message || 'Failed to update number routing';
-            if (addToast) addToast('error', msg);
-            else alert(msg);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col ring-1 ring-gray-200">
-                <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center shrink-0 bg-gray-50/50">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-primary-50 text-primary-600 ring-1 ring-primary-100">
-                            <Pencil size={18} />
-                        </div>
-                        <div>
-                            <h4 className="text-base font-extrabold text-gray-900 tracking-tight">Edit {title}</h4>
-                            <p className="text-xs font-mono font-bold text-primary-600 mt-0.5">{phoneNumber}</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="rounded-xl p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
-                    >
-                        <X size={20} />
-                    </button>
-                </div>
-
-                <form onSubmit={handleSave} className="p-6 space-y-5">
-                    {loading ? (
-                        <div className="flex justify-center py-10">
-                            <Loader2 className="h-7 w-7 animate-spin text-primary-600" />
-                        </div>
-                    ) : (
-                        <>
-                            <div>
-                                <label className="block text-xs font-extrabold text-gray-500 uppercase tracking-widest mb-1.5">
-                                    Assigned Number
-                                </label>
-                                <input
-                                    type="text"
-                                    disabled
-                                    value={phoneNumber}
-                                    className="block w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm font-mono font-bold text-gray-700 cursor-not-allowed"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-extrabold text-gray-500 uppercase tracking-widest mb-1.5">
-                                    Call Route Destination
-                                </label>
-                                <select
-                                    value={routeType}
-                                    onChange={(e) => {
-                                        setRouteType(e.target.value);
-                                        setRouteDestinationId('');
-                                    }}
-                                    className="block w-full rounded-xl border border-gray-200 py-2.5 px-3 text-sm font-semibold text-gray-900 shadow-2xs focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white transition-all"
-                                >
-                                    <option value="extension">Direct Extension</option>
-                                    <option value="ring_group">Ring Group</option>
-                                    <option value="ivr">Interactive Voice Response (IVR)</option>
-                                    <option value="schedule">Operational Schedule</option>
-                                    <option value="forward">External Number (Forward)</option>
-                                </select>
-                            </div>
-
-                            {routeType === 'extension' && (
-                                <div>
-                                    <label className="block text-xs font-extrabold text-gray-500 uppercase tracking-widest mb-1.5">
-                                        Select Extension
-                                    </label>
-                                    <select
-                                        value={routeDestinationId}
-                                        onChange={(e) => setRouteDestinationId(e.target.value)}
-                                        className="block w-full rounded-xl border border-gray-200 py-2.5 px-3 text-sm font-semibold text-gray-900 shadow-2xs focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white transition-all"
-                                    >
-                                        <option value="">-- Choose Extension --</option>
-                                        {destinations.extensions.map((ext) => (
-                                            <option key={ext.id} value={ext.id}>
-                                                Ext {ext.extensionNumber} {ext.name ? `(${ext.name})` : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {routeType === 'ring_group' && (
-                                <div>
-                                    <label className="block text-xs font-extrabold text-gray-500 uppercase tracking-widest mb-1.5">
-                                        Select Ring Group
-                                    </label>
-                                    <select
-                                        value={routeDestinationId}
-                                        onChange={(e) => setRouteDestinationId(e.target.value)}
-                                        className="block w-full rounded-xl border border-gray-200 py-2.5 px-3 text-sm font-semibold text-gray-900 shadow-2xs focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white transition-all"
-                                    >
-                                        <option value="">-- Choose Ring Group --</option>
-                                        {destinations.ringGroups.map((rg) => (
-                                            <option key={rg.id} value={rg.id}>
-                                                {rg.name} {rg.extensionNumber ? `(Ext ${rg.extensionNumber})` : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {routeType === 'ivr' && (
-                                <div>
-                                    <label className="block text-xs font-extrabold text-gray-500 uppercase tracking-widest mb-1.5">
-                                        Select IVR Menu
-                                    </label>
-                                    <select
-                                        value={routeDestinationId}
-                                        onChange={(e) => setRouteDestinationId(e.target.value)}
-                                        className="block w-full rounded-xl border border-gray-200 py-2.5 px-3 text-sm font-semibold text-gray-900 shadow-2xs focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white transition-all"
-                                    >
-                                        <option value="">-- Choose IVR --</option>
-                                        {destinations.ivrs.map((ivr) => (
-                                            <option key={ivr.id} value={ivr.id}>
-                                                {ivr.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {routeType === 'schedule' && (
-                                <div>
-                                    <label className="block text-xs font-extrabold text-gray-500 uppercase tracking-widest mb-1.5">
-                                        Select Schedule
-                                    </label>
-                                    <select
-                                        value={routeDestinationId}
-                                        onChange={(e) => setRouteDestinationId(e.target.value)}
-                                        className="block w-full rounded-xl border border-gray-200 py-2.5 px-3 text-sm font-semibold text-gray-900 shadow-2xs focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white transition-all"
-                                    >
-                                        <option value="">-- Choose Operational Schedule --</option>
-                                        {destinations.schedules.map((sch) => (
-                                            <option key={sch.id} value={sch.id}>
-                                                {sch.name} ({sch.startTime} - {sch.endTime})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {routeType === 'forward' && (
-                                <div>
-                                    <label className="block text-xs font-extrabold text-gray-500 uppercase tracking-widest mb-1.5">
-                                        External Forwarding Number (E.164)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="+18005550199"
-                                        value={forwardNumber}
-                                        onChange={(e) => setForwardNumber(e.target.value)}
-                                        required
-                                        className="block w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono font-medium text-gray-900 shadow-2xs focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white transition-all"
-                                    />
-                                    <p className="text-[11px] text-gray-400 mt-1">Incoming calls will be immediately bridged to this external number.</p>
-                                </div>
-                            )}
-
-                            <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    className="px-4 py-2 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-sm transition-all disabled:opacity-50"
-                                >
-                                    {saving && <Loader2 size={13} className="animate-spin" />}
-                                    Save Routing Changes
-                                </button>
-                            </div>
-                        </>
-                    )}
-                </form>
-            </div>
-        </div>
-    );
-};
-
 const ExtensionsTab = ({ tenant, onUpdate }) => {
     const [extensions, setExtensions] = useState([]);
-    const [monitoringUsers, setMonitoringUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
     const [newExt, setNewExt] = useState({ name: '', password: '' });
     const [predictedExt, setPredictedExt] = useState('...');
 
-    // Monitoring Edit State
-    const [showMonitoringModal, setShowMonitoringModal] = useState(false);
-    const [selectedMonitoringUser, setSelectedMonitoringUser] = useState(null);
 
     useEffect(() => {
         fetchExtensions();
@@ -1002,17 +462,9 @@ const ExtensionsTab = ({ tenant, onUpdate }) => {
     const fetchExtensions = async () => {
         setLoading(true);
         try {
-            const [extRes, usersRes] = await Promise.all([
-                api.get(`/telecom/extensions?tenantId=${tenant.id}`),
-                api.get(`/users?tenantId=${tenant.id}`)
-            ]);
+            const extRes = await api.get(`/telecom/extensions?tenantId=${tenant.id}`);
 
             setExtensions(extRes.data);
-
-            // Filter users for monitoring extensions
-            const users = usersRes.data.data || [];
-            const monitoring = users.filter(u => u.monitoringEnabled && u.monitoringExtension);
-            setMonitoringUsers(monitoring);
         } catch (err) {
             console.error('Failed to fetch extensions', err);
         } finally {
@@ -1034,47 +486,6 @@ const ExtensionsTab = ({ tenant, onUpdate }) => {
             onUpdate();
         } catch (err) {
             alert('Failed to add extension: ' + (err.response?.data?.message || err.message));
-        }
-    };
-
-    const handleEditMonitoring = (user) => {
-        setSelectedMonitoringUser(user);
-        setShowMonitoringModal(true);
-    };
-
-    const handleUpdateMonitoring = async ({ monitoringExtension, monitoringSecret, name }) => {
-        if (!selectedMonitoringUser) return;
-        try {
-            await api.patch(`/users/${selectedMonitoringUser.id}/permissions`, {
-                monitoringEnabled: true,
-                monitoringExtension,
-                monitoringSecret,
-                name
-            });
-            setShowMonitoringModal(false);
-            setSelectedMonitoringUser(null);
-            fetchExtensions(); // Refresh
-        } catch (err) {
-            console.error("Failed to update monitoring user", err);
-            alert("Failed to update: " + (err.response?.data?.message || err.message));
-        }
-    };
-
-    const handleDisableMonitoring = async (user) => {
-        if (!window.confirm(`Are you sure you want to disable monitoring for ${user.name || user.email}?`)) {
-            return;
-        }
-
-        try {
-            await api.patch(`/users/${user.id}/permissions`, {
-                monitoringEnabled: false,
-                monitoringExtension: null, // Clear these too nicely
-                monitoringSecret: null
-            });
-            fetchExtensions();
-        } catch (err) {
-            console.error('Failed to disable monitoring:', err);
-            alert('Failed to disable monitoring: ' + (err.response?.data?.message || err.message));
         }
     };
 
@@ -1100,7 +511,7 @@ const ExtensionsTab = ({ tenant, onUpdate }) => {
             <div className="flex justify-between items-center pb-4 border-b border-gray-100">
                 <div>
                     <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Extensions</h3>
-                    <p className="text-sm font-medium text-gray-500 mt-1">Manage standard and monitoring lines.</p>
+                    <p className="text-sm font-medium text-gray-500 mt-1">Manage standard extension lines.</p>
                 </div>
                 <div className="flex gap-2">
                     <button
@@ -1159,46 +570,6 @@ const ExtensionsTab = ({ tenant, onUpdate }) => {
                         </div>
                     </div>
 
-                    {/* Monitoring Extensions Section */}
-                    {monitoringUsers.length > 0 && (
-                        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 overflow-hidden mt-6">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                                    <Info size={14} className="text-blue-500" /> Monitoring Extensions
-                                </h4>
-                            </div>
-                            <div className="p-5">
-                                <div className="space-y-3 max-w-2xl">
-                                    {monitoringUsers.map(user => (
-                                        <div key={user.id} className="flex justify-between items-center bg-blue-50/30 p-4 rounded-xl ring-1 ring-inset ring-blue-100 shadow-sm hover:shadow-md transition-all">
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="font-mono font-extrabold text-sm text-blue-900">{user.monitoringExtension}</span>
-                                                    <span className="text-sm font-bold text-blue-800">{user.name || 'Unnamed'}</span>
-                                                </div>
-                                                <p className="text-xs font-medium text-blue-600/80">{user.email}</p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => handleEditMonitoring(user)}
-                                                    className="inline-flex justify-center items-center rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-blue-700 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                >
-                                                    Edit
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDisableMonitoring(user)}
-                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors focus:outline-none"
-                                                    title="Disable Monitoring"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </>
             )}
 
@@ -1262,158 +633,6 @@ const ExtensionsTab = ({ tenant, onUpdate }) => {
                 </div>
             )}
 
-            {showMonitoringModal && selectedMonitoringUser && (
-                <MonitoringExtensionModal
-                    onClose={() => {
-                        setShowMonitoringModal(false);
-                        setSelectedMonitoringUser(null);
-                    }}
-                    onSubmit={handleUpdateMonitoring}
-                    initialExtension={selectedMonitoringUser.monitoringExtension}
-                    initialSecret={selectedMonitoringUser.monitoringSecret}
-                    initialName={selectedMonitoringUser.name}
-                    isEditing={true}
-                    tenantId={tenant.id}
-                />
-            )}
-        </div>
-    );
-};
-
-// Modal for assigning numbers from available inventory (TFN or DID)
-const AssignNumberModal = ({ type, targetItem, tenantId, onClose, onSuccess }) => {
-    const [available, setAvailable] = useState([]);
-    const [selectedNumber, setSelectedNumber] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-    const { addToast } = useToast() || {};
-
-    const isTfn = type === 'tfn';
-    const title = isTfn ? 'Toll-Free Number (TFN)' : 'Direct Inward Dialing (DID)';
-
-    useEffect(() => {
-        const fetchAvailable = async () => {
-            setLoading(true);
-            try {
-                const endpoint = isTfn ? '/subscription/tfns/available' : '/subscription/dids/available';
-                const res = await api.get(endpoint);
-                const list = Array.isArray(res.data) ? res.data : [];
-                setAvailable(list);
-                if (list.length > 0) {
-                    setSelectedNumber(list[0].number || list[0].id || '');
-                }
-            } catch (err) {
-                console.error('Failed to fetch available inventory:', err);
-                if (addToast) addToast('error', 'Failed to load available inventory');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchAvailable();
-    }, [isTfn]);
-
-    const handleAssign = async (e) => {
-        e.preventDefault();
-        if (!selectedNumber) return;
-
-        setSubmitting(true);
-        try {
-            const endpoint = isTfn ? '/subscription/tfns/assign' : '/subscription/dids/assign';
-            await api.post(endpoint, {
-                number: selectedNumber,
-                tenantId: tenantId
-            });
-
-            if (addToast) addToast('success', `${selectedNumber} assigned successfully`);
-            onSuccess();
-        } catch (err) {
-            console.error('Failed to assign number:', err);
-            const msg = err.response?.data?.message || 'Failed to assign number';
-            if (addToast) addToast('error', msg);
-            else alert(msg);
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col ring-1 ring-gray-200">
-                <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center shrink-0">
-                    <div>
-                        <h4 className="text-lg font-extrabold text-gray-900 tracking-tight">Assign {title}</h4>
-                        {targetItem?.source_id && (
-                            <p className="text-xs font-mono font-bold text-gray-500 mt-0.5">
-                                Slot: {targetItem.source_id}
-                            </p>
-                        )}
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="rounded-xl p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
-                    >
-                        <X size={20} />
-                    </button>
-                </div>
-
-                <form onSubmit={handleAssign} className="p-6 space-y-4">
-                    {loading ? (
-                        <div className="flex justify-center py-8">
-                            <Loader2 className="h-7 w-7 animate-spin text-primary-600" />
-                        </div>
-                    ) : available.length === 0 ? (
-                        <div className="text-center py-8">
-                            <Phone className="mx-auto h-10 w-10 text-gray-300 mb-2" />
-                            <p className="text-sm font-medium text-gray-600">No available {title} inventory found.</p>
-                            <p className="text-xs text-gray-400 mt-1">Add more numbers to global inventory in Numbers Management.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            <label className="block text-xs font-extrabold text-gray-500 uppercase tracking-widest">
-                                Select Number from Inventory
-                            </label>
-                            <select
-                                className="block w-full rounded-xl border-0 py-3 px-3.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 text-sm font-mono font-bold bg-white transition-all"
-                                value={selectedNumber}
-                                onChange={(e) => setSelectedNumber(e.target.value)}
-                                required
-                            >
-                                {available.map((num) => {
-                                    const val = num.number || num.id;
-                                    return (
-                                        <option key={num.id || val} value={val}>
-                                            {val} {num.provider ? `(${num.provider})` : ''} {num.isDemo ? '• Demo' : ''}
-                                        </option>
-                                    );
-                                })}
-                            </select>
-                        </div>
-                    )}
-
-                    <div className="pt-3 flex justify-end gap-3 border-t border-gray-100">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="inline-flex justify-center items-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-all active:scale-[0.98] focus:outline-none"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={submitting || loading || available.length === 0}
-                            className="inline-flex justify-center items-center rounded-xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {submitting ? (
-                                <><Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" /> Assigning...</>
-                            ) : (
-                                'Assign Number'
-                            )}
-                        </button>
-                    </div>
-                </form>
-            </div>
         </div>
     );
 };
@@ -1446,8 +665,8 @@ const UsersTab = ({ tenant }) => {
         setImpersonatingId(userId);
         try {
             const response = await api.post(`/users/impersonate/${userId}`);
-            const { accessToken, refreshToken } = response.data;
-            const url = `/impersonate?token=${accessToken}&refresh=${refreshToken}`;
+            const { ticket } = response.data;
+            const url = `/impersonate?ticket=${encodeURIComponent(ticket)}`;
             window.open(url, '_blank');
         } catch (err) {
             alert('Impersonation failed: ' + (err.response?.data?.message || err.message));
@@ -1537,27 +756,6 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
         didForwardLimit: 10,
     });
     const [updatingFeature, setUpdatingFeature] = useState(null);
-    const [adminUser, setAdminUser] = useState(null);
-    const [userMonitoringEnabled, setUserMonitoringEnabled] = useState(false);
-    const [showMonitoringModal, setShowMonitoringModal] = useState(false);
-
-    // Fetch tenant admin user to know user-level monitoring status
-    useEffect(() => {
-        fetchAdminUser();
-    }, [tenant.id]);
-
-    const fetchAdminUser = async () => {
-        try {
-            const res = await api.get(`/users?tenantId=${tenant.id}`);
-            const usersList = res.data?.data || [];
-            // Find tenant admin (or first user)
-            const targetAdmin = usersList.find(u => u.role === 'ADMIN') || usersList[0] || null;
-            setAdminUser(targetAdmin);
-            setUserMonitoringEnabled(targetAdmin?.monitoringEnabled || false);
-        } catch (err) {
-            console.error('Failed to fetch admin user for monitoring toggle:', err);
-        }
-    };
 
     // Keep state in sync if tenant prop updates
     useEffect(() => {
@@ -1567,35 +765,6 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
     }, [tenant.tenantFeatures]);
 
     const handleToggle = async (key) => {
-        if (key === 'monitoringEnabled') {
-            if (!adminUser) {
-                alert('No admin user found for this tenant to configure monitoring permissions.');
-                return;
-            }
-
-            if (!userMonitoringEnabled) {
-                // Opening modal to collect monitoring extension and secret
-                setShowMonitoringModal(true);
-            } else {
-                // Turn OFF via user permissions API
-                setUpdatingFeature('monitoringEnabled');
-                try {
-                    await api.patch(`/users/${adminUser.id}/permissions`, {
-                        monitoringEnabled: false
-                    });
-                    setUserMonitoringEnabled(false);
-                    await fetchAdminUser();
-                    onUpdate();
-                } catch (err) {
-                    console.error('Failed to disable monitoring:', err);
-                    alert('Failed to disable monitoring: ' + (err.response?.data?.message || err.message));
-                } finally {
-                    setUpdatingFeature(null);
-                }
-            }
-            return;
-        }
-
         setUpdatingFeature(key);
         const updatedFeatures = {
             ...features,
@@ -1608,28 +777,6 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
         } catch (err) {
             console.error('Failed to update tenant features:', err);
             alert('Failed to update tenant features');
-        } finally {
-            setUpdatingFeature(null);
-        }
-    };
-
-    const handleEnableMonitoring = async ({ monitoringExtension, monitoringSecret, name }) => {
-        if (!adminUser) return;
-        setUpdatingFeature('monitoringEnabled');
-        try {
-            await api.patch(`/users/${adminUser.id}/permissions`, {
-                monitoringEnabled: true,
-                monitoringExtension,
-                monitoringSecret,
-                name
-            });
-            setUserMonitoringEnabled(true);
-            setShowMonitoringModal(false);
-            await fetchAdminUser();
-            onUpdate();
-        } catch (err) {
-            console.error('Failed to enable monitoring:', err);
-            alert('Failed to enable monitoring: ' + (err.response?.data?.message || err.message));
         } finally {
             setUpdatingFeature(null);
         }
@@ -1662,13 +809,6 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
             title: 'Call Recording Permission',
             description: 'Allow tenant administrators to toggle automatic call recording for extensions.',
             icon: Mic,
-            color: 'text-blue-600 bg-blue-50 border-blue-100',
-        },
-        {
-            key: 'monitoringEnabled',
-            title: 'Call Monitoring',
-            description: 'Allows administrators to view real-time calls and listen-in to active calls.',
-            icon: ShieldAlert,
             color: 'text-blue-600 bg-blue-50 border-blue-100',
         },
         {
@@ -1717,7 +857,7 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
             <div className="grid grid-cols-1 gap-4">
                 {FEATURE_ITEMS.map((item) => {
                     const Icon = item.icon;
-                    const isEnabled = item.key === 'monitoringEnabled' ? userMonitoringEnabled : features[item.key];
+                    const isEnabled = features[item.key];
                     const isUpdating = updatingFeature === item.key || updatingFeature === item.limitKey;
                     const limitVal = features[item.limitKey] ?? 10;
 
@@ -1793,14 +933,6 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                 })}
             </div>
 
-            {showMonitoringModal && adminUser && (
-                <MonitoringExtensionModal
-                    onClose={() => setShowMonitoringModal(false)}
-                    onSubmit={handleEnableMonitoring}
-                    tenantId={tenant.id}
-                    initialUserId={adminUser.id}
-                />
-            )}
         </div>
     );
 };

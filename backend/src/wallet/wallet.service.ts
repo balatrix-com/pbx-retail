@@ -9,6 +9,8 @@ import { firstValueFrom } from 'rxjs';
 
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
 import { LookupRedisService } from '../redis/lookup-redis.module';
+import { mirrorSubBillingPlan } from '../plans/plan-mirror';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Injectable()
 export class WalletService {
@@ -23,6 +25,7 @@ export class WalletService {
         private configService: ConfigService,
         private freeSwitchSync: FreeSwitchSyncService,
         private lookupRedis: LookupRedisService,
+        private subscriptions: SubscriptionsService,
     ) {
         this.subBillingUrl = this.configService.get<string>('SUB_BILLING_API_URL') || 'http://localhost:5005/api';
     }
@@ -206,151 +209,23 @@ export class WalletService {
         }
     }
 
-    async switchSubscriptionPlan(tenantId: string, planId: string, immediate: boolean = true) {
-        const customerId = await this.getSubBillingCustomerId(tenantId);
-        try {
-            this.logger.log(`Switching subscription plan in sub-billing for customer ${customerId} (tenant ${tenantId}) to ${planId}`);
-            const response = await firstValueFrom(
-                this.httpService.post(`${this.subBillingUrl}/subscriptions/switch-plan`, {
-                    customer_id: customerId,
-                    target_plan_id: planId,
-                    execute_on_expiration: !immediate
-                })
-            );
-
-            const endDate = new Date();
-            endDate.setFullYear(endDate.getFullYear() + 1);
-
-            const subBillingData = response.data?.data;
-            const subBillingSubId = subBillingData?.subscription_id || subBillingData?.id;
-
-            // Find matching local plan in Prisma DB (for foreign key relation)
-            let localPlan = await this.prisma.plan.findFirst({
-                where: { OR: [{ id: planId }, { name: { equals: planId, mode: 'insensitive' } }] }
-            });
-            if (!localPlan) {
-                localPlan = await this.prisma.plan.findFirst();
-            }
-            const localPlanIdToUse = localPlan ? localPlan.id : planId;
-
-            // Fetch dynamic plan limits from sub-billing system
-            let allowedExtensions = 5;
-            let freeMins = localPlan?.freeMinutes || 500;
-            try {
-                const planRes = await firstValueFrom(
-                    this.httpService.get(`${this.subBillingUrl}/plans/${planId}`)
-                );
-                const subPlan = planRes.data?.data || planRes.data;
-                if (subPlan) {
-                    if (subPlan.extensions !== undefined && subPlan.extensions !== null) {
-                        allowedExtensions = Number(subPlan.extensions);
-                    }
-                    if (subPlan.free_mins !== undefined && subPlan.free_mins !== null) {
-                        freeMins = Number(subPlan.free_mins);
-                    }
-                }
-            } catch (err) {
-                this.logger.warn(`Could not fetch plan limits from sub-billing for ${planId}: ${err.message}`);
-                allowedExtensions = localPlan?.maxExtensions || 5;
-            }
-
-            const existingSub = await this.prisma.subscription.findFirst({
-                where: { tenantId }
-            });
-
-            if (existingSub) {
-                await this.prisma.subscription.update({
-                    where: { id: existingSub.id },
-                    data: {
-                        planId: localPlanIdToUse,
-                        subBillingSubscriptionId: subBillingSubId || existingSub.subBillingSubscriptionId,
-                        status: 'ACTIVE',
-                        remainingFreeMinutes: freeMins,
-                        updatedAt: new Date()
-                    }
-                });
-            } else {
-                await this.prisma.subscription.create({
-                    data: {
-                        tenantId,
-                        planId: localPlanIdToUse,
-                        subBillingSubscriptionId: subBillingSubId || undefined,
-                        status: 'ACTIVE',
-                        startDate: new Date(),
-                        endDate,
-                        remainingFreeMinutes: freeMins
-                    }
-                });
-            }
-
-            // Auto-provision extensions matching target plan limit
-            const tenant = await this.prisma.tenant.findUnique({
-                where: { id: tenantId },
-                select: { customerCode: true }
-            });
-
-            if (tenant && tenant.customerCode && allowedExtensions > 0) {
-                const currentExtCount = await this.prisma.extension.count({
-                    where: { tenantId }
-                });
-
-                if (currentExtCount < allowedExtensions) {
-                    const toCreate = allowedExtensions - currentExtCount;
-                    this.logger.log(`Auto-provisioning ${toCreate} extension(s) for tenant ${tenantId} (plan allowance: ${allowedExtensions})`);
-
-                    for (let i = currentExtCount; i < allowedExtensions; i++) {
-                        const suffix = (i + 1).toString().padStart(2, '0');
-                        const extNum = `${tenant.customerCode}${suffix}`;
-
-                        const existingExt = await this.prisma.extension.findUnique({
-                            where: {
-                                tenantId_extensionNumber: {
-                                    tenantId,
-                                    extensionNumber: extNum
-                                }
-                            }
-                        });
-
-                        if (!existingExt) {
-                            const newExt = await this.prisma.extension.create({
-                                data: {
-                                    tenantId,
-                                    extensionNumber: extNum,
-                                    name: `Extension ${suffix}`,
-                                    sipUsername: extNum,
-                                    sipPassword: '123456',
-                                    sipAuthRealm: process.env.SIP_SERVER || 'localhost',
-                                    sequenceId: i + 1
-                                }
-                            });
-
-                            // Sync to FreeSWITCH dialplan & Kamailio subscriber table
-                            try {
-                                await this.freeSwitchSync.syncExtension(newExt.id);
-                            } catch (syncErr: any) {
-                                this.logger.warn(`FreeSWITCH/Kamailio sync failed for new extension ${extNum}: ${syncErr.message}`);
-                            }
-                        } else {
-                            // Ensure existing extension is registered in Kamailio
-                            try {
-                                await this.freeSwitchSync.syncExtension(existingExt.id);
-                            } catch (syncErr: any) {
-                                this.logger.debug(`Kamailio sync check failed for ${extNum}: ${syncErr.message}`);
-                            }
-                        }
-                    }
-
-                    // Sync with Redis Lookup DB
-                    await this.lookupRedis.updateExtensionLookup(tenantId).catch(() => { });
-                }
-            }
-
-            return response.data;
-        } catch (error) {
-            const errorMsg = error.response?.data?.message || error.message;
-            this.logger.error(`Failed to switch subscription plan for tenant ${tenantId}: ${errorMsg}`);
-            throw new BadRequestException(`Failed to switch subscription plan: ${errorMsg}`);
-        }
+    // Compatibility for the customer-creation wizard; this is activation, not plan switching.
+    async switchSubscriptionPlan(tenantId: string, planId: string, immediate: boolean = true, actor: string = 'onboarding') {
+        if (!immediate) throw new BadRequestException('Scheduled plan switching is retired. Manage subscriptions and asset reassignment from Subscriptions.');
+        await this.getSubBillingCustomerId(tenantId);
+        const planResponse = await firstValueFrom(this.httpService.get(`${this.subBillingUrl}/plans/${encodeURIComponent(planId)}`));
+        const remotePlan = planResponse.data?.data || planResponse.data;
+        if (!remotePlan || remotePlan.plan_id !== planId) throw new BadRequestException(`Sub-billing plan ${planId} was not found`);
+        await mirrorSubBillingPlan(this.prisma, remotePlan);
+        this.logger.log(`Activating subscription for tenant ${tenantId}: ${planId}`);
+        const result = await this.subscriptions.activate(tenantId, {
+            plan_id: planId,
+            payment_mode: 'wallet',
+            auto_renew: false,
+            // Stable across HTTP retries, including retries after PBX reconciliation fails.
+            operation_key: `wallet-activation:${tenantId}:${planId}`,
+        }, actor);
+        return { success: true, data: result };
     }
 
     async getCards(tenantId: string) {

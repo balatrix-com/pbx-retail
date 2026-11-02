@@ -28,6 +28,7 @@ export class FreeSwitchSyncService {
             include: { tenant: true }
         });
         if (!ext) return;
+        if (!ext.isActive) { await this.deleteExtension(ext); return; }
 
         // 1. Sync Kamailio Subscriber
         if (ext.sipPassword) {
@@ -200,6 +201,7 @@ export class FreeSwitchSyncService {
             }
 
             this.logger.log(`Syncing DID ${did.number} to FreeSWITCH...`);
+            if (!did.isActive) { await this.deleteDID(did); return; }
 
             if (!did.tenant) {
                 this.logger.warn(`DID ${did.number} has no tenant. Skipping sync.`);
@@ -249,6 +251,7 @@ export class FreeSwitchSyncService {
             }
         } catch (error) {
             this.logger.error(`Failed to sync DID`, error);
+            throw error;
         }
     }
 
@@ -263,12 +266,12 @@ export class FreeSwitchSyncService {
         const normalizedNumber = this.normalizeNumber(did.number);
         
         // 1. Remove from did_routes and dialplan_xml (exact match)
-        await this.freeswitchDB.removeDID(normalizedNumber, normalizedNumber).catch(() => {});
+        await this.freeswitchDB.removeDID(normalizedNumber, normalizedNumber);
 
         // 2. Clean up potential forwarding XMLs
         // DIDs use: fwd_{seqId}_{customerCode}
         if (did.tenant && did.sequenceId !== undefined) {
-            await this.freeswitchDB.deleteDialplanPattern(`fwd_${did.sequenceId}_${did.tenant.customerCode}`).catch(() => {});
+            await this.freeswitchDB.deleteDialplanPattern(`fwd_${did.sequenceId}_${did.tenant.customerCode}`);
         }
 
         this.logger.log(`Deleted DID ${normalizedNumber} and associated forwarding XMLs`);
@@ -300,6 +303,7 @@ export class FreeSwitchSyncService {
             }
 
             this.logger.log(`Syncing TFN ${tfn.number} to FreeSWITCH...`);
+            if (tfn.status !== 'ASSIGNED') { await this.deleteTFN(tfn); return; }
 
             let targetKey = '';
 
@@ -372,6 +376,7 @@ export class FreeSwitchSyncService {
 
         } catch (error) {
             this.logger.error(`Failed to sync TFN`, error);
+            throw error;
         }
     }
 
@@ -383,15 +388,15 @@ export class FreeSwitchSyncService {
         const normalizedNumber = this.normalizeNumber(tfn.number);
         
         // 1. Remove from did_routes and dialplan_xml (exact match)
-        await this.freeswitchDB.removeDID(normalizedNumber, normalizedNumber).catch(() => {});
+        await this.freeswitchDB.removeDID(normalizedNumber, normalizedNumber);
 
         // 2. Clean up potential forwarding XMLs
         // TFNs use: fwd_tfn_{number}
-        await this.freeswitchDB.deleteDialplanPattern(`fwd_tfn_${tfn.number}`).catch(() => {});
+        await this.freeswitchDB.deleteDialplanPattern(`fwd_tfn_${tfn.number}`);
         
         // DIDs (and sometimes TFNs if passed same object) use: fwd_{seqId}_{customerCode}
         if (tfn.tenant && tfn.sequenceId !== undefined) {
-            await this.freeswitchDB.deleteDialplanPattern(`fwd_${tfn.sequenceId}_${tfn.tenant.customerCode}`).catch(() => {});
+            await this.freeswitchDB.deleteDialplanPattern(`fwd_${tfn.sequenceId}_${tfn.tenant.customerCode}`);
         }
 
         this.logger.log(`Deleted TFN/DID ${normalizedNumber} and associated forwarding XMLs`);
@@ -403,7 +408,7 @@ export class FreeSwitchSyncService {
     /**
      * Bulk delete all routing data for a tenant from FreeSWITCH
      */
-    async bulkDeleteTenantData(customerCode: string): Promise<void> {
+    async bulkDeleteTenantData(customerCode: string, strict = false): Promise<void> {
         if (!customerCode) return;
         
         try {
@@ -425,6 +430,7 @@ export class FreeSwitchSyncService {
             }
         } catch (error) {
             this.logger.error(`Failed bulk FreeSWITCH cleanup for ${customerCode}: ${error.message}`);
+            if (strict) throw error;
         }
     }
 
@@ -529,7 +535,7 @@ export class FreeSwitchSyncService {
         if (!extension || !extension.tenant) return;
 
         // 1. Delete from Kamailio
-        await this.kamailioDB.deleteSubscriber(extension.extensionNumber);
+        await this.kamailioDB.deleteSubscriber(extension.extensionNumber, true);
 
         // 2. Delete from FreeSWITCH
         const key = this.getExtensionDialplanKey(extension);

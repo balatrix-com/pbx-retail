@@ -78,4 +78,9 @@ export class AuthController {
     async resetPassword(@Body() { token, newPassword }: { token: string; newPassword: string }) {
         return this.authService.resetPassword(token, newPassword);
     }
+
+    @Post('exchange-impersonate-ticket')
+    async exchangeImpersonateTicket(@Body() { ticket }: { ticket: string }) {
+        return this.authService.exchangeImpersonationTicket(ticket);
+    }
 }

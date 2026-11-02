@@ -1,8 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { KamailioDBService } from '../freeswitch/kamailio-db.service';
 import { MailService } from '../mail/mail.service';
+import { REDIS_CLIENT } from '../redis/redis.module';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
 import { Role, UserStatus } from '@prisma/client';
 import { BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -49,7 +53,11 @@ describe('UsersService - Staff Invite Lifecycle & Auto-Flush', () => {
                 UsersService,
                 { provide: PrismaService, useValue: prisma },
                 { provide: KamailioDBService, useValue: { syncSubscriber: jest.fn(), deleteSubscriber: jest.fn() } },
-                { provide: MailService, useValue: mailService }
+                { provide: MailService, useValue: mailService },
+                { provide: REDIS_CLIENT, useValue: { publish: jest.fn() } },
+                { provide: HttpService, useValue: { get: jest.fn() } },
+                { provide: ConfigService, useValue: { get: jest.fn() } },
+                { provide: SubscriptionsService, useValue: {} },
             ],
         }).compile();
 
@@ -60,7 +68,6 @@ describe('UsersService - Staff Invite Lifecycle & Auto-Flush', () => {
         it('should create an invited user with a secure invite token and 7-day expiry', async () => {
             prisma.user.findUnique.mockResolvedValueOnce(mockAdmin); // admin lookup
             prisma.user.findUnique.mockResolvedValueOnce(null); // existing user check
-            prisma.user.findFirst.mockResolvedValueOnce(null); // existing support check
 
             const createdUser = {
                 id: 'staff-uuid-101',
@@ -83,6 +90,21 @@ describe('UsersService - Staff Invite Lifecycle & Auto-Flush', () => {
             expect(result.inviteLink).toContain('/invite/accept?token=');
             expect(mailService.sendSupportInvitationEmail).toHaveBeenCalled();
         });
+    });
+
+    it('allows another Support user so purchased monitoring seats can be assigned', async () => {
+        prisma.user.findUnique.mockResolvedValueOnce(mockAdmin).mockResolvedValueOnce(null);
+        prisma.user.findFirst.mockResolvedValueOnce({ id: 'existing-support', role: Role.SUPPORT });
+        prisma.user.create.mockResolvedValueOnce({
+            id: 'second-support', email: 'second@balatrix.com', name: 'Second Staff',
+            role: Role.SUPPORT, status: UserStatus.INVITED,
+        });
+
+        const result = await service.inviteSupportUser('admin-uuid-1', {
+            email: 'second@balatrix.com', name: 'Second Staff',
+        });
+        expect(result.id).toBe('second-support');
+        expect(prisma.user.findFirst).not.toHaveBeenCalled();
     });
 
     describe('2. getInviteLink (SuperAdmin / Admin API)', () => {

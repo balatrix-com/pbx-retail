@@ -3,6 +3,8 @@ import { Dialog } from '@headlessui/react';
 import { X, CheckCircle2, Loader2, ShieldCheck, DollarSign, CreditCard, Users, Phone, Hash, Activity } from 'lucide-react';
 import { subscriptionService } from '../../services/subscription.service';
 import { useToast } from '../../context/ToastContext';
+import PlanValidityFields from './PlanValidityFields';
+import { planDurationPayload } from '../../utils/planDuration';
 
 const PlanFormModal = ({ isOpen, onClose, onSuccess }) => {
     const { addToast } = useToast();
@@ -13,7 +15,9 @@ const PlanFormModal = ({ isOpen, onClose, onSuccess }) => {
         name: '',
         amount: 49.99,
         currency: 'usd',
-        validity_months: 1,
+        plan_category: 'base',
+        duration_unit: 'months',
+        duration_count: 1,
         numbers: 3,
         extensions: 5,
         monitoring_extensions: 1,
@@ -43,6 +47,7 @@ const PlanFormModal = ({ isOpen, onClose, onSuccess }) => {
         try {
             const payload = {
                 ...formData,
+                ...planDurationPayload(formData),
                 plan_id: planId
             };
             const res = await subscriptionService.createPlan(payload);
@@ -51,7 +56,7 @@ const PlanFormModal = ({ isOpen, onClose, onSuccess }) => {
             onClose();
         } catch (err) {
             console.error('Failed to create plan:', err);
-            addToast('error', err.response?.data?.message || 'Failed to create plan');
+            addToast('error', err.response?.data?.message || err.message || 'Failed to create plan');
         } finally {
             setSubmitting(false);
         }
@@ -90,6 +95,10 @@ const PlanFormModal = ({ isOpen, onClose, onSuccess }) => {
 
                     {/* Form Details */}
                     <form onSubmit={handleSubmit} className="py-4 space-y-4">
+                        <div className="grid grid-cols-1 gap-3">
+                            <label>Plan category<select className="w-full border rounded-lg p-2 dark:bg-slate-800" name="plan_category" value={formData.plan_category} onChange={handleChange}><option value="base">Base PBX</option><option value="capacity">Extra capacity</option></select></label>
+                            <PlanValidityFields formData={formData} onChange={handleChange} />
+                        </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>

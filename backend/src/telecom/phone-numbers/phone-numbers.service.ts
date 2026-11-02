@@ -3,13 +3,28 @@ import { DIDsService } from '../dids/dids.service';
 import { TFNsService } from '../tfns/tfns.service';
 import { PhoneNumberResponseDto } from './dto/phone-number-response.dto';
 import { UpdatePhoneNumberDto } from './dto/update-phone-number.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 
 @Injectable()
 export class PhoneNumbersService {
     constructor(
         private readonly didsService: DIDsService,
         private readonly tfnsService: TFNsService,
+        private readonly prisma: PrismaService,
+        private readonly subscriptions: SubscriptionsService,
     ) { }
+
+    async getQuota(tenantId: string) {
+        const subscriptions = (await this.subscriptions.list(tenantId)).filter(s => ['active','grace'].includes(s.status));
+        const [tfns, dids] = await Promise.all([
+            this.prisma.tFN.count({ where: { tenantId } }),
+            this.prisma.dID.count({ where: { tenantId } }),
+        ]);
+        const used = subscriptions.reduce((n,s) => n + Number(s.usage.numbers || 0), 0);
+        const limit = subscriptions.reduce((n,s) => n + Number(s.entitlement_snapshot.numbers || 0), 0);
+        return { used, limit, subscriptions, totalAssigned: tfns + dids, remaining: Math.max(0, limit - used), hasActivePlan: subscriptions.length > 0 };
+    }
 
     async findAll(tenantId: string): Promise<PhoneNumberResponseDto[]> {
         const [dids, tfns] = await Promise.all([
@@ -39,7 +54,7 @@ export class PhoneNumbersService {
                 id: tfn.id,
                 number: tfn.number,
                 type: 'TFN',
-                status: tfn.status,
+                status: tfn.status === 'ASSIGNED' ? 'ACTIVE' : tfn.status,
                 monthlyFee: tfn.price ? Number(tfn.price) : 0,
                 routeType: tfn.routeType,
                 routeTargetId: tfn.routeTargetId,
@@ -86,7 +101,7 @@ export class PhoneNumbersService {
                 id: result.id,
                 number: result.number,
                 type: 'TFN',
-                status: result.status,
+                status: result.status === 'ASSIGNED' ? 'ACTIVE' : result.status,
                 monthlyFee: result.price ? Number(result.price) : 0,
                 routeType: result.routeType,
                 routeTargetId: result.routeTargetId,

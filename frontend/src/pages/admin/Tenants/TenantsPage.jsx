@@ -15,6 +15,9 @@ const TenantsPage = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [selectedTenantId, setSelectedTenantId] = useState(null);
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [actionBusy, setActionBusy] = useState(null);
+    const [actionError, setActionError] = useState('');
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 20,
@@ -29,7 +32,13 @@ const TenantsPage = () => {
 
     useEffect(() => {
         fetchTenants();
-    }, [pagination.page, search]);
+    }, [pagination.page, search, statusFilter]);
+
+    useEffect(() => {
+        if (!tenants.some(t => t.archiveJob && t.archiveJob.state !== 'ARCHIVED')) return;
+        const timer = setInterval(fetchTenants, 5000);
+        return () => clearInterval(timer);
+    }, [tenants]);
 
     const fetchTenants = async () => {
         try {
@@ -37,7 +46,8 @@ const TenantsPage = () => {
             const params = new URLSearchParams({
                 page: pagination.page.toString(),
                 limit: pagination.limit.toString(),
-                ...(search && { search })
+                ...(search && { search }),
+                ...(statusFilter && { status: statusFilter })
             });
             const res = await api.get(`/tenants?${params}`);
             setTenants(res.data.data || []);
@@ -62,14 +72,33 @@ const TenantsPage = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this tenant? This action cannot be undone.')) return;
+        if (!window.confirm('Archive this customer permanently? Calling and portal access will stop, SIP credentials and routing will be removed, and subscriptions will be cancelled. Numbers will remain held until you explicitly confirm release. Customer IDs, CDRs, invoices and payment history are preserved. This cannot be undone.')) return;
+        setActionBusy(id); setActionError('');
         try {
             await api.delete(`/tenants/${id}`);
             fetchTenants();
         } catch (error) {
             console.error('Failed to delete tenant', error);
-            alert('Failed to delete tenant');
-        }
+            setActionError(error.response?.data?.message || 'Archive request failed. Check the status and retry.');
+            fetchTenants();
+        } finally { setActionBusy(null); }
+    };
+
+    const handleRetryArchive = async id => {
+        setActionBusy(id); setActionError('');
+        try { await api.post(`/tenants/${id}/archive/retry`); await fetchTenants(); }
+        catch (error) { setActionError(error.response?.data?.message || 'Archive retry failed'); }
+        finally { setActionBusy(null); }
+    };
+
+    const handleReleaseNumbers = async id => {
+        if (!window.confirm('Confirm the carrier has approved number release. This will make held TFNs available and remove held DID assignments so those numbers can be reassigned.')) return;
+        const reason = window.prompt('Enter the carrier approval/reference or release reason:');
+        if (!reason?.trim()) return;
+        setActionBusy(id); setActionError('');
+        try { await api.post(`/tenants/${id}/archive/release-numbers`, { provider_confirmed: true, reason }); await fetchTenants(); }
+        catch (error) { setActionError(error.response?.data?.message || 'Number release failed'); }
+        finally { setActionBusy(null); }
     };
 
     const handleToggleBlock = async (id, currentBlocked) => {
@@ -78,6 +107,8 @@ const TenantsPage = () => {
             fetchTenants();
         } catch (error) {
             console.error('Failed to toggle tenant block', error);
+            setActionError(error.response?.data?.message || 'Service-state update failed');
+            fetchTenants();
         }
     };
 
@@ -162,6 +193,13 @@ const TenantsPage = () => {
             </div>
 
             {/* Tenants Table */}
+            <label className="flex items-center gap-3 text-sm font-bold text-gray-700">
+                Customer status
+                <select className="border rounded-xl p-3 bg-white" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPagination(p => ({ ...p, page: 1 })); }}>
+                    <option value="">Current customers</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Blocked / archiving</option><option value="ARCHIVED">Archived</option><option value="ALL">All customers</option>
+                </select>
+            </label>
+            {actionError && <p role="alert" className="p-3 rounded-xl bg-red-50 text-red-700">{actionError}</p>}
             <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-100">
@@ -198,12 +236,13 @@ const TenantsPage = () => {
                                         <td className="px-6 py-5 whitespace-nowrap">
                                             <span className={clsx(
                                                 "inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ring-1",
-                                                tenant.serviceBlocked 
+                                                tenant.status === 'ARCHIVED' ? 'bg-slate-100 text-slate-700 ring-slate-500/20' : tenant.serviceBlocked
                                                     ? 'bg-red-50 text-red-700 ring-red-600/10' 
                                                     : 'bg-emerald-50 text-emerald-700 ring-emerald-600/10'
                                             )}>
-                                                {tenant.serviceBlocked ? 'Service Blocked' : 'Active'}
+                                                {tenant.status === 'ARCHIVED' ? 'Archived' : tenant.archiveJob ? tenant.archiveJob.state.replaceAll('_', ' ') : tenant.serviceBlocked ? 'Service Blocked' : 'Active'}
                                             </span>
+                                            {tenant.archiveJob?.last_error && <p className="text-xs text-red-700 max-w-xs whitespace-normal mt-1">{tenant.archiveJob.last_error}</p>}
                                         </td>
                                         <td className="hidden sm:table-cell px-6 py-5 whitespace-nowrap text-center">
                                             <span className="inline-flex items-center rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-black text-gray-600 ring-1 ring-inset ring-gray-200">
@@ -222,29 +261,36 @@ const TenantsPage = () => {
                                             {new Date(tenant.createdAt).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-5 whitespace-nowrap text-right">
-                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex flex-wrap justify-end gap-2">
                                                 <button
                                                     onClick={() => setSelectedTenantId(tenant.id)}
                                                     className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-xs font-black text-primary-600 shadow-sm ring-1 ring-inset ring-primary-200 hover:bg-primary-50 transition-all active:scale-95"
                                                 >
-                                                    Configure
+                                                    {tenant.status === 'ARCHIVED' ? 'View history' : tenant.archiveJob ? 'View archive progress' : 'Configure'}
                                                 </button>
                                                 <button
                                                     onClick={() => handleToggleBlock(tenant.id, tenant.serviceBlocked)}
+                                                    disabled={Boolean(tenant.archiveJob) || tenant.status === 'ARCHIVED' || actionBusy === tenant.id}
                                                     className={clsx(
                                                         "p-2 rounded-xl transition-all",
                                                         tenant.serviceBlocked ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-600 hover:bg-amber-50"
                                                     )}
-                                                    title={tenant.serviceBlocked ? "Unblock" : "Block"}
+                                                    title={tenant.serviceBlocked ? "Unblock calls and portal access" : "Block calls and portal access"}
+                                                    aria-label={tenant.serviceBlocked ? "Unblock customer" : "Block customer"}
                                                 >
                                                     {tenant.serviceBlocked ? <CheckCircle2 size={18} /> : <Ban size={18} />}
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(tenant.id)}
+                                                    disabled={Boolean(tenant.archiveJob) || tenant.status === 'ARCHIVED' || actionBusy === tenant.id}
+                                                    title="Archive customer permanently"
+                                                    aria-label="Archive customer permanently"
                                                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                                                 >
                                                     <Trash2 size={18} />
                                                 </button>
+                                                {tenant.archiveJob?.state === 'ARCHIVE_FAILED' && <button disabled={actionBusy === tenant.id} onClick={() => handleRetryArchive(tenant.id)} className="p-2 rounded-xl text-amber-700 bg-amber-50">Retry archive</button>}
+                                                {tenant.status === 'ARCHIVED' && <button disabled={actionBusy === tenant.id} onClick={() => handleReleaseNumbers(tenant.id)} className="p-2 rounded-xl text-primary-700 bg-primary-50">Release held numbers</button>}
                                             </div>
                                         </td>
                                     </tr>

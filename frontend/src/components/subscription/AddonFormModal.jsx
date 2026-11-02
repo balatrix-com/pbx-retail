@@ -219,10 +219,11 @@ const AddonFormModal = ({ isOpen, onClose, onSuccess }) => {
                         {/* Resource Type & Units Included Grid */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-bold text-gray-700 dark:text-slate-200 uppercase tracking-wider mb-1.5">
+                                <label htmlFor="addon-resource-type" className="block text-xs font-bold text-gray-700 dark:text-slate-200 uppercase tracking-wider mb-1.5">
                                     Resource Type <span className="text-rose-500">*</span>
                                 </label>
                                 <select
+                                    id="addon-resource-type"
                                     name="resource_type"
                                     value={formData.resource_type}
                                     onChange={handleChange}
@@ -232,6 +233,7 @@ const AddonFormModal = ({ isOpen, onClose, onSuccess }) => {
                                     <option value="tfn">Toll-Free Number (TFN)</option>
                                     <option value="did">DID Number</option>
                                     <option value="supervisor">Supervisor Seat</option>
+                                    <option value="monitoring_extension">Monitoring Extension</option>
                                 </select>
                             </div>
 

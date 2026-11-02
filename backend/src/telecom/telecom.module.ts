@@ -17,7 +17,6 @@ import { DIDForwardsModule } from './did-forwards/did-forwards.module';
 import { PhoneNumbersModule } from './phone-numbers/phone-numbers.module';
 
 import { AdminModule } from '../admin/admin.module';
-import { SubscriptionTelecomController } from './subscription-telecom.controller';
 
 import { TeardownEnforcerService } from './teardown-enforcer.service';
 
@@ -39,7 +38,7 @@ import { TeardownEnforcerService } from './teardown-enforcer.service';
     AdminModule,
     PhoneNumbersModule,
   ],
-  controllers: [TelecomController, SubscriptionTelecomController],
+  controllers: [TelecomController],
   providers: [TelecomService, TeardownEnforcerService],
 })
 export class TelecomModule { }

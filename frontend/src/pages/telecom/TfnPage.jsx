@@ -49,7 +49,7 @@ const TfnPage = () => {
         const loadData = async () => {
             try {
                 const [w, state, myTfns] = await Promise.all([
-                    walletService.getWallet(user.tenantId),
+                    walletService.getBalance(user.tenantId),
                     usageService.getServiceState(),
                     telecomService.getMyTfns()
                 ]);

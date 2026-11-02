@@ -12,6 +12,7 @@ import { Role, type User } from '@prisma/client';
 import { CreateSupportUserDto } from './dto/create-support-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdatePermissionsDto } from './dto/update-permissions.dto';
+import { ReassignMonitoringDto } from './dto/reassign-monitoring.dto';
 import { InviteSupportUserDto } from './dto/invite-support-user.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
@@ -52,8 +53,21 @@ export class UsersController {
         return this.usersService.updateUserStatus(user.id, targetUserId, dto.status);
     }
 
+    @Get('monitoring/seats')
+    @Roles(Role.ADMIN)
+    getMonitoringSeats(@GetUser() user: User) {
+        return this.usersService.getMonitoringSeats(user.id);
+    }
+
+    @Post('monitoring/reassign')
+    @Roles(Role.ADMIN)
+    @Audit('MONITORING_SEAT_REASSIGNED', 'USER_MANAGEMENT')
+    reassignMonitoring(@GetUser() user: User, @Body() dto: ReassignMonitoringDto) {
+        return this.usersService.reassignMonitoring(user.id, dto);
+    }
+
     @Patch(':id/permissions')
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+    @Roles(Role.ADMIN)
     @Audit('USER_ROLE_UPDATED', 'USER_MANAGEMENT')
     updatePermissions(
         @GetUser() user: User,
@@ -66,7 +80,8 @@ export class UsersController {
             dto.monitoringEnabled,
             dto.monitoringExtension,
             dto.monitoringSecret,
-            dto.name
+            dto.name,
+            dto.subscriptionId
         );
     }
 
@@ -128,10 +143,8 @@ export class UsersController {
         // Update refresh token for target user
         await this.authService.updateRefreshToken(result.user.id, tokens.refreshToken);
 
-        return {
-            ...result,
-            ...tokens
-        };
+        const ticket = await this.authService.createImpersonationTicket(tokens);
+        return { ticket };
     }
 
     @Public()

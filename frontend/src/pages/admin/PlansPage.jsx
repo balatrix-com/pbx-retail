@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSubscriptionQuery, useWalletQuery } from '../../hooks/useBillingQueries';
 import { subscriptionService } from '../../services/subscription.service';
@@ -26,8 +26,9 @@ import ConfirmActionModal from '../../components/subscription/ConfirmActionModal
 import AddonCatalogManagement from '../../components/subscription/AddonCatalogManagement';
 
 const PlansPage = () => {
+    const navigate=useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const activeTab = searchParams.get('tab') || 'plans';
+    const activeTab = 'plans';
 
     const { user, isSuperAdmin, isAdmin } = useAuth();
     const canManagePlans = isSuperAdmin || isAdmin;
@@ -75,8 +76,7 @@ const PlansPage = () => {
 
     // Plan Switch Handler
     const handleInitiatePlanSwitch = (plan) => {
-        setSelectedPlanForSwitch(plan);
-        setPlanSwitchModalOpen(true);
+        navigate(isSuperAdmin ? '/super-admin/subscriptions' : '/subscriptions');
     };
 
     // Refresh active subscription & wallet after plan changes
@@ -134,7 +134,7 @@ const PlansPage = () => {
                         Plans & Add-ons Engine
                     </h1>
                     <p className="text-gray-500 dark:text-slate-400 mt-1 font-medium text-sm md:text-base">
-                        Manage subscription tiers, catalog add-on bundles, and purchasing power
+                        Manage base and capacity plan catalog. Assign plans from Subscriptions.
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -159,16 +159,6 @@ const PlansPage = () => {
                 >
                     <ShieldCheck className="h-4 w-4" />
                     Plans
-                </button>
-                <button
-                    onClick={() => handleTabChange('addons')}
-                    className={`pb-3 text-sm font-extrabold flex items-center gap-2 border-b-2 transition-colors relative ${activeTab === 'addons'
-                        ? 'border-primary-600 text-primary-600 dark:text-primary-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
-                        }`}
-                >
-                    <Package className="h-4 w-4" />
-                    Add-on Catalog
                 </button>
             </div>
 
@@ -306,7 +296,7 @@ const PlansPage = () => {
 
                                                 <div className="text-2xl font-extrabold font-mono text-gray-900 dark:text-white mb-4">
                                                     ${Number(p.amount || p.price || 0).toFixed(2)}
-                                                    <span className="text-xs text-gray-400 font-normal font-sans"> / month</span>
+                                                    <span className="text-xs text-gray-400 font-normal font-sans"> / {p.duration_count || p.validity_months || 1} {p.duration_unit || 'months'} · {p.plan_category || 'base'}</span>
                                                 </div>
 
                                                 <ul className="space-y-2 text-xs text-gray-600 dark:text-slate-300 font-medium">
@@ -334,7 +324,7 @@ const PlansPage = () => {
                                                 >
                                                     {isCurrent ? 'Current Plan' : (
                                                         <>
-                                                            Switch to Plan <ArrowUpRight className="h-4 w-4" />
+                                                            Manage subscriptions <ArrowUpRight className="h-4 w-4" />
                                                         </>
                                                     )}
                                                 </button>

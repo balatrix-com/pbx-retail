@@ -24,6 +24,7 @@ export class KamailioDBService {
             user: process.env.FS_DB_USER,
             password: process.env.FS_DB_PASSWORD,
             connectionTimeoutMillis: 5000,
+            query_timeout: 15000,
         });
     }
 
@@ -32,6 +33,7 @@ export class KamailioDBService {
         try {
             const response = await fetch(rpcUrl, {
                 method: 'POST',
+                signal: AbortSignal.timeout(10000),
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     jsonrpc: '2.0',
@@ -105,9 +107,10 @@ export class KamailioDBService {
      * Sync Subscriber to Kamailio
      * Calculates HA1/HA1B and upserts into subscriber table
      */
-    async syncSubscriber(username: string, passwordPlain: string): Promise<void> {
+    async syncSubscriber(username: string, passwordPlain: string, strict = false): Promise<void> {
         if (!this.realm) {
             this.logger.error('Cannot sync subscriber: SIP_REALM is not defined in environment variables.');
+            if (strict) throw new Error('SIP_REALM is not configured');
             return;
         }
 
@@ -134,15 +137,17 @@ export class KamailioDBService {
             this.logger.log(`Synced Kamailio subscriber: ${username}@${this.realm}`);
         } catch (error) {
             this.logger.error(`Failed to sync Kamailio subscriber ${username}:`, error);
+            if (strict) throw error;
         }
     }
 
     /**
      * Delete Subscriber from Kamailio
      */
-    async deleteSubscriber(username: string): Promise<void> {
+    async deleteSubscriber(username: string, strict = false): Promise<void> {
         if (!this.realm) {
             this.logger.error('Cannot delete subscriber: SIP_REALM is not defined in environment variables.');
+            if (strict) throw new Error('SIP_REALM is not configured');
             return;
         }
 
@@ -151,6 +156,7 @@ export class KamailioDBService {
             this.logger.log(`Deleted Kamailio subscriber: ${username}@${this.realm}`);
         } catch (error) {
             this.logger.error(`Failed to delete Kamailio subscriber ${username}:`, error);
+            if (strict) throw error;
         }
     }
 
@@ -173,7 +179,7 @@ export class KamailioDBService {
     /**
      * Remove Carrier IP from Kamailio address table
      */
-    async removeCarrierIP(ip: string, port: number): Promise<void> {
+    async removeCarrierIP(ip: string, port: number, strict = false): Promise<void> {
         const query = `DELETE FROM address WHERE grp = 1 AND ip_addr = $1 AND port = $2`;
         try {
             await this.executeQuery(query, [ip, port]);
@@ -181,6 +187,7 @@ export class KamailioDBService {
             await this.callKamailioRpc('permissions.addressReload');
         } catch (error) {
             this.logger.error(`Failed to remove Carrier IP ${ip}:${port}:`, error);
+            if (strict) throw error;
         }
     }
 

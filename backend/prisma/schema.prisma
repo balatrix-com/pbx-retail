@@ -17,6 +17,7 @@ model Health {
 model Tenant {
   id                   String                @id @default(uuid())
   name                 String
+  status               TenantStatus          @default(ACTIVE)
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   stripeCustomerId     String?               @unique
@@ -97,6 +98,7 @@ model Extension {
   password                   String?
   sequenceId                 Int               @default(0)
   recordingEnabled           Boolean           @default(false)
+  isActive                   Boolean           @default(true)
   tenant                     Tenant            @relation(fields: [tenantId], references: [id])
   ringGroupMembers           RingGroupMember[]
 
@@ -224,6 +226,7 @@ model User {
 
 model Plan {
   id                  String         @id @default(uuid())
+  subBillingPlanId    String?        @unique
   name                String
   description         String?
   stripePriceId       String?
@@ -291,16 +294,20 @@ model SupportProfile {
 
 model UserAuditLog {
   id        String          @id @default(uuid())
-  actorId   String
+  actorId   String?
   targetId  String?
+  actorSnapshotId String?
+  targetSnapshotId String?
   action    UserAuditAction
   metadata  Json?
   timestamp DateTime        @default(now())
-  actor     User            @relation("Actor", fields: [actorId], references: [id])
-  target    User?           @relation("Target", fields: [targetId], references: [id])
+  actor     User?           @relation("Actor", fields: [actorId], references: [id], onDelete: SetNull)
+  target    User?           @relation("Target", fields: [targetId], references: [id], onDelete: SetNull)
 
   @@index([actorId])
   @@index([targetId])
+  @@index([actorSnapshotId])
+  @@index([targetSnapshotId])
   @@index([timestamp])
   @@index([action])
   @@map("user_audit_logs")
@@ -523,6 +530,12 @@ model tenant_config_versions {
   @@index([tenantId], map: "idx_tenant_config_versions_tenant")
 }
 
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
 enum Role {
   SUPER_ADMIN
   ADMIN
@@ -612,7 +625,6 @@ model TenantFeature {
   didForwardEnabled Boolean  @default(true)
   didForwardLimit   Int      @default(10)
   monitorEnabled    Boolean  @default(true)
-  monitorLimit      Int      @default(10)
   recordingEnabled  Boolean  @default(false)
   recordingAllowed  Boolean  @default(false)
   createdAt         DateTime @default(now())

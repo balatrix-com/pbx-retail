@@ -45,8 +45,8 @@ export class AddonsController {
     }
 
     @Get('subscription/:subscriptionId')
-    getSubscriptionAddons(@Param('subscriptionId') subscriptionId: string) {
-        return this.addonsService.getSubscriptionAddons(subscriptionId);
+    getSubscriptionAddons(@GetUser() user: User, @Param('subscriptionId') subscriptionId: string) {
+        return this.addonsService.getSubscriptionAddons(subscriptionId, user.tenantId, user.role);
     }
 
     @Delete('subscription/:subscriptionAddonId')

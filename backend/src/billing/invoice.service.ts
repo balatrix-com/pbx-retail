@@ -81,9 +81,9 @@ export class InvoiceService {
         return updated;
     }
 
-    async getInvoice(id: string) {
-        return this.prisma.invoice.findUnique({
-            where: { id },
+    async getInvoice(id: string, tenantId: string | null) {
+        return this.prisma.invoice.findFirst({
+            where: { id, ...(tenantId ? { tenantId } : {}) },
             include: { adjustments: true }
         });
     }

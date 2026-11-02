@@ -27,7 +27,7 @@ export class PlansController {
     }
 
     @Delete(':planId')
-    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+    @Roles(Role.SUPER_ADMIN)
     @UseGuards(RolesGuard)
     @Audit('PLAN_DELETED', 'PLANS_ADDONS')
     async deletePlan(@Param('planId') planId: string) {

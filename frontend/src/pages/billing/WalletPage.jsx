@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { walletService } from '../../services/wallet.service';
 import { useBillingIntelligence } from '../../hooks/useBillingIntelligence';
-import { useWalletQuery, useSubscriptionQuery, useCardsQuery, useWalletActions } from '../../hooks/useBillingQueries';
+import { useWalletQuery, useWalletTransactionsQuery, useSubscriptionQuery, useCardsQuery, useWalletActions } from '../../hooks/useBillingQueries';
 import { Wallet, ArrowDown, ArrowUp, CreditCard, RotateCw, TrendingDown, Clock, AlertTriangle, CheckCircle, RefreshCw, DollarSign } from 'lucide-react';
 import ReadOnlyBanner from '../../components/ReadOnlyBanner';
 
@@ -19,11 +19,12 @@ const WalletPage = () => {
 
     // Queries
     const { data: wallet, isLoading: walletLoading, isFetching: walletRefreshing } = useWalletQuery();
+    const { data: transactions = [] } = useWalletTransactionsQuery();
     const { data: subscription, isLoading: subLoading } = useSubscriptionQuery();
     const { data: cards = [], isLoading: cardsLoading } = useCardsQuery();
     const { refreshWallet } = useWalletActions();
 
-    const intelligence = useBillingIntelligence(wallet, subscription);
+    const intelligence = useBillingIntelligence({ ...wallet, transactions }, subscription);
 
     const { addToast } = useToast();
 
@@ -351,10 +352,10 @@ const WalletPage = () => {
                         </div>
                         <div className="p-0 max-h-[400px] overflow-y-auto">
                             <ul role="list" className="divide-y divide-gray-100 dark:divide-slate-800">
-                                {(!wallet?.transactions || wallet.transactions.length === 0) && (
+                                {(!transactions || transactions.length === 0) && (
                                     <li className="p-8 text-center text-gray-500 dark:text-slate-400 font-medium">No transactions found.</li>
                                 )}
-                                {(wallet?.transactions || []).map((tx) => (
+                                {(transactions || []).map((tx) => (
                                     <li key={tx.id} className="p-4 sm:px-6 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
                                         <div className="flex items-center space-x-4">
                                             <div className="flex-shrink-0">
