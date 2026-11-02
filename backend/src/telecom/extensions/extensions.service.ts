@@ -93,7 +93,7 @@ export class ExtensionsService {
                 try {
                     const defaultPassword = 'Password@123';
                     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-                    const sipPasswordPlaintext = '123456';
+                    const sipPasswordPlaintext = crypto.randomBytes(24).toString('base64url');
 
                     const newExt = await this.prisma.extension.create({
                         data: {
@@ -239,7 +239,7 @@ export class ExtensionsService {
 
         // Generate SIP credentials
         const sipUsername = extensionNumber; // Use extension number as username
-        const sipPasswordPlaintext = '123456';
+        const sipPasswordPlaintext = crypto.randomBytes(24).toString('base64url');
 
         // Note: We are storing the plaintext SIP password in `sipPassword` field as FreeSWITCH needs to know it (or we store hash if using hash auth, but typically plaintext for directory)
         // Actually, freeswitch usually needs the password to authenticate the user. 

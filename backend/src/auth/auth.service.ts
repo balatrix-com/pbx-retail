@@ -4,7 +4,12 @@ import {
     BadRequestException,
     NotFoundException,
     ConflictException,
+    Inject,
+    Optional,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import type { RedisClientType } from 'redis';
+import { REDIS_CLIENT } from '../redis/redis.module';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -24,8 +29,25 @@ export class AuthService {
         private configService: ConfigService,
         private enforcementService: EnforcementService,
         private mailService: MailService,
-        private notificationsService: NotificationsService
+        private notificationsService: NotificationsService,
+        @Optional() @Inject(REDIS_CLIENT) private readonly redisClient?: RedisClientType,
     ) { }
+
+    async createImpersonationTicket(tokens: { accessToken: string; refreshToken: string }): Promise<string> {
+        if (!this.redisClient) throw new Error('Impersonation ticket store unavailable');
+        const ticket = randomUUID();
+        await this.redisClient.set(`impersonate_ticket:${ticket}`, JSON.stringify(tokens), { EX: 60 });
+        return ticket;
+    }
+
+    async exchangeImpersonationTicket(ticket: string) {
+        if (!this.redisClient || !/^[0-9a-f-]{36}$/i.test(ticket || '')) {
+            throw new BadRequestException('Invalid impersonation ticket');
+        }
+        const serialized = await this.redisClient.getDel(`impersonate_ticket:${ticket}`);
+        if (!serialized) throw new BadRequestException('Invalid or expired impersonation ticket');
+        return JSON.parse(serialized) as { accessToken: string; refreshToken: string };
+    }
 
     async validateUser(email: string, pass: string): Promise<any> {
         console.log(`Attempting login for: ${email}`);
@@ -326,6 +348,8 @@ export class AuthService {
             data: {
                 actorId: originalUserId,
                 targetId: user.sub,
+                actorSnapshotId: originalUserId,
+                targetSnapshotId: user.sub,
                 action: 'END_IMPERSONATION' as any,
                 metadata: {
                     targetEmail: user.email
@@ -442,6 +466,8 @@ export class AuthService {
                 password: hashedPassword,
                 resetToken: null,
                 resetTokenExpiry: null,
+                refreshToken: null,
+                forcePasswordChange: false,
             },
         });
 

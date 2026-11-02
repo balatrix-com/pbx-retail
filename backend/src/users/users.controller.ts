@@ -143,10 +143,8 @@ export class UsersController {
         // Update refresh token for target user
         await this.authService.updateRefreshToken(result.user.id, tokens.refreshToken);
 
-        return {
-            ...result,
-            ...tokens
-        };
+        const ticket = await this.authService.createImpersonationTicket(tokens);
+        return { ticket };
     }
 
     @Public()

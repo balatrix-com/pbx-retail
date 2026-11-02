@@ -1,43 +1,33 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 
 const ImpersonateLoader = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { refreshUser } = useAuth(); // We might need to refresh context user from storage
+    const exchangeRef = useRef(null);
 
     useEffect(() => {
-        const accessToken = searchParams.get('token');
-        const refreshToken = searchParams.get('refresh');
-
-        if (accessToken) {
-            // Set session storage for tab isolation
-            sessionStorage.setItem('accessToken', accessToken);
-            if (refreshToken) {
-                sessionStorage.setItem('refreshToken', refreshToken);
-            }
-            // Clear local storage in this tab context to ensure session storage takes precedence? 
-            // No, local storage is shared. We kept it. API interceptor prioritizes session storage.
-
-            // However, we need to ensure AuthContext picks up the new user.
-            // AuthContext reads from storage on init. 
-            // Since this is a fresh tab load (implied by window.open), AuthProvider will mount.
-            // But AuthProvider uses authService.me() which uses api.js.
-            // api.js uses interceptor.
-
-            // We just need to ensure the token is in sessionStorage BEFORE AuthProvider tries to use it?
-            // Actually, AuthProvider is already mounted if this is a route in App.jsx.
-            // So we need to trigger a refresh.
-
-            // Wait a tick to ensure storage is set
-            setTimeout(async () => {
-                await refreshUser();
-                navigate('/dashboard', { replace: true });
-            }, 100);
-        } else {
-            navigate('/login');
+        const ticket = searchParams.get('ticket');
+        window.history.replaceState({}, '', '/impersonate');
+        if (!ticket) {
+            navigate('/login', { replace: true });
+            return;
         }
+        let active = true;
+        if (!exchangeRef.current) exchangeRef.current = api.post('/auth/exchange-impersonate-ticket', { ticket });
+        exchangeRef.current.then(async ({ data }) => {
+            if (!active) return;
+            sessionStorage.setItem('accessToken', data.accessToken);
+            sessionStorage.setItem('refreshToken', data.refreshToken);
+            await refreshUser();
+            if (active) navigate('/dashboard', { replace: true });
+        }).catch(() => {
+            if (active) navigate('/login', { replace: true });
+        });
+        return () => { active = false; };
     }, [searchParams, navigate, refreshUser]);
 
     return (

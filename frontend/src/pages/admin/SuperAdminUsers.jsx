@@ -131,8 +131,8 @@ const SuperAdminUsers = () => {
         if (!window.confirm('Open impersonation session?')) return;
         try {
             const response = await api.post(`/users/impersonate/${userId}`);
-            const { accessToken, refreshToken } = response.data;
-            window.open(`/impersonate?token=${accessToken}&refresh=${refreshToken}`, '_blank');
+            const { ticket } = response.data;
+            window.open(`/impersonate?ticket=${encodeURIComponent(ticket)}`, '_blank');
         } catch (error) {
             console.error('Impersonation error:', error);
         }

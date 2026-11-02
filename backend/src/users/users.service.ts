@@ -70,6 +70,8 @@ export class UsersService {
             data: {
                 actorId,
                 targetId,
+                actorSnapshotId: actorId,
+                targetSnapshotId: targetId,
                 action,
                 metadata: metadata || {}
             }
@@ -600,19 +602,7 @@ export class UsersService {
                 where: { supportUserId: targetUserId }
             });
 
-            // 2. Delete Audit Logs where user is actor (or target if necessary)
-            // Ideally we'd keep them but set to null, but schema might restrict. 
-            // For Safety/Simplicity in dev: delete logs involving this user to clear DB state as requested
-            await prisma.userAuditLog.deleteMany({
-                where: {
-                    OR: [
-                        { actorId: targetUserId },
-                        { targetId: targetUserId }
-                    ]
-                }
-            });
-
-            // 3. Delete the User
+            // 2. Preserve audit history; nullable relations detach on user deletion.
             await prisma.user.delete({
                 where: { id: targetUserId }
             });
@@ -628,6 +618,8 @@ export class UsersService {
             data: {
                 actorId,
                 targetId: null, // User is gone
+                actorSnapshotId: actorId,
+                targetSnapshotId: targetUserId,
                 action: UserAuditAction.DELETE_USER,
                 metadata: {
                     email: targetUser.email,
@@ -674,7 +666,9 @@ export class UsersService {
                 where: {
                     OR: [
                         { actorId: targetUserId },
-                        { targetId: targetUserId }
+                        { targetId: targetUserId },
+                        { actorSnapshotId: targetUserId },
+                        { targetSnapshotId: targetUserId },
                     ]
                 },
                 include: {
@@ -690,7 +684,9 @@ export class UsersService {
                 where: {
                     OR: [
                         { actorId: targetUserId },
-                        { targetId: targetUserId }
+                        { targetId: targetUserId },
+                        { actorSnapshotId: targetUserId },
+                        { targetSnapshotId: targetUserId },
                     ]
                 }
             })

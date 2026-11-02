@@ -1,6 +1,6 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { assertTenantServiceAccess } from '../tenant-service-access';
@@ -11,14 +11,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     constructor(configService: ConfigService, private prisma: PrismaService) {
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+            passReqToCallback: true,
             ignoreExpiration: false,
             secretOrKey: configService.get<string>('jwt.secret') || 'secret',
         });
     }
 
-    async validate(payload: any) {
+    async validate(reqOrPayload: any, payload?: any) {
+        const req = payload !== undefined ? reqOrPayload : null;
+        const actualPayload = payload !== undefined ? payload : reqOrPayload;
         const account = await this.prisma.user.findUnique({
-            where: { id: payload.sub },
+            where: { id: actualPayload?.sub },
             include: {
                 supportProfile: {
                     select: { adminUser: { select: { role: true, status: true, tenantId: true } } },
@@ -26,10 +29,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             },
         });
         if (!account || account.status !== 'ACTIVE') throw new UnauthorizedException('Access denied');
+        const requestPath = req?.originalUrl?.split('?')[0] || req?.url?.split('?')[0] || '';
+        if (account.forcePasswordChange && ![
+            '/api/auth/me', '/auth/me', '/api/auth/logout', '/auth/logout',
+        ].includes(requestPath)) {
+            throw new ForbiddenException('Password change is required before accessing PBX services');
+        }
         await assertTenantServiceAccess(this.prisma, account);
         return {
-            id: payload.sub,
-            email: payload.email,
+            id: actualPayload.sub,
+            email: actualPayload.email,
             role: account.role,
             tenantId: account.tenantId,
             platformSupport: account.role === Role.SUPPORT && account.tenantId === null &&
@@ -37,7 +46,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
                 account.supportProfile.adminUser.status === 'ACTIVE' &&
                 account.supportProfile.adminUser.tenantId === null,
             monitoringEnabled: account.monitoringEnabled,
-            impersonation: payload.impersonation,
+            impersonation: actualPayload.impersonation,
         };
     }
 }

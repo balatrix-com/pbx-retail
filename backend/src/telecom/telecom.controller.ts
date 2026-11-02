@@ -2,7 +2,9 @@ import { Controller, Post, Get, Body, UseGuards, Query, Param, Res } from '@nest
 import { TelecomService } from './telecom.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
-import { type User } from '@prisma/client';
+import { Role, type User } from '@prisma/client';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('telecom')
 @UseGuards(JwtAuthGuard)
@@ -32,6 +34,8 @@ export class TelecomController {
     }
 
     @Post('recording/toggle')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
     toggleRecording(@GetUser() user: User, @Body() body: { enabled: boolean }) {
         return this.telecomService.toggleRecording(user.tenantId!, body.enabled);
     }
@@ -55,6 +59,8 @@ export class TelecomController {
     }
 
     @Post('tfns/:id/routing') // Using Post or Patch
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
     updateTFNRouting(
         @GetUser() user: User,
         @Param('id') id: string,

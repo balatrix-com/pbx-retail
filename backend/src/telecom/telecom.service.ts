@@ -117,6 +117,7 @@ export class TelecomService implements OnModuleInit {
 
 
     async checkRecording(tenantId: string, callUuid: string): Promise<boolean> {
+        this.assertSafeRecordingId(callUuid);
         const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
         if (!tenant || !tenant.customerCode) return false;
         
@@ -125,6 +126,7 @@ export class TelecomService implements OnModuleInit {
     }
 
     async streamRecording(tenantId: string, callUuid: string, res: any): Promise<void> {
+        this.assertSafeRecordingId(callUuid);
         const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
         if (!tenant || !tenant.customerCode) {
             res.status(404).send('Not found');
@@ -133,6 +135,12 @@ export class TelecomService implements OnModuleInit {
 
         const remotePath = `/recordings/${tenant.customerCode}/${callUuid}.mp3`;
         await this.recordingStorageService.streamAudio(remotePath, res);
+    }
+
+    private assertSafeRecordingId(callUuid: string): void {
+        if (!/^[A-Za-z0-9_-]{1,128}$/.test(callUuid)) {
+            throw new BadRequestException('Invalid recording ID');
+        }
     }
 
     // --- Routing Interconnection Logic ---
@@ -180,9 +188,13 @@ export class TelecomService implements OnModuleInit {
         if (!tfn) throw new NotFoundException('TFN not found');
         if (tfn.tenantId !== tenantId) throw new ForbiddenException('Access denied');
 
-        // Validate Target
-        if (data.routeType && data.routeTargetId) {
-            await this.validateRouteTarget(data.routeType, data.routeTargetId, tenantId);
+        // Validate the route that would exist after a partial update.
+        if (data.routeType !== undefined || data.routeTargetId !== undefined) {
+            const routeType = data.routeType !== undefined ? data.routeType : tfn.routeType;
+            const routeTargetId = data.routeTargetId !== undefined ? data.routeTargetId : tfn.routeTargetId;
+            if (routeType && routeTargetId) {
+                await this.validateRouteTarget(routeType, routeTargetId, tenantId);
+            }
         }
 
         const updated = await this.prisma.tFN.update({

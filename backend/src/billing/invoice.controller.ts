@@ -1,5 +1,5 @@
 
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { InvoiceService } from './invoice.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -21,8 +21,10 @@ export class InvoiceController {
 
     @Get(':id')
     @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-    findOne(@Param('id') id: string) {
-        return this.invoiceService.getInvoice(id);
+    findOne(@Param('id') id: string, @Request() req: any) {
+        const isSuperAdmin = req.user.role === Role.SUPER_ADMIN;
+        if (!isSuperAdmin && !req.user.tenantId) throw new ForbiddenException('Tenant required');
+        return this.invoiceService.getInvoice(id, isSuperAdmin ? null : req.user.tenantId);
     }
 
     @Post(':id/adjustments')

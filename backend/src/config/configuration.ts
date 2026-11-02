@@ -31,8 +31,8 @@ export default () => ({
         apiUrl: process.env.SUB_BILLING_API_URL || 'http://localhost:5005/api',
     },
     billingCacheRefresh: {
-        url: process.env.BILLING_CACHE_REFRESH_URL || 'http://localhost:8000/api/v1/cache/refresh',
-        token: process.env.BILLING_CACHE_REFRESH_TOKEN || 'dev-token-123',
+        url: process.env.BILLING_CACHE_REFRESH_URL || 'http://localhost:8005/api/v1/cache/refresh',
+        token: process.env.BILLING_CACHE_REFRESH_TOKEN,
     },
     kamailio: {
         rpcUrl: process.env.KAMAILIO_RPC_URL || 'http://10.30.0.60:8080/rpc',

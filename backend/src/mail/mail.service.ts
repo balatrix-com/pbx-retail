@@ -351,7 +351,7 @@ export class MailService {
         customerEmail: string,
         planName: string = 'N/A',
         quoteNo: string = 'N/A',
-        password: string = 'Welcome123!'
+        password: string = ''
     ) {
         const partner = await this.prisma.partner.findFirst();
         const platformName = partner?.name || 'Cloud PBX';
@@ -383,10 +383,10 @@ export class MailService {
                     <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Extension Username:</td>
                     <td style="padding: 6px 0; color: #0f172a; font-weight: 700;">${customerCode}</td>
                   </tr>
-                  <tr>
+                  ${password ? `<tr>
                     <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Temporary Password:</td>
                     <td style="padding: 6px 0; color: #0f172a; font-family: monospace; font-weight: 700; font-size: 15px;">${password}</td>
-                  </tr>
+                  </tr>` : ''}
                   <tr>
                     <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Customer Code:</td>
                     <td style="padding: 6px 0; color: #0f172a; font-weight: 700;">${customerCode}</td>

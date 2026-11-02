@@ -14,6 +14,7 @@ import { REDIS_SUBSCRIBER, REDIS_CLIENT } from '../redis/redis.module';
 import type { RedisClientType } from 'redis';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserStatus } from '@prisma/client';
 import { MonitoringAccessService } from './monitoring-access.service';
 import { assertTenantServiceAccess } from '../auth/tenant-service-access';
 
@@ -119,13 +120,40 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
     private async disconnectBlockedSockets() {
         try {
             const sockets = await this.server.fetchSockets();
-            const tenantIds = new Set(sockets.filter(s => s.data.user?.role !== 'SUPER_ADMIN').map(s => s.data.user?.tenantId).filter(Boolean));
+            const userIds = [...new Set(sockets.map(s => s.data.user?.sub).filter(Boolean))];
+            const accounts = userIds.length ? await this.prismaService.user.findMany({
+                where: { id: { in: userIds } },
+                select: { id: true, role: true, status: true, tenantId: true },
+            }) : [];
+            const accountsById = new Map(accounts.map(account => [account.id, account]));
+            const activeSockets = sockets.filter(socket => {
+
+                if (!socket.data.user?.sub) return true;
+                if (this.matchesCurrentAccount(socket.data.user, accountsById.get(socket.data.user?.sub))) return true;
+                socket.disconnect(true);
+                return false;
+            });
+            const tenantIds = new Set(activeSockets.filter(s => s.data.user?.role !== 'SUPER_ADMIN').map(s => s.data.user?.tenantId).filter(Boolean));
             for (const tenantId of tenantIds) {
                 const tenant = await this.prismaService.tenant.findUnique({ where: { id: tenantId }, select: { serviceBlocked: true } });
                 if (tenant && !tenant.serviceBlocked) continue;
-                for (const socket of sockets) if (socket.data.user?.tenantId === tenantId && socket.data.user?.role !== 'SUPER_ADMIN') socket.disconnect(true);
+                for (const socket of activeSockets) if (socket.data.user?.tenantId === tenantId && socket.data.user?.role !== 'SUPER_ADMIN') socket.disconnect(true);
             }
         } catch (error) { this.logger.warn(`Tenant socket state check failed: ${error.message}`); }
+    }
+
+    private matchesCurrentAccount(user: any, account: { role: string; status: UserStatus; tenantId: string | null } | null | undefined): boolean {
+        return !!user?.sub && !!account && account.status === UserStatus.ACTIVE &&
+            account.role === user.role && account.tenantId === user.tenantId;
+    }
+
+    private async getCurrentAccount(user: any) {
+        if (!user?.sub) return null;
+        const account = await this.prismaService.user.findUnique({
+            where: { id: user.sub },
+            select: { id: true, role: true, status: true, tenantId: true },
+        });
+        return this.matchesCurrentAccount(user, account) ? account : null;
     }
 
     onModuleDestroy() {
@@ -244,11 +272,16 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
             }
 
             const payload = this.jwtService.verify(token);
-            await assertTenantServiceAccess(this.prismaService, payload);
+            const account = await this.getCurrentAccount(payload);
+            if (!account) {
+                client.disconnect(true);
+                return;
+            }
+            await assertTenantServiceAccess(this.prismaService, account);
 
             // Check permissions
             try {
-                await this.monitoringAccess.getAssignedExtension(payload);
+                await this.monitoringAccess.getAssignedExtension({ id: account.id, role: account.role, tenantId: account.tenantId });
             } catch (error) {
                 this.logger.warn(`Client ${client.id} (User: ${payload.sub}) denied monitoring access`);
                 client.disconnect();
@@ -285,7 +318,11 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
             return;
         }
 
-        try { await assertTenantServiceAccess(this.prismaService, user); }
+        try {
+            const account = await this.getCurrentAccount(user);
+            if (!account) { client.disconnect(true); return; }
+            await assertTenantServiceAccess(this.prismaService, account);
+        }
         catch { client.disconnect(true); return; }
 
         this.logger.log(`User attempting join: ${user.sub}, Role: ${user.role}, UserTenant: ${user.tenantId}, ReqTenant: ${tenantId}`); // DEBUG

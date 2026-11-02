@@ -294,16 +294,20 @@ model SupportProfile {
 
 model UserAuditLog {
   id        String          @id @default(uuid())
-  actorId   String
+  actorId   String?
   targetId  String?
+  actorSnapshotId String?
+  targetSnapshotId String?
   action    UserAuditAction
   metadata  Json?
   timestamp DateTime        @default(now())
-  actor     User            @relation("Actor", fields: [actorId], references: [id])
-  target    User?           @relation("Target", fields: [targetId], references: [id])
+  actor     User?           @relation("Actor", fields: [actorId], references: [id], onDelete: SetNull)
+  target    User?           @relation("Target", fields: [targetId], references: [id], onDelete: SetNull)
 
   @@index([actorId])
   @@index([targetId])
+  @@index([actorSnapshotId])
+  @@index([targetSnapshotId])
   @@index([timestamp])
   @@index([action])
   @@map("user_audit_logs")

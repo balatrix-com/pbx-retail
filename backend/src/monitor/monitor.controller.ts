@@ -63,6 +63,10 @@ export class MonitorController {
             if (!belongsToTenant) {
                 throw new ForbiddenException('Access denied: target call does not belong to your tenant');
             }
+            if (body.mode === 'whisper' &&
+                !(await this.monitorService.verifyCallLegPair(body.uuid_in, body.uuid_out, user.tenantId))) {
+                throw new ForbiddenException('Outbound leg does not belong to the target call');
+            }
         }
 
         const result = await this.monitorService.initiateBarge(

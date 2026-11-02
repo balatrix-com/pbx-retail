@@ -7,6 +7,7 @@ import { InvoiceService } from '../billing/invoice.service';
 import { WalletService } from '../wallet/wallet.service';
 import { InvoiceStatus, TransactionType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
@@ -62,6 +63,7 @@ export class OnboardingService {
             };
         }
 
+        let initialPassword: string | null = null;
         const transactionResult = await this.prisma.$transaction(async (tx) => {
             // 1. Upsert Tenant
             let tenant = await tx.tenant.findUnique({
@@ -102,6 +104,7 @@ export class OnboardingService {
             });
 
             if (!user) {
+                initialPassword = randomBytes(24).toString('base64url');
                 user = await tx.user.create({
                     data: {
                         email: data.customerEmail.toLowerCase(),
@@ -110,7 +113,7 @@ export class OnboardingService {
                         tenantId: tenant.id,
                         status: UserStatus.ACTIVE,
                         forcePasswordChange: true,
-                        password: await bcrypt.hash('Welcome123!', 10), // Default password for automated provisioning
+                        password: await bcrypt.hash(initialPassword, 10),
                         monitoringEnabled: data.subBillingCustomerId?.startsWith('T')
                     }
                 });
@@ -251,7 +254,7 @@ export class OnboardingService {
                 data.customerEmail,
                 data.planName,
                 data.subBillingSubscriptionId.slice(0, 8).toUpperCase(),
-                'Welcome123!' // Default password
+                initialPassword || ''
             );
         } catch (emailErr) {
             this.logger.error(`Failed to send onboarding completion email (Sub-billing flow) for ${data.customerEmail}: ${emailErr.message}`);

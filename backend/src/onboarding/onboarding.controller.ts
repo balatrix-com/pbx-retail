@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Param, Headers, UnauthorizedException, Logger, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Headers, UnauthorizedException, InternalServerErrorException, Logger, Req, UseGuards } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import { OnboardingService } from './onboarding.service';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
 import { ProvisionTenantDto } from './dto/provision-tenant.dto';
@@ -37,10 +38,19 @@ export class OnboardingController {
     @Post('provision-tenant')
     async provisionTenant(@Body() data: ProvisionTenantDto, @Req() req: any) {
         const authHeader = req.headers['x-sync-token'];
-        const expectedToken = process.env.PBX_SYNC_TOKEN || 'your-super-secret-jwt-key-change-this-in-production';
-        
-        if (authHeader !== expectedToken) {
-            console.error(`[PBX Provisioning] Unauthorized attempt. Received: ${authHeader}, Expected: ${expectedToken ? 'SET' : 'MISSING'}`);
+        const expectedToken = process.env.PBX_SYNC_TOKEN;
+
+        if (!expectedToken || expectedToken.trim().length < 32) {
+            throw new InternalServerErrorException('Tenant provisioning is unavailable');
+        }
+
+        if (typeof authHeader !== 'string') {
+            throw new UnauthorizedException('Invalid sync token');
+        }
+
+        const expected = Buffer.from(expectedToken);
+        const received = Buffer.from(authHeader);
+        if (expected.length !== received.length || !timingSafeEqual(expected, received)) {
             throw new UnauthorizedException('Invalid sync token');
         }
 

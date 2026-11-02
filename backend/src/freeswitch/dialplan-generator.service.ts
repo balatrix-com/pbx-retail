@@ -8,6 +8,11 @@ const AUDIO_INVALID = '/opt/ivr_audio/system/invalid_input.wav';
 const AUDIO_UNAVAILABLE = '/opt/ivr_audio/system/ext_unavailable.wav';
 const AUDIO_NOINPUT = '/opt/ivr_audio/system/ivr_no_input.wav';
 
+function escapeXmlAttr(value: string | number): string {
+  return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /**
  * Dialplan Generator Service
  * 
@@ -424,7 +429,7 @@ ${actions}
           <action application="answer"/>
           <action application="sleep" data="200"/>
           <action application="export" data="route_key=${baseKey}"/>
-          <action application="play_and_get_digits" data="${playDigitsData}"/>
+          <action application="play_and_get_digits" data="${escapeXmlAttr(playDigitsData)}"/>
           <action application="transfer" data="910\${main_choice} XML public"/>
         </condition>
       </extension>
@@ -459,7 +464,7 @@ ${actions}
         <condition field="destination_number" expression="^${level1Code}$">
           <action application="set" data="continue_on_fail=true"/>
           <action application="set" data="call_timeout=25"/>
-          <action application="play_and_get_digits" data="1 1 3 5000 # ${subGreeting} ${AUDIO_INVALID} sub_choice ^[0-9]$ 2000"/>
+          <action application="play_and_get_digits" data="${escapeXmlAttr(`1 1 3 5000 # ${subGreeting} ${AUDIO_INVALID} sub_choice ^[0-9]$ 2000`)}"/>
           <action application="transfer" data="${subTransferData}"/>
         </condition>
       </extension>
@@ -557,7 +562,7 @@ ${actions}
       <extension name="${extName}">
         <condition field="destination_number" expression="^${code}$">
           <action application="set" data="continue_on_fail=true"/>
-          <action application="transfer" data="${baseKey} XML public"/>
+          <action application="transfer" data="${escapeXmlAttr(baseKey)} XML public"/>
         </condition>
       </extension>
     </context>
@@ -576,7 +581,7 @@ ${actions}
         <condition field="destination_number" expression="^${code}$">
           <action application="set" data="continue_on_fail=true"/>
           <action application="set" data="hangup_after_bridge=true"/>
-          <action application="transfer" data="${dest} XML public"/>
+          <action application="transfer" data="${escapeXmlAttr(dest)} XML public"/>
         </condition>
       </extension>
     </context>

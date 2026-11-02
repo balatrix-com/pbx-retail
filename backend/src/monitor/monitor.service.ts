@@ -162,6 +162,11 @@ export class MonitorService {
         }
     }
 
+    async verifyCallLegPair(uuidIn: string, uuidOut: string, tenantId: string): Promise<boolean> {
+        const calls = await this.getActiveCalls(tenantId);
+        return calls.some(call => call.uuid === uuidIn && call.bUuid === uuidOut);
+    }
+
     /**
      * Initiate Barge / Whisper / Listen
      */
