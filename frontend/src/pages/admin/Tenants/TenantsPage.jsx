@@ -245,11 +245,15 @@ const TenantsPage = () => {
                                         <td className="px-6 py-5 whitespace-nowrap">
                                             <span className={clsx(
                                                 "inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ring-1",
-                                                tenant.status === 'ARCHIVED' ? 'bg-slate-100 text-slate-700 ring-slate-500/20' : tenant.serviceBlocked
-                                                    ? 'bg-red-50 text-red-700 ring-red-600/10' 
-                                                    : 'bg-emerald-50 text-emerald-700 ring-emerald-600/10'
+                                                tenant.status === 'ARCHIVED' ? 'bg-slate-100 text-slate-700 ring-slate-500/20' : 
+                                                tenant.serviceBlocked || tenant.serviceStatus === 'BLOCKED' ? 'bg-red-50 text-red-700 ring-red-600/10' :
+                                                tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-50 text-amber-700 ring-amber-600/20' :
+                                                'bg-emerald-50 text-emerald-700 ring-emerald-600/10'
                                             )}>
-                                                {tenant.status === 'ARCHIVED' ? 'Archived' : tenant.archiveJob ? tenant.archiveJob.state.replaceAll('_', ' ') : tenant.serviceBlocked ? 'Service Blocked' : 'Active'}
+                                                {tenant.status === 'ARCHIVED' ? 'Archived' : 
+                                                 tenant.archiveJob ? tenant.archiveJob.state.replaceAll('_', ' ') : 
+                                                 tenant.serviceBlocked || tenant.serviceStatus === 'BLOCKED' ? 'Service Blocked' : 
+                                                 tenant.serviceStatus === 'DEACTIVATED' ? 'Deactivated' : 'Active'}
                                             </span>
                                             {tenant.archiveJob?.last_error && <p className="text-xs text-red-700 max-w-xs whitespace-normal mt-1">{tenant.archiveJob.last_error}</p>}
                                         </td>

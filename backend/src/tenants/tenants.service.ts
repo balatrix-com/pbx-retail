@@ -56,7 +56,14 @@ export class TenantsService {
                     _count: {
                         select: { users: { where: { status: { not: 'DELETED' } } } }
                     },
-                    wallet: true
+                    wallet: true,
+                    subscriptions: {
+                        where: {
+                            status: 'ACTIVE',
+                            endDate: { gt: new Date() }
+                        },
+                        select: { id: true }
+                    }
                 }
             }),
             this.prisma.tenant.count({ where }),
@@ -66,7 +73,23 @@ export class TenantsService {
         const archiveJobs = await this.prisma.$queryRawUnsafe<any[]>('SELECT * FROM tenant_archive_jobs WHERE tenant_id = ANY($1::text[])', data.map(t => t.id));
         // Merge real-time balances into the PBX tenant data
         const enrichedData = data.map((tenant: any) => {
-            tenant = { ...tenant, archiveJob: archiveJobs.find(j => j.tenant_id === tenant.id) || null };
+            const archiveJob = archiveJobs.find(j => j.tenant_id === tenant.id) || null;
+            const hasActivePlan = Array.isArray(tenant.subscriptions) && tenant.subscriptions.length > 0;
+            let serviceStatus = 'ACTIVE';
+            if (tenant.status === 'ARCHIVED' || archiveJob) {
+                serviceStatus = 'ARCHIVED';
+            } else if (tenant.serviceBlocked || tenant.status === 'SUSPENDED') {
+                serviceStatus = 'BLOCKED';
+            } else if (!hasActivePlan) {
+                serviceStatus = 'DEACTIVATED';
+            }
+
+            tenant = {
+                ...tenant,
+                archiveJob,
+                serviceStatus,
+                hasActivePlan
+            };
             const billingWallet = realTimeBalances.find((b: any) => b.customer_id === tenant.id);
             if (billingWallet) {
                 return {
@@ -316,6 +339,8 @@ export class TenantsService {
         return {
             ...tenant,
             archiveJob: await this.archives.status(id),
+            serviceStatus: (tenant.status === 'ARCHIVED') ? 'ARCHIVED' : (tenant.serviceBlocked || tenant.status === 'SUSPENDED') ? 'BLOCKED' : (!subscription || !['active', 'grace'].includes(subscription.status)) ? 'DEACTIVATED' : 'ACTIVE',
+            hasActivePlan: Boolean(subscription && ['active', 'grace'].includes(subscription.status)),
             wallet: realWallet,
             tenantFeatures: features,
             subscription,

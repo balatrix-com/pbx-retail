@@ -50,6 +50,24 @@ const TenantManager = ({ tenantId, onClose }) => {
 
     const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
 
+    const [isBlockLoading, setIsBlockLoading] = useState(false);
+    const handleToggleBlock = async () => {
+        if (!tenant) return;
+        const willBlock = !tenant.serviceBlocked;
+        if (willBlock && !window.confirm(`Block customer ${tenant.name}? Outbound and inbound calls will be stopped and portal access will be disabled.`)) {
+            return;
+        }
+        setIsBlockLoading(true);
+        try {
+            await api.patch(`/tenants/${tenant.id}/block`, { blocked: willBlock });
+            handleRefresh();
+        } catch (err) {
+            alert('Failed to update service status: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsBlockLoading(false);
+        }
+    };
+
     if (loading && !tenant) {
         return (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -120,7 +138,7 @@ const TenantManager = ({ tenantId, onClose }) => {
 
                     {/* Tab Content */}
                     <div className="flex-1 min-h-0 overflow-y-auto p-8 bg-white">
-                        {activeTab === 'overview' && (<OverviewTab tenant={tenant} subscription={subscription} />)}
+                        {activeTab === 'overview' && (<OverviewTab tenant={tenant} subscription={subscription} onToggleBlock={handleToggleBlock} isBlockLoading={isBlockLoading} />)}
                         {activeTab === 'wallet' && <WalletTab tenant={tenant} onUpdate={handleRefresh} />}
                         {activeTab === 'extensions' && <ExtensionsTab tenant={tenant} onUpdate={handleRefresh} />}
                         {activeTab === 'users' && <UsersTab tenant={tenant} />}
@@ -136,7 +154,7 @@ const TenantManager = ({ tenantId, onClose }) => {
 
 // --- Sub-Components ---
 
-const OverviewTab = ({ tenant, subscription }) => (
+const OverviewTab = ({ tenant, subscription, onToggleBlock, isBlockLoading }) => (
     <div className="space-y-6 w-full">
         <div>
             <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Organization Overview</h3>
@@ -169,14 +187,40 @@ const OverviewTab = ({ tenant, subscription }) => (
             <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
                 <div className="relative z-10">
                     <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <div className={`h-1.5 w-1.5 rounded-full ${tenant.serviceBlocked ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                        <div className={`h-1.5 w-1.5 rounded-full ${
+                            tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'bg-red-500' :
+                            tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-500' :
+                            tenant.serviceStatus === 'ARCHIVED' ? 'bg-slate-500' :
+                            'bg-green-500'
+                        }`}></div>
                         System Status
                     </div>
-                    <div className="mt-1">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${tenant.serviceBlocked ? 'bg-red-50 text-red-700 ring-red-600/20' : 'bg-green-50 text-green-700 ring-green-600/20'
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${
+                            tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'bg-red-50 text-red-700 ring-red-600/20' :
+                            tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-50 text-amber-700 ring-amber-600/20' :
+                            tenant.serviceStatus === 'ARCHIVED' ? 'bg-slate-50 text-slate-700 ring-slate-600/20' :
+                            'bg-green-50 text-green-700 ring-green-600/20'
                             }`}>
-                            {tenant.serviceBlocked ? 'Blocked' : 'Active'}
+                            {tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'Blocked' :
+                             tenant.serviceStatus === 'DEACTIVATED' ? 'Deactivated' :
+                             tenant.serviceStatus === 'ARCHIVED' ? 'Archived' : 'Active'}
                         </span>
+                        {onToggleBlock && tenant.serviceStatus !== 'ARCHIVED' && (
+                            <button
+                                type="button"
+                                onClick={onToggleBlock}
+                                disabled={isBlockLoading}
+                                className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all shadow-sm ${
+                                    tenant.serviceBlocked
+                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                        : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                                }`}
+                                title={tenant.serviceBlocked ? "Unblock calls and portal access" : "Block calls and portal access"}
+                            >
+                                {isBlockLoading ? 'Updating...' : tenant.serviceBlocked ? 'Unblock' : 'Block'}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
