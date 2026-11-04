@@ -449,11 +449,54 @@ export class TenantsService {
         didForwardLimit?: number;
         monitorEnabled?: boolean;
         recordingAllowed?: boolean;
+        /** Required when enabling recordingAllowed (turning it from false → true).
+         *  Must match a valid rec_rate_card.id. */
+        recRateCardId?: number;
     }) {
         const tenant = await this.prisma.tenant.findUnique({
             where: { id }
         });
         if (!tenant) throw new NotFoundException('Tenant not found');
+
+        // ── Recording guard: rate card is mandatory before enabling recording ──
+        if (dto.recordingAllowed === true) {
+            if (!dto.recRateCardId) {
+                throw new BadRequestException(
+                    'A recording rate card (recRateCardId) must be selected before enabling call recording.',
+                );
+            }
+
+            // Validate that the rate card exists in the local DB before calling billing
+            const rcExists = await this.prisma.recRateCard.findUnique({
+                where: { id: dto.recRateCardId },
+            });
+            if (!rcExists) {
+                throw new BadRequestException(
+                    `Recording rate card id ${dto.recRateCardId} does not exist.`,
+                );
+            }
+
+            // Upsert the customer → rec rate card mapping via admin service
+            const customerId = tenant.subBillingCustomerId || tenant.customerCode;
+            if (!customerId) {
+                throw new BadRequestException('Tenant is not linked to a billing customer; cannot assign rate card.');
+            }
+            try {
+                await this.adminService.updateCustomerRecRateCardMapping(customerId, {
+                    rec_rc_id: dto.recRateCardId,
+                });
+                this.logger.log(
+                    `Recording rate card ${dto.recRateCardId} assigned to customer ${customerId} before enabling recording.`,
+                );
+            } catch (rcErr: any) {
+                this.logger.error(
+                    `Failed to assign recording rate card ${dto.recRateCardId} to ${customerId}: ${rcErr.message}`,
+                );
+                throw new BadRequestException(
+                    `Could not assign recording rate card: ${rcErr.message}`,
+                );
+            }
+        }
 
         const isDisablingRecording = dto.recordingAllowed === false;
 

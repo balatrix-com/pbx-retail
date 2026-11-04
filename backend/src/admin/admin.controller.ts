@@ -80,48 +80,6 @@ export class AdminController {
     }
 
     /**
-     * Rate Card Management (SUPER_ADMIN only)
-     */
-    @Get('rate-cards')
-    @Roles('SUPER_ADMIN')
-    getAllRateCards() {
-        return this.adminService.getAllRateCards();
-    }
-
-    @Get('rate-cards/mappings')
-    @Roles('SUPER_ADMIN')
-    getCustomerRateCardMappings() {
-        return this.adminService.getCustomerRateCardMappings();
-    }
-
-    @Get('rate-cards/:id')
-    @Roles('SUPER_ADMIN')
-    getRateCard(@Param('id') id: string) {
-        return this.adminService.getRateCard(id);
-    }
-
-    @Post('rate-cards')
-    @Roles('SUPER_ADMIN')
-    @Audit('RATE_CARD_CREATED', 'RATE_CARD')
-    createRateCard(@Body() data: any) {
-        return this.adminService.createRateCard(data);
-    }
-
-    @Put('rate-cards/:id')
-    @Roles('SUPER_ADMIN')
-    @Audit('RATE_CARD_UPDATED', 'RATE_CARD')
-    updateRateCard(@Param('id') id: string, @Body() data: any) {
-        return this.adminService.updateRateCard(id, data);
-    }
-
-    @Post('rate-cards/mappings')
-    @Roles('SUPER_ADMIN')
-    @Audit('RATE_CARD_MAPPING_UPDATED', 'RATE_CARD')
-    updateCustomerRateCardMapping(@Body() data: { customer_id: string; ratecard_id: number }) {
-        return this.adminService.updateCustomerRateCardMapping(data);
-    }
-
-    /**
      * Recording Rate Card Management (SUPER_ADMIN only)
      */
     @Get('rec-rate-cards')

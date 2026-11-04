@@ -30,14 +30,26 @@ export const subscriptionService = {
         return res.data;
     },
 
+    getRateCards: async () => {
+        try {
+            const res = await api.get('/plans/rate-cards').catch(() => api.get('/admin/rec-rate-cards'));
+            const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
+            return list;
+        } catch (err) {
+            console.error('Failed to fetch rate cards:', err);
+            return [];
+        }
+    },
+
     // ------------------------------------------------------------------------
     // 2. EXISTING BACKEND API: GET /api/wallet/subscription (Status: 200 OK)
     // ------------------------------------------------------------------------
-    getSubscription: async (tenantId) => {
+    getSubscription: async (tenantId, params = {}) => {
         try {
             const res = await api.get('/wallet/subscription', {
                 params: {
-                    tenantId
+                    ...(tenantId ? { tenantId } : {}),
+                    ...params
                 }
             });
 
@@ -46,6 +58,36 @@ export const subscriptionService = {
             console.warn('GET /wallet/subscription endpoint error:', e);
             return null;
         }
+    },
+
+    getAllSubscriptions: async (params = {}) => {
+        try {
+            const res = await api.get('/wallet/subscription', {
+                params: {
+                    tenantId: 'all',
+                    ...params
+                }
+            });
+            return res.data;
+        } catch (e) {
+            console.warn('GET /wallet/subscription?tenantId=all endpoint error:', e);
+            return { data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 1 } };
+        }
+    },
+
+    toggleAutoRenew: async (targetTenantId, auto_renew) => {
+        const res = await api.patch('/wallet/subscription/auto-renew', {
+            ...(targetTenantId && { targetTenantId }),
+            auto_renew
+        });
+        return res.data;
+    },
+
+    cancelScheduledSwitch: async (customerId) => {
+        const res = await api.post('/wallet/subscription/cancel-switch', {
+            targetTenantId: customerId
+        });
+        return res.data;
     },
 
     // ------------------------------------------------------------------------

@@ -752,6 +752,186 @@ const UsersTab = ({ tenant }) => {
     );
 };
 
+const RecordingRateCardModal = ({ onClose, onConfirm, customerId }) => {
+    const [rateCards, setRateCards] = useState([]);
+    const [selectedCardId, setSelectedCardId] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchCards = async () => {
+            setLoading(true);
+            setError('');
+            try {
+                const res = await api.get('/admin/rec-rate-cards');
+                const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+                if (!isMounted) return;
+                setRateCards(list);
+                if (list.length > 0) {
+                    setSelectedCardId(String(list[0].id));
+                }
+
+                // If customer has an existing recording rate card mapping, pre-select it
+                if (customerId) {
+                    try {
+                        const mapRes = await api.get(`/admin/rec-rate-cards/customer/${customerId}`);
+                        const mappedId = mapRes.data?.rec_rc_id || mapRes.data?.id;
+                        if (mappedId && list.some(c => String(c.id) === String(mappedId))) {
+                            if (isMounted) setSelectedCardId(String(mappedId));
+                        }
+                    } catch (e) {
+                        // Ignore if no mapping exists yet
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load recording rate cards:', err);
+                if (isMounted) {
+                    setError(err.response?.data?.message || err.message || 'Failed to load recording rate cards');
+                }
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        fetchCards();
+        return () => { isMounted = false; };
+    }, [customerId]);
+
+    const selectedCard = rateCards.find(c => String(c.id) === String(selectedCardId));
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!selectedCardId) return;
+        setSubmitting(true);
+        try {
+            await onConfirm(Number(selectedCardId));
+        } catch (err) {
+            // Error handled by onConfirm
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col ring-1 ring-gray-200">
+                <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                            <Mic className="h-5 w-5" />
+                        </div>
+                        <div className="text-left">
+                            <h4 className="text-lg font-extrabold text-gray-900 tracking-tight">Enable Call Recording</h4>
+                            <p className="text-xs font-medium text-gray-500 mt-0.5">
+                                Select a recording rate card for this tenant
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-xl p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-4 text-left">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-8 gap-2">
+                            <Loader2 className="h-7 w-7 animate-spin text-primary-600" />
+                            <span className="text-xs font-medium text-gray-500">Loading recording rate cards...</span>
+                        </div>
+                    ) : error ? (
+                        <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-xs font-medium">
+                            {error}
+                        </div>
+                    ) : rateCards.length === 0 ? (
+                        <div className="text-center py-8">
+                            <Mic className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                            <p className="text-sm font-bold text-gray-700">No recording rate cards available</p>
+                            <p className="text-xs text-gray-400 mt-1">Please create a recording rate card in Rate Cards Management first.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-2">
+                                    Recording Rate Card <span className="text-rose-500">*</span>
+                                </label>
+                                <select
+                                    className="block w-full rounded-xl border border-gray-300 py-2.5 px-3.5 text-gray-900 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm font-semibold bg-white"
+                                    value={selectedCardId}
+                                    onChange={(e) => setSelectedCardId(e.target.value)}
+                                    required
+                                >
+                                    <option value="" disabled>Select a Rate Card</option>
+                                    {rateCards.map((card) => {
+                                        const rate = card.rate_per_min ?? card.ratePerMin;
+                                        const rateStr = rate !== undefined && rate !== null ? `${parseFloat(rate).toFixed(4)}/min` : '';
+                                        const retention = card.retention_period ?? card.retentionPeriod;
+                                        const retentionStr = retention ? `${retention}d retention` : '';
+                                        const parts = [rateStr, retentionStr].filter(Boolean).join(', ');
+                                        return (
+                                            <option key={card.id} value={card.id}>
+                                                {card.name}{parts ? ` — ${parts}` : ''}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+
+                            {selectedCard && (
+                                <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 space-y-1.5 text-xs text-gray-600">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">Rate:</span>
+                                        <span className="font-bold font-mono text-gray-900">
+                                            ${parseFloat(selectedCard.rate_per_min ?? selectedCard.ratePerMin ?? 0).toFixed(4)} / min
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">Retention Period:</span>
+                                        <span className="font-bold text-gray-900">
+                                            {selectedCard.retention_period ?? selectedCard.retentionPeriod ?? 7} Days
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">Currency:</span>
+                                        <span className="font-bold text-gray-900">{selectedCard.currency || 'USD'}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="pt-3 flex justify-end gap-3 border-t border-gray-100">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={submitting}
+                            className="inline-flex justify-center items-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-all active:scale-[0.98] focus:outline-none"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting || loading || rateCards.length === 0 || !selectedCardId}
+                            className="inline-flex justify-center items-center rounded-xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {submitting ? (
+                                <><Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" /> Enabling...</>
+                            ) : (
+                                'Confirm & Enable'
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const FeaturesTab = ({ tenant, onUpdate }) => {
     const [features, setFeatures] = useState(tenant.tenantFeatures || {
         ivrEnabled: true,
@@ -764,6 +944,7 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
         didForwardLimit: 10,
     });
     const [updatingFeature, setUpdatingFeature] = useState(null);
+    const [showRecordingModal, setShowRecordingModal] = useState(false);
 
     // Keep state in sync if tenant prop updates
     useEffect(() => {
@@ -773,18 +954,57 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
     }, [tenant.tenantFeatures]);
 
     const handleToggle = async (key) => {
+        if (key === 'recordingAllowed') {
+            const currentlyAllowed = !!features.recordingAllowed;
+            if (!currentlyAllowed) {
+                setShowRecordingModal(true);
+            } else {
+                setUpdatingFeature('recordingAllowed');
+                try {
+                    await api.patch(`/tenants/${tenant.id}/features`, { recordingAllowed: false });
+                    setFeatures(prev => ({ ...prev, recordingAllowed: false }));
+                    onUpdate();
+                } catch (err) {
+                    console.error('Failed to disable call recording:', err);
+                    alert('Failed to disable call recording: ' + (err.response?.data?.message || err.message));
+                } finally {
+                    setUpdatingFeature(null);
+                }
+            }
+            return;
+        }
+
         setUpdatingFeature(key);
         const updatedFeatures = {
             ...features,
             [key]: !features[key]
         };
         try {
-            await api.patch(`/tenants/${tenant.id}/features`, updatedFeatures);
+            await api.patch(`/tenants/${tenant.id}/features`, { [key]: !features[key] });
             setFeatures(updatedFeatures);
             onUpdate(); // refresh parent details
         } catch (err) {
             console.error('Failed to update tenant features:', err);
             alert('Failed to update tenant features');
+        } finally {
+            setUpdatingFeature(null);
+        }
+    };
+
+    const handleEnableRecording = async (recRateCardId) => {
+        setUpdatingFeature('recordingAllowed');
+        try {
+            await api.patch(`/tenants/${tenant.id}/features`, {
+                recordingAllowed: true,
+                recRateCardId: Number(recRateCardId)
+            });
+            setFeatures(prev => ({ ...prev, recordingAllowed: true }));
+            setShowRecordingModal(false);
+            onUpdate();
+        } catch (err) {
+            console.error('Failed to enable call recording:', err);
+            alert('Failed to enable call recording: ' + (err.response?.data?.message || err.message));
+            throw err;
         } finally {
             setUpdatingFeature(null);
         }
@@ -941,6 +1161,13 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                 })}
             </div>
 
+            {showRecordingModal && (
+                <RecordingRateCardModal
+                    onClose={() => setShowRecordingModal(false)}
+                    onConfirm={handleEnableRecording}
+                    customerId={tenant.customerCode || tenant.id}
+                />
+            )}
         </div>
     );
 };

@@ -148,63 +148,6 @@ export class AdminService {
     }
 
     /**
-     * Rate Cards CRUD Proxy
-     */
-    async getAllRateCards() {
-        try {
-            const response = await lastValueFrom(this.httpService.get(`${this.subBillingUrl}/rate-cards`));
-            return response.data;
-        } catch (error: any) {
-            this.handleProxyError(error, 'getAllRateCards');
-        }
-    }
-
-    async getRateCard(id: string) {
-        try {
-            const response = await lastValueFrom(this.httpService.get(`${this.subBillingUrl}/rate-cards/${id}`));
-            return response.data;
-        } catch (error: any) {
-            this.handleProxyError(error, 'getRateCard');
-        }
-    }
-
-    async createRateCard(data: any) {
-        try {
-            const response = await lastValueFrom(this.httpService.post(`${this.subBillingUrl}/rate-cards`, data));
-            if (response.data.success) {
-                await this.triggerCacheRefresh();
-            }
-            return response.data;
-        } catch (error: any) {
-            this.handleProxyError(error, 'createRateCard');
-        }
-    }
-
-    async updateRateCard(id: string, data: any) {
-        try {
-            const response = await lastValueFrom(this.httpService.put(`${this.subBillingUrl}/rate-cards/${id}`, data));
-            if (response.data.success) {
-                await this.triggerCacheRefresh();
-            }
-            return response.data;
-        } catch (error: any) {
-            this.handleProxyError(error, 'updateRateCard');
-        }
-    }
-
-    /**
-     * Customer Rate Card Mappings Proxy
-     */
-    async getCustomerRateCardMappings() {
-        try {
-            const response = await lastValueFrom(this.httpService.get(`${this.subBillingUrl}/rate-cards/mappings`));
-            return response.data;
-        } catch (error: any) {
-            this.handleProxyError(error, 'getCustomerRateCardMappings');
-        }
-    }
-
-    /**
      * Fetch real-time wallet balances from billing system
      */
     async getRealTimeBalances() {
@@ -220,18 +163,6 @@ export class AdminService {
     async getBillingTotalBalance() {
         const balances = await this.getRealTimeBalances();
         return balances.reduce((sum: number, b: any) => sum + (parseFloat(b.balance) || 0), 0);
-    }
-
-    async updateCustomerRateCardMapping(data: { customer_id: string; ratecard_id: number }) {
-        try {
-            const response = await lastValueFrom(this.httpService.post(`${this.subBillingUrl}/rate-cards/mappings`, data));
-            if (response.data.success) {
-                await this.triggerCacheRefresh();
-            }
-            return response.data;
-        } catch (error: any) {
-            this.handleProxyError(error, 'updateCustomerRateCardMapping');
-        }
     }
 
     /**

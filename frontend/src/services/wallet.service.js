@@ -19,8 +19,23 @@ export const walletService = {
         return { ...wallet.data, transactions: transactions.data };
     },
 
-    getSubscription: async () => {
-        const response = await api.get('/wallet/subscription');
+    getSubscription: async (tenantId, params = {}) => {
+        const response = await api.get('/wallet/subscription', {
+            params: {
+                ...(tenantId ? { tenantId } : {}),
+                ...params
+            }
+        });
+        return response.data;
+    },
+
+    getAllSubscriptions: async (params = {}) => {
+        const response = await api.get('/wallet/subscription', {
+            params: {
+                tenantId: 'all',
+                ...params
+            }
+        });
         return response.data;
     },
 

@@ -4,15 +4,14 @@ import { walletService } from '../services/wallet.service';
 import { usageService } from '../services/usage.service';
 import { useAuth } from '../context/AuthContext';
 
-export const useWalletQuery = (options = {}) => {
+export const useWalletQuery = (targetTenantId) => {
     const { user } = useAuth();
+    const effectiveTenantId = targetTenantId || user?.tenantId;
     return useQuery({
-        queryKey: ['wallet', user?.tenantId],
-        queryFn: () => walletService.getBalance(user?.tenantId),
-        enabled: !!user?.tenantId,
-        staleTime: Infinity, // Only fetch on mount, never auto-refetch on timer or navigation
-        refetchOnWindowFocus: false,
-        ...options,
+        queryKey: ['wallet', effectiveTenantId],
+        queryFn: () => walletService.getWallet(effectiveTenantId),
+        enabled: !!effectiveTenantId,
+        refetchInterval: 30000,
     });
 };
 
@@ -28,51 +27,40 @@ export const useWalletTransactionsQuery = (options = {}) => {
     });
 };
 
-export const useSubscriptionQuery = (options = {}) => {
+export const useSubscriptionQuery = (targetTenantId, params) => {
     const { user } = useAuth();
+    const effectiveTenantId = targetTenantId || user?.tenantId;
     return useQuery({
-        queryKey: ['subscription', user?.tenantId],
-        queryFn: () => walletService.getSubscription(),
-        enabled: !!user?.tenantId,
-        staleTime: Infinity,
-        refetchOnWindowFocus: false,
-        ...options,
+        queryKey: ['subscription', effectiveTenantId, params || {}],
+        queryFn: () => walletService.getSubscription(effectiveTenantId, params || {}),
+        enabled: !!effectiveTenantId,
     });
 };
 
-export const useCardsQuery = (options = {}) => {
+export const useCardsQuery = () => {
     const { user } = useAuth();
     return useQuery({
         queryKey: ['cards', user?.tenantId],
         queryFn: () => walletService.listCards(),
         enabled: !!user?.tenantId,
-        staleTime: Infinity,
-        refetchOnWindowFocus: false,
-        ...options,
     });
 };
 
-export const useUsageSummaryQuery = (options = {}) => {
+export const useUsageSummaryQuery = () => {
     const { user } = useAuth();
     return useQuery({
         queryKey: ['usageSummary', user?.tenantId],
         queryFn: () => usageService.getUsageSummary().catch(() => ({ totalMinutes: 0, totalCost: 0 })),
         enabled: !!user?.tenantId,
-        staleTime: Infinity,
-        refetchOnWindowFocus: false,
-        ...options,
     });
 };
 
-export const useServiceStateQuery = (options = {}) => {
+export const useServiceStateQuery = () => {
     const { user } = useAuth();
     return useQuery({
         queryKey: ['serviceState', user?.tenantId],
         queryFn: () => usageService.getServiceState().catch(() => 'SERVICE_ACTIVE'),
         enabled: !!user?.tenantId,
-        staleTime: Infinity,
-        refetchOnWindowFocus: false,
-        ...options,
     });
 };
 
@@ -85,6 +73,9 @@ export const useWalletActions = () => {
         queryClient.invalidateQueries({ queryKey: ['wallet', tenantId] });
         queryClient.invalidateQueries({ queryKey: ['wallet-transactions', tenantId] });
         queryClient.invalidateQueries({ queryKey: ['subscription', tenantId] });
+        queryClient.invalidateQueries({ queryKey: ['cards', tenantId] });
+        queryClient.invalidateQueries({ queryKey: ['usageSummary', tenantId] });
+        queryClient.invalidateQueries({ queryKey: ['serviceState', tenantId] });
     }, [queryClient, user?.tenantId]);
 
     return { refreshWallet };

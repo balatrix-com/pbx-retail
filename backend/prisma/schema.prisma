@@ -724,38 +724,6 @@ enum InboundNormalization {
   AUTO_10DIGIT
 }
 
-model RateCard {
-  ratecardId            Int                @id @default(autoincrement()) @map("ratecard_id")
-  name                  String
-  currency              String             @default("USD") @db.Char(3)
-  country               String?
-  inRatePerMin          Decimal            @default(0.000000) @map("in_rate_per_min") @db.Decimal(14, 6)
-  inRatePerSec          Decimal?           @map("in_rate_per_sec") @db.Decimal(14, 8)
-  inInitialIncrementSec Int                @default(60) @map("in_initial_increment_sec")
-  inIncrementSec        Int                @default(60) @map("in_increment_sec")
-  obRatePerMin          Decimal            @default(0.000000) @map("ob_rate_per_min") @db.Decimal(14, 6)
-  obRatePerSec          Decimal?           @map("ob_rate_per_sec") @db.Decimal(14, 8)
-  obInitialIncrementSec Int                @default(60) @map("ob_initial_increment_sec")
-  obIncrementSec        Int                @default(60) @map("ob_increment_sec")
-  createdAt             DateTime           @default(now()) @map("created_at")
-  updatedAt             DateTime           @updatedAt @map("updated_at")
-  customerMappings      CustomerRatecard[]
-
-  @@map("rate_cards")
-}
-
-model CustomerRatecard {
-  customerId    String    @id @map("customer_id")
-  ratecardId    Int       @map("ratecard_id")
-  effectiveFrom DateTime  @default(now()) @map("effective_from")
-  effectiveTo   DateTime? @map("effective_to")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @default(now()) @map("updated_at")
-  rateCard      RateCard  @relation(fields: [ratecardId], references: [ratecardId], onDelete: Cascade)
-
-  @@map("customer_ratecard")
-}
-
 model RecRateCard {
   id               Int             @id @default(autoincrement())
   name             String

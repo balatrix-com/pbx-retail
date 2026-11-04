@@ -101,6 +101,7 @@ export class TenantsController {
             didForwardLimit?: number;
             monitorEnabled?: boolean;
             recordingAllowed?: boolean;
+            recRateCardId?: number;
         }
     ) {
         return this.tenantsService.updateTenantFeatures(id, body);

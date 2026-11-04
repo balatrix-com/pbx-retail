@@ -43,7 +43,7 @@ import CarriersGatewaysPage from './pages/admin/CarriersGatewaysPage';
 import BrandingSettingsPage from './pages/admin/BrandingSettingsPage';
 import ExtensionStatus from './pages/admin/ExtensionStatus';
 import PlansPage from './pages/admin/PlansPage';
-import SubscriptionsPage from './pages/billing/SubscriptionsPage';
+import SubscriptionsPage from './pages/admin/SubscriptionsPage';
 import CreatePlanPage from './pages/admin/CreatePlanPage';
 import OnboardingLayout from './pages/onboarding/OnboardingLayout';
 import TfnOnboardingPage from './pages/onboarding/TfnOnboardingPage';
