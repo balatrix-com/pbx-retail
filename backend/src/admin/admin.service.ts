@@ -200,6 +200,9 @@ export class AdminService {
             const response = await lastValueFrom(this.httpService.get(`${this.subBillingUrl}/rec-rate-cards/customer/${customerId}`));
             return response.data;
         } catch (error: any) {
+            if (error.response?.status === 404) {
+                return { success: true, data: null };
+            }
             this.handleProxyError(error, 'getCustomerRecRateCard');
         }
     }
