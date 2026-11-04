@@ -466,41 +466,53 @@ export class TenantsService {
                 );
             }
 
-            // Validate that the rate card exists in the local DB or sub-billing
-            let rcExists = await this.prisma.recRateCard.findUnique({
-                where: { id: dto.recRateCardId },
-            });
-            if (!rcExists) {
-                try {
-                    const billingCards = await this.adminService.getAllRecRateCards();
-                    const cardsList = Array.isArray(billingCards) ? billingCards : billingCards?.data || [];
-                    const found = cardsList.find((rc: any) => Number(rc.id) === Number(dto.recRateCardId));
-                    if (found) {
-                        rcExists = await this.prisma.recRateCard.upsert({
-                            where: { id: Number(found.id) },
-                            update: {
-                                name: found.name,
-                                currency: found.currency || 'USD',
-                                ratePerMin: found.rate_per_min || found.ratePerMin || 0,
-                                retentionPeriod: Number(found.retention_period || found.retentionPeriod || 15) as 7 | 15 | 30,
-                            },
-                            create: {
-                                id: Number(found.id),
-                                name: found.name,
-                                currency: found.currency || 'USD',
-                                ratePerMin: found.rate_per_min || found.ratePerMin || 0,
-                                retentionPeriod: Number(found.retention_period || found.retentionPeriod || 15) as 7 | 15 | 30,
-                            },
-                        }).catch(() => null);
-                    }
-                } catch (e: any) {
-                    this.logger.warn(`Could not sync rate card from sub-billing: ${e.message}`);
+            // Validate that the rate card exists in sub-billing (authoritative) or local DB
+            let cardFound: any = null;
+            try {
+                const billingCards = await this.adminService.getAllRecRateCards();
+                const cardsList = Array.isArray(billingCards) ? billingCards : billingCards?.data || [];
+                cardFound = cardsList.find((rc: any) => Number(rc.id) === Number(dto.recRateCardId));
+            } catch (e: any) {
+                this.logger.warn(`Could not fetch rate cards from sub-billing: ${e.message}`);
+            }
+
+            if (!cardFound) {
+                const localCard = await this.prisma.recRateCard.findUnique({
+                    where: { id: dto.recRateCardId },
+                }).catch(() => null);
+                if (localCard) {
+                    cardFound = localCard;
                 }
             }
-            if (!rcExists) {
+
+            if (!cardFound) {
                 throw new BadRequestException(
                     `Recording rate card id ${dto.recRateCardId} does not exist.`,
                 );
+            }
+
+            // Best-effort local sync
+            try {
+                if (this.prisma.recRateCard) {
+                    await this.prisma.recRateCard.upsert({
+                        where: { id: Number(cardFound.id) },
+                        update: {
+                            name: cardFound.name,
+                            currency: cardFound.currency || 'USD',
+                            ratePerMin: cardFound.rate_per_min || cardFound.ratePerMin || 0,
+                            retentionPeriod: Number(cardFound.retention_period || cardFound.retentionPeriod || 15) as 7 | 15 | 30,
+                        },
+                        create: {
+                            id: Number(cardFound.id),
+                            name: cardFound.name,
+                            currency: cardFound.currency || 'USD',
+                            ratePerMin: cardFound.rate_per_min || cardFound.ratePerMin || 0,
+                            retentionPeriod: Number(cardFound.retention_period || cardFound.retentionPeriod || 15) as 7 | 15 | 30,
+                        },
+                    });
+                }
+            } catch (syncErr: any) {
+                this.logger.warn(`Could not sync rec_rate_card locally: ${syncErr.message}`);
             }
 
             // Upsert the customer → rec rate card mapping via admin service

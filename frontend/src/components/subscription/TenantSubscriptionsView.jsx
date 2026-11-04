@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Package,
     CreditCard,
     Calendar,
     RefreshCw,
-    ArrowUpDown,
     CheckCircle2,
     AlertCircle,
     Loader2,
     Sparkles,
     Layers,
-    Trash2,
     Clock,
     Zap,
     Building2,
@@ -18,306 +15,430 @@ import {
     X,
     Search,
     ChevronRight,
-    Users
+    Users,
+    ArrowRight,
+    ArrowLeft,
+    Phone,
+    Shield,
+    History,
+    MoveRight,
+    Lock,
+    Unlock
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { useSubscriptionQuery } from '../../hooks/useBillingQueries';
 import { subscriptionService } from '../../services/subscription.service';
-import { addonsService } from '../../services/addons.service';
-import PlanSwitchModal from './PlanSwitchModal';
-import ConfirmActionModal from './ConfirmActionModal';
+
+const formatDate = (val) => {
+    if (!val) return '—';
+    try {
+        return new Date(val).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    } catch {
+        return '—';
+    }
+};
+
+const getDaysRemaining = (nextBilling) => {
+    if (!nextBilling) return null;
+    const now = new Date();
+    const target = new Date(nextBilling);
+    const diffTime = target.getTime() - now.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
 
 const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
     const { user, isSuperAdmin } = useAuth();
     const { addToast } = useToast();
 
-    // Tenants state for Super Admin
+    // Tenants state
     const [tenants, setTenants] = useState([]);
-    const [selectedTenantId, setSelectedTenantId] = useState('');
-
-    useEffect(() => {
+    const [selectedTenantId, setSelectedTenantId] = useState(() => {
         if (isSuperAdmin) {
-            api.get('/tenants?limit=100')
-                .then(res => {
-                    const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
-                    setTenants(list);
-                    if (list.length > 0 && !selectedTenantId) {
-                        setSelectedTenantId('all');
-                    }
-                })
-                .catch(err => {
-                    console.error('Failed to load tenants for selector:', err);
-                });
+            const param = new URLSearchParams(window.location.search).get('tenantId');
+            return param || 'all';
         }
-    }, [isSuperAdmin]);
+        return user?.tenantId || '';
+    });
 
     const isAllTenants = isSuperAdmin && selectedTenantId === 'all';
-    const effectiveTenantId = isSuperAdmin ? selectedTenantId : user?.tenantId;
+    const effectiveTenantId = isAllTenants ? null : (selectedTenantId || user?.tenantId);
     const currentTenant = isAllTenants ? null : tenants.find(t => t.id === effectiveTenantId);
     const isArchived = isAllTenants ? false : currentTenant?.status === 'ARCHIVED';
 
-    // Target tenant for modal actions (used when opening PlanSwitchModal from all-tenants view)
-    const [modalTargetTenant, setModalTargetTenant] = useState(null);
+    // Data states
+    const [loading, setLoading] = useState(false);
+    const [plans, setPlans] = useState([]);
+    const [allOverview, setAllOverview] = useState({ summary: null, data: [] });
+    const [tenantSubscriptions, setTenantSubscriptions] = useState([]);
+    const [tenantWallet, setTenantWallet] = useState(null);
 
     // Filters for All Tenants view
-    const [allSearchQuery, setAllSearchQuery] = useState('');
-    const [allStatusFilter, setAllStatusFilter] = useState('ALL');
-    const [allPlanFilter, setAllPlanFilter] = useState('ALL');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('ALL');
+    const [planFilter, setPlanFilter] = useState('ALL');
 
-    // Primary Subscription query
-    const {
-        data: subscription,
-        isLoading: subLoading,
-        isFetching: subFetching,
-        refetch: refetchSubscription
-    } = useSubscriptionQuery(effectiveTenantId, isAllTenants ? { limit: 100 } : {});
+    // Modals
+    const [activationModal, setActivationModal] = useState({
+        isOpen: false,
+        tenantId: '',
+        plan_id: '',
+        duration_count: 1,
+        duration_unit: 'months',
+        payment_mode: 'wallet',
+        auto_renew: true
+    });
+    const [quote, setQuote] = useState(null);
+    const [quoting, setQuoting] = useState(false);
+    const [submittingActivation, setSubmittingActivation] = useState(false);
 
-    // Add-on Subscriptions State
-    const [addons, setAddons] = useState([]);
-    const [addonsLoading, setAddonsLoading] = useState(false);
-    const [togglingPlanAutoRenew, setTogglingPlanAutoRenew] = useState(false);
-    const [togglingAddonId, setTogglingAddonId] = useState(null);
+    const [renewalModal, setRenewalModal] = useState({
+        isOpen: false,
+        subscription: null,
+        tenantId: ''
+    });
+    const [submittingRenewal, setSubmittingRenewal] = useState(false);
 
-    // Plan Switch Modal
-    const [planSwitchModalOpen, setPlanSwitchModalOpen] = useState(false);
+    const [reassignModal, setReassignModal] = useState({
+        isOpen: false,
+        tenantId: '',
+        asset: null,
+        targetSubscriptionId: ''
+    });
+    const [submittingReassign, setSubmittingReassign] = useState(false);
 
-    // Cancel Scheduled Switch State
-    const [cancellingSchedule, setCancellingSchedule] = useState(false);
+    const [historyModal, setHistoryModal] = useState({
+        isOpen: false,
+        subscription: null,
+        events: [],
+        loading: false
+    });
 
-    // Cancel Addon Modal State
-    const [addonToCancel, setAddonToCancel] = useState(null);
-    const [cancellingAddon, setCancellingAddon] = useState(false);
+    const [togglingAutoRenewId, setTogglingAutoRenewId] = useState(null);
 
-    const subscriptionId = isAllTenants ? null : (subscription?.id || subscription?.subscription_id);
-
-    // Fetch active add-ons when subscription is available (only for single tenant)
+    // Load tenants and plans
     useEffect(() => {
-        if (!isAllTenants && subscriptionId) {
-            fetchSubscriptionAddons(subscriptionId);
-        } else {
-            setAddons([]);
+        subscriptionService.getPlans().then(setPlans).catch(err => console.error('Failed to load plans:', err));
+        if (isSuperAdmin) {
+            api.get('/tenants', { params: { limit: 1000, status: 'ALL' } })
+                .then(res => {
+                    const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
+                    setTenants(list);
+                })
+                .catch(err => console.error('Failed to load tenants:', err));
         }
-    }, [isAllTenants, subscriptionId]);
+    }, [isSuperAdmin]);
 
-    const fetchSubscriptionAddons = async (subId) => {
-        setAddonsLoading(true);
+    // Main data fetch
+    const fetchData = async () => {
+        setLoading(true);
         try {
-            const data = await addonsService.getSubscriptionAddons(subId);
-            setAddons(Array.isArray(data) ? data : []);
+            if (isAllTenants) {
+                const res = await subscriptionService.getAllSubscriptions();
+                setAllOverview({
+                    summary: res?.summary || null,
+                    data: Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+                });
+            } else if (effectiveTenantId) {
+                const [subsRes, walletRes] = await Promise.all([
+                    subscriptionService.getSubscriptions(effectiveTenantId),
+                    api.get('/wallet', { params: { tenantId: effectiveTenantId } }).catch(() => null)
+                ]);
+                setTenantSubscriptions(Array.isArray(subsRes) ? subsRes : (subsRes?.data || []));
+                setTenantWallet(walletRes?.data || null);
+            }
         } catch (err) {
-            console.error('Failed to fetch subscription add-ons:', err);
-            // Graceful fallback: set empty array if none found
-            setAddons([]);
+            console.error('Failed to load subscriptions:', err);
+            addToast('error', err.response?.data?.message || 'Failed to load subscription data');
         } finally {
-            setAddonsLoading(false);
+            setLoading(false);
         }
     };
 
-    const handleRefreshAll = () => {
-        refetchSubscription();
-        if (!isAllTenants && subscriptionId) {
-            fetchSubscriptionAddons(subscriptionId);
-        }
-    };
+    useEffect(() => {
+        fetchData();
+    }, [isAllTenants, effectiveTenantId]);
 
-    // Cancel Scheduled Plan Switch
-    const handleCancelScheduledSwitch = async () => {
-        if (cancellingSchedule) return;
-        if (!window.confirm('Are you sure you want to cancel the scheduled plan switch? Your current plan will remain active and renew normally.')) {
+    // Live quote calculation when activation parameters change
+    useEffect(() => {
+        if (!activationModal.isOpen || !activationModal.plan_id) {
+            setQuote(null);
             return;
         }
-        setCancellingSchedule(true);
-        try {
-            const res = await subscriptionService.cancelScheduledSwitch(effectiveTenantId);
-            addToast('success', res?.message || 'Scheduled plan switch cancelled successfully.');
-            handleRefreshAll();
-        } catch (err) {
-            console.error('Failed to cancel scheduled plan switch:', err);
-            const msg = err.response?.data?.message || err.normalized?.message || 'Failed to cancel scheduled plan switch';
-            addToast('error', msg);
-        } finally {
-            setCancellingSchedule(false);
-        }
-    };
 
-    // Toggle Primary Plan Auto-Renew
-    const handleTogglePlanAutoRenew = async () => {
-        if (togglingPlanAutoRenew) return;
-        const currentVal = !!subscription?.auto_renew;
-        const nextVal = !currentVal;
-
-        setTogglingPlanAutoRenew(true);
-        try {
-            await subscriptionService.toggleAutoRenew(effectiveTenantId, nextVal);
-            addToast('success', `Plan auto-renew turned ${nextVal ? 'ON' : 'OFF'}`);
-            refetchSubscription();
-        } catch (err) {
-            console.error('Failed to toggle plan auto-renew:', err);
-            const msg = err.response?.data?.message || err.normalized?.message || 'Failed to update auto-renew setting';
-            addToast('error', msg);
-        } finally {
-            setTogglingPlanAutoRenew(false);
-        }
-    };
-
-    // Toggle Add-on Auto-Renew
-    const handleToggleAddonAutoRenew = async (addonItem) => {
-        const addonSubId = addonItem.id || addonItem.subscription_addon_id;
-        if (!addonSubId || togglingAddonId === addonSubId) return;
-
-        const nextVal = !addonItem.auto_renew;
-        setTogglingAddonId(addonSubId);
-
-        // Optimistic UI update
-        setAddons(prev => prev.map(item => {
-            const id = item.id || item.subscription_addon_id;
-            return id === addonSubId ? { ...item, auto_renew: nextVal } : item;
-        }));
-
-        try {
-            await addonsService.toggleAutoRenew(addonSubId, nextVal);
-            addToast('success', `Add-on auto-renew turned ${nextVal ? 'ON' : 'OFF'}`);
-        } catch (err) {
-            console.error('Failed to toggle add-on auto-renew:', err);
-            // Revert optimistic update
-            setAddons(prev => prev.map(item => {
-                const id = item.id || item.subscription_addon_id;
-                return id === addonSubId ? { ...item, auto_renew: !nextVal } : item;
-            }));
-            const msg = err.response?.data?.message || err.normalized?.message || 'Failed to update add-on auto-renew';
-            addToast('error', msg);
-        } finally {
-            setTogglingAddonId(null);
-        }
-    };
-
-    // Confirm cancel add-on
-    const handleConfirmCancelAddon = async () => {
-        if (!addonToCancel) return;
-        const addonSubId = addonToCancel.id || addonToCancel.subscription_addon_id;
-        setCancellingAddon(true);
-        try {
-            await addonsService.cancelSubscriptionAddon(addonSubId);
-            addToast('success', 'Add-on subscription cancelled successfully');
-            setAddonToCancel(null);
-            if (subscriptionId) {
-                fetchSubscriptionAddons(subscriptionId);
+        let cancelled = false;
+        setQuoting(true);
+        const timer = setTimeout(async () => {
+            try {
+                const q = await subscriptionService.getQuote({
+                    tenantId: activationModal.tenantId,
+                    plan_id: activationModal.plan_id,
+                    duration_unit: activationModal.duration_unit,
+                    duration_count: activationModal.duration_count
+                });
+                if (!cancelled) setQuote(q);
+            } catch (err) {
+                if (!cancelled) {
+                    console.error('Quote calculation error:', err);
+                    setQuote(null);
+                }
+            } finally {
+                if (!cancelled) setQuoting(false);
             }
+        }, 300);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [activationModal.isOpen, activationModal.plan_id, activationModal.duration_count, activationModal.duration_unit, activationModal.tenantId]);
+
+    // Toggle Auto-Renew
+    const handleToggleAutoRenew = async (subId, currentVal, targetTenant) => {
+        if (!subId || togglingAutoRenewId === subId) return;
+        const tenantToUse = targetTenant || effectiveTenantId;
+        setTogglingAutoRenewId(subId);
+        try {
+            await subscriptionService.toggleAutoRenew(subId, !currentVal, tenantToUse);
+            addToast('success', `Auto-renew turned ${!currentVal ? 'ON' : 'OFF'}`);
+            fetchData();
         } catch (err) {
-            console.error('Failed to cancel addon subscription:', err);
-            const msg = err.response?.data?.message || err.normalized?.message || 'Failed to cancel add-on';
-            addToast('error', msg);
+            console.error('Auto-renew toggle failed:', err);
+            addToast('error', err.response?.data?.message || 'Failed to update auto-renew');
         } finally {
-            setCancellingAddon(false);
+            setTogglingAutoRenewId(null);
         }
     };
 
-    // Calculate days remaining helper
-    const getDaysRemaining = (expiryDate) => {
-        if (!expiryDate) return null;
-        const diffTime = new Date(expiryDate).getTime() - new Date().getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays;
+    // Confirm Plan Activation
+    const handleConfirmActivation = async (e) => {
+        e.preventDefault();
+        if (submittingActivation) return;
+        setSubmittingActivation(true);
+        try {
+            await subscriptionService.activateSubscription({
+                tenantId: activationModal.tenantId,
+                plan_id: activationModal.plan_id,
+                duration_count: Number(activationModal.duration_count),
+                duration_unit: activationModal.duration_unit,
+                payment_mode: activationModal.payment_mode,
+                auto_renew: activationModal.auto_renew,
+                operation_key: `act:${activationModal.tenantId}:${activationModal.plan_id}:${Date.now()}`
+            });
+            addToast('success', 'Subscription activated successfully');
+            setActivationModal(prev => ({ ...prev, isOpen: false }));
+            fetchData();
+        } catch (err) {
+            console.error('Activation failed:', err);
+            addToast('error', err.response?.data?.message || 'Failed to activate subscription');
+        } finally {
+            setSubmittingActivation(false);
+        }
     };
 
-    // All Tenants data and filtering
-    const rawAllTenantsList = useMemo(() => {
-        if (!isAllTenants) return [];
-        if (Array.isArray(subscription?.data)) return subscription.data;
-        if (Array.isArray(subscription)) return subscription;
-        return [];
-    }, [isAllTenants, subscription]);
+    // Confirm Manual Renewal
+    const handleConfirmRenewal = async () => {
+        if (!renewalModal.subscription || submittingRenewal) return;
+        setSubmittingRenewal(true);
+        try {
+            await subscriptionService.renewSubscription(renewalModal.subscription.id, {
+                tenantId: renewalModal.tenantId,
+                operation_key: `renew:${renewalModal.subscription.id}:${Date.now()}`
+            });
+            addToast('success', 'Subscription renewed successfully');
+            setRenewalModal({ isOpen: false, subscription: null, tenantId: '' });
+            fetchData();
+        } catch (err) {
+            console.error('Renewal failed:', err);
+            addToast('error', err.response?.data?.message || 'Failed to renew subscription');
+        } finally {
+            setSubmittingRenewal(false);
+        }
+    };
 
+    // Confirm Asset Move
+    const handleConfirmReassign = async (e) => {
+        e.preventDefault();
+        if (!reassignModal.asset || !reassignModal.targetSubscriptionId || submittingReassign) return;
+        setSubmittingReassign(true);
+        try {
+            await subscriptionService.reassignAsset({
+                tenantId: reassignModal.tenantId,
+                asset_id: reassignModal.asset.id,
+                type: reassignModal.asset.type,
+                target_subscription_id: reassignModal.targetSubscriptionId
+            });
+            addToast('success', 'Asset moved successfully');
+            setReassignModal({ isOpen: false, tenantId: '', asset: null, targetSubscriptionId: '' });
+            fetchData();
+        } catch (err) {
+            console.error('Asset reassignment failed:', err);
+            addToast('error', err.response?.data?.message || 'Failed to move asset');
+        } finally {
+            setSubmittingReassign(false);
+        }
+    };
+
+    // Transition (Freeze, Cancel, Release)
+    const handleTransition = async (subId, transition, targetTenant) => {
+        if (!window.confirm(`Are you sure you want to ${transition} this subscription?`)) return;
+        try {
+            await subscriptionService.transitionSubscription(subId, transition, targetTenant || effectiveTenantId);
+            addToast('success', `Subscription ${transition} executed`);
+            fetchData();
+        } catch (err) {
+            console.error(`Transition ${transition} failed:`, err);
+            addToast('error', err.response?.data?.message || `Failed to ${transition} subscription`);
+        }
+    };
+
+    // Open History Modal
+    const handleOpenHistory = async (sub, targetTenant) => {
+        setHistoryModal({ isOpen: true, subscription: sub, events: [], loading: true });
+        try {
+            const data = await subscriptionService.getSubscriptionHistory(sub.id, targetTenant || effectiveTenantId);
+            setHistoryModal(prev => ({ ...prev, events: Array.isArray(data) ? data : [], loading: false }));
+        } catch (err) {
+            console.error('Failed to load history:', err);
+            setHistoryModal(prev => ({ ...prev, loading: false }));
+            addToast('error', 'Failed to load subscription history');
+        }
+    };
+
+    // Open Activation Modal pre-filled for a tenant
+    const openActivationModal = (tenantId, defaultPlanId = '') => {
+        const firstPlan = plans[0];
+        setActivationModal({
+            isOpen: true,
+            tenantId: tenantId || effectiveTenantId,
+            plan_id: defaultPlanId || firstPlan?.plan_id || '',
+            duration_count: firstPlan?.duration_count || firstPlan?.validity_months || 1,
+            duration_unit: firstPlan?.duration_unit || 'months',
+            payment_mode: 'wallet',
+            auto_renew: true
+        });
+    };
+
+    // Filtered All Tenants data
+    const rawAllTenantsList = allOverview.data || [];
     const filteredAllTenants = useMemo(() => {
-        if (!isAllTenants) return [];
         return rawAllTenantsList.filter(item => {
-            // Status filter
-            if (allStatusFilter !== 'ALL' && item.tenantStatus?.toUpperCase() !== allStatusFilter) {
-                return false;
-            }
-            // Plan filter
-            if (allPlanFilter === 'SUBSCRIBED' && !item.hasSubscription) return false;
-            if (allPlanFilter === 'NO_PLAN' && item.hasSubscription) return false;
+            if (statusFilter !== 'ALL' && item.tenantStatus?.toUpperCase() !== statusFilter) return false;
+            if (planFilter === 'SUBSCRIBED' && !item.hasSubscription) return false;
+            if (planFilter === 'NO_PLAN' && item.hasSubscription) return false;
 
-            // Search query
-            if (allSearchQuery.trim()) {
-                const q = allSearchQuery.toLowerCase();
-                const matchesName = (item.tenantName || '').toLowerCase().includes(q);
-                const matchesCode = (item.customerCode || '').toLowerCase().includes(q);
-                const matchesEmail = (item.adminEmail || '').toLowerCase().includes(q);
-                const matchesPlan = (item.subscription?.plan_name || '').toLowerCase().includes(q);
-                const matchesCustId = (item.subBillingCustomerId || '').toLowerCase().includes(q);
-                return matchesName || matchesCode || matchesEmail || matchesPlan || matchesCustId;
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
+                const matchesName = item.tenantName?.toLowerCase().includes(q);
+                const matchesCode = item.customerCode?.toLowerCase().includes(q);
+                const matchesEmail = item.adminEmail?.toLowerCase().includes(q);
+                const matchesPlan = item.subscription?.plan_name?.toLowerCase().includes(q);
+                return Boolean(matchesName || matchesCode || matchesEmail || matchesPlan);
             }
-
             return true;
         });
-    }, [isAllTenants, rawAllTenantsList, allStatusFilter, allPlanFilter, allSearchQuery]);
+    }, [rawAllTenantsList, statusFilter, planFilter, searchQuery]);
 
-    // KPI counts for All Tenants
-    const allStats = useMemo(() => {
+    // KPI stats
+    const stats = useMemo(() => {
+        if (allOverview.summary) return allOverview.summary;
         const total = rawAllTenantsList.length;
-        const subscribed = rawAllTenantsList.filter(t => t.hasSubscription).length;
-        const noPlan = total - subscribed;
-        const archived = rawAllTenantsList.filter(t => t.tenantStatus === 'ARCHIVED').length;
-        return { total, subscribed, noPlan, archived };
-    }, [rawAllTenantsList]);
+        const active = rawAllTenantsList.filter(t => t.hasSubscription).length;
+        const noPlan = total - active;
+        const deactivated = rawAllTenantsList.filter(t => t.tenantStatus !== 'ACTIVE').length;
+        return { totalTenants: total, activeSubscriptions: active, noActivePlan: noPlan, deactivatedOrgs: deactivated };
+    }, [allOverview.summary, rawAllTenantsList]);
+
+    // Summary of active subscriptions for single tenant
+    const activeSingleTenantSubs = useMemo(() => {
+        return tenantSubscriptions.filter(s => ['active', 'grace'].includes(s.status));
+    }, [tenantSubscriptions]);
+
+    const activeAssetsSummary = useMemo(() => {
+        const result = { extensions: { total: 0, used: 0 }, numbers: { total: 0, used: 0 }, monitoring_extensions: { total: 0, used: 0 } };
+        for (const s of activeSingleTenantSubs) {
+            const entitlements = s.entitlement_snapshot || {};
+            const usage = s.usage || {};
+            result.extensions.total += Number(entitlements.extensions || 0);
+            result.extensions.used += Number(usage.extensions || 0);
+            result.numbers.total += Number(entitlements.numbers || 0);
+            result.numbers.used += Number(usage.numbers || 0);
+            result.monitoring_extensions.total += Number(entitlements.monitoring_extensions || 0);
+            result.monitoring_extensions.used += Number(usage.monitoring_extensions || 0);
+        }
+        return result;
+    }, [activeSingleTenantSubs]);
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-300">
-
-            {/* Top Toolbar / Refresh Status */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-                <div>
-                    <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
-                        <CreditCard className="h-6 w-6 text-primary-600 dark:text-primary-400" />
-                        Subscription & Recurring Services
-                    </h2>
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                        Manage active plan, recurring add-ons, and automated renewals
-                    </p>
-                </div>
+        <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Header controls & Tenant selector */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-200/80 dark:border-slate-800 shadow-xs">
                 <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
+                        <CreditCard className="h-6 w-6 stroke-[2.2]" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-extrabold text-gray-900 dark:text-white">
+                            Subscription & Recurring Services
+                        </h2>
+                        <p className="text-xs font-medium text-gray-500 dark:text-slate-400">
+                            {isAllTenants ? 'Managing active plans across all tenant accounts' : `Managing subscriptions for ${currentTenant?.name || 'Selected Tenant'}`}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                    {/* Tenant Selector Dropdown (SuperAdmin only) */}
                     {isSuperAdmin && (
-                        <div className="relative bg-white dark:bg-slate-800 border border-gray-200/90 dark:border-slate-700 shadow-xs rounded-xl flex items-center px-3 py-1.5 gap-2 hover:border-slate-300 transition-all">
-                            <Building2 className="h-4 w-4 text-primary-600 dark:text-primary-400 shrink-0" />
+                        <div className="relative">
                             <select
                                 value={selectedTenantId}
                                 onChange={(e) => setSelectedTenantId(e.target.value)}
-                                className="bg-transparent text-xs font-bold text-gray-800 dark:text-slate-200 pr-5 py-0.5 focus:outline-none cursor-pointer border-none ring-0 appearance-none font-sans"
-                                style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
+                                className="appearance-none pl-9 pr-9 py-2 rounded-xl text-xs font-bold bg-gray-50/70 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer shadow-xs"
                             >
-                                {tenants.length === 0 && (
-                                    <option value="">No Tenants</option>
-                                )}
-                                <option value="all" className="dark:bg-slate-800 font-bold">
-                                    🏢 All Tenants
-                                </option>
-                                {tenants.map((t) => (
-                                    <option key={t.id} value={t.id} className="dark:bg-slate-800">
-                                        🏢 {t.name} {t.status === 'ARCHIVED' ? '(Deactivated)' : ''}
-                                    </option>
-                                ))}
+                                <option value="all">🏢 All Tenants Overview</option>
+                                <optgroup label="Individual Tenants">
+                                    {tenants.map(t => (
+                                        <option key={t.id} value={t.id}>
+                                            {t.name} ({t.customerCode || t.id.slice(0, 8)}) {t.status === 'ARCHIVED' ? '— Deactivated' : ''}
+                                        </option>
+                                    ))}
+                                </optgroup>
                             </select>
-                            <ChevronDown className="h-3.5 w-3.5 text-gray-400 pointer-events-none -ml-4" />
+                            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
                         </div>
                     )}
+
                     <button
-                        onClick={handleRefreshAll}
-                        disabled={subFetching || addonsLoading}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition shadow-xs disabled:opacity-50"
-                        title="Refresh Subscriptions"
+                        type="button"
+                        onClick={fetchData}
+                        disabled={loading}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 transition border border-gray-200 dark:border-slate-700 shadow-xs"
                     >
-                        <RefreshCw className={`h-3.5 w-3.5 ${(subFetching || addonsLoading) ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-primary-600' : ''}`} />
                         <span>Sync Status</span>
                     </button>
+
+                    {!isAllTenants && (
+                        <button
+                            type="button"
+                            onClick={() => openActivationModal(effectiveTenantId)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white transition shadow-xs"
+                        >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            <span>Activate Plan</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* ========================================================================= */}
-            {/* VIEW A: All Tenants Subscriptions Overview (when selectedTenantId === 'all') */}
+            {/* VIEW A: All Tenants Overview Table (when selectedTenantId === 'all')      */}
             {/* ========================================================================= */}
             {isAllTenants ? (
                 <div className="space-y-6">
@@ -328,12 +449,8 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                 <Building2 className="h-5 w-5" />
                             </div>
                             <div>
-                                <div className="text-xl font-extrabold text-gray-900 dark:text-white">
-                                    {allStats.total}
-                                </div>
-                                <div className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Total Tenants
-                                </div>
+                                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-slate-500">Total Tenants</span>
+                                <div className="text-xl font-black text-gray-900 dark:text-white mt-0.5">{stats.totalTenants}</div>
                             </div>
                         </div>
 
@@ -342,12 +459,8 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                 <CheckCircle2 className="h-5 w-5" />
                             </div>
                             <div>
-                                <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                                    {allStats.subscribed}
-                                </div>
-                                <div className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Active Subscriptions
-                                </div>
+                                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-slate-500">Active Subscriptions</span>
+                                <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{stats.activeSubscriptions}</div>
                             </div>
                         </div>
 
@@ -356,12 +469,8 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                 <AlertCircle className="h-5 w-5" />
                             </div>
                             <div>
-                                <div className="text-xl font-extrabold text-amber-600 dark:text-amber-400">
-                                    {allStats.noPlan}
-                                </div>
-                                <div className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
-                                    No Active Plan
-                                </div>
+                                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-slate-500">No Active Plan</span>
+                                <div className="text-xl font-black text-amber-600 dark:text-amber-400 mt-0.5">{stats.noActivePlan}</div>
                             </div>
                         </div>
 
@@ -370,12 +479,8 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                 <Layers className="h-5 w-5" />
                             </div>
                             <div>
-                                <div className="text-xl font-extrabold text-gray-900 dark:text-white">
-                                    {allStats.archived}
-                                </div>
-                                <div className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Deactivated Orgs
-                                </div>
+                                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-slate-500">Deactivated Orgs</span>
+                                <div className="text-xl font-black text-rose-600 dark:text-rose-400 mt-0.5">{stats.deactivatedOrgs}</div>
                             </div>
                         </div>
                     </div>
@@ -387,14 +492,14 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                             <input
                                 type="text"
                                 placeholder="Search by tenant name, code, email, or plan..."
-                                value={allSearchQuery}
-                                onChange={(e) => setAllSearchQuery(e.target.value)}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-9 pr-8 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition"
                             />
-                            {allSearchQuery && (
+                            {searchQuery && (
                                 <button
                                     type="button"
-                                    onClick={() => setAllSearchQuery('')}
+                                    onClick={() => setSearchQuery('')}
                                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                 >
                                     <X className="h-3.5 w-3.5" />
@@ -404,8 +509,8 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
 
                         <div className="flex items-center gap-2">
                             <select
-                                value={allStatusFilter}
-                                onChange={(e) => setAllStatusFilter(e.target.value)}
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
                                 className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-50/50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
                             >
                                 <option value="ALL">All Statuses</option>
@@ -414,8 +519,8 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                             </select>
 
                             <select
-                                value={allPlanFilter}
-                                onChange={(e) => setAllPlanFilter(e.target.value)}
+                                value={planFilter}
+                                onChange={(e) => setPlanFilter(e.target.value)}
                                 className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-50/50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
                             >
                                 <option value="ALL">All Plan Types</option>
@@ -427,7 +532,7 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
 
                     {/* All Tenants Table */}
                     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200/80 dark:border-slate-800 overflow-hidden">
-                        {subLoading ? (
+                        {loading ? (
                             <div className="flex items-center justify-center py-16 gap-3 text-sm text-gray-500 dark:text-slate-400 font-medium">
                                 <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
                                 <span>Loading all tenant subscriptions...</span>
@@ -441,7 +546,7 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                 </p>
                             </div>
                         ) : (
-                            <div className="w-full overflow-hidden">
+                            <div className="w-full overflow-x-auto">
                                 <table className="w-full divide-y divide-gray-100 dark:divide-slate-800 text-left">
                                     <thead className="bg-gray-50/70 dark:bg-slate-800/50">
                                         <tr>
@@ -459,6 +564,7 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                             const isOrgArchived = t.tenantStatus === 'ARCHIVED';
                                             const sub = t.subscription;
                                             const daysLeft = sub?.next_billing ? getDaysRemaining(sub.next_billing) : null;
+                                            const isToggling = togglingAutoRenewId === sub?.id;
 
                                             return (
                                                 <tr key={t.tenantId} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors">
@@ -508,14 +614,8 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                                                     </span>
                                                                 </div>
                                                                 <div className="text-xs font-mono font-bold text-gray-500 dark:text-slate-400">
-                                                                    ${Number(sub.amount || 0).toFixed(2)} / mo
+                                                                    ${Number(sub.renewal_price || sub.amount || 0).toFixed(2)} {sub.currency || 'USD'}
                                                                 </div>
-                                                                {sub.target_plan_name && (
-                                                                    <div className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-400">
-                                                                        <Clock className="h-2.5 w-2.5 shrink-0" />
-                                                                        <span>Switch: {sub.target_plan_name}</span>
-                                                                    </div>
-                                                                )}
                                                             </div>
                                                         ) : (
                                                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
@@ -528,19 +628,16 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                                     {/* Limits & Add-ons */}
                                                     <td className="px-4 py-3.5">
                                                         {t.hasSubscription && sub ? (
-                                                            <div className="space-y-1.5">
-                                                                <div className="flex items-center gap-1.5 text-xs font-mono text-gray-700 dark:text-slate-300">
+                                                            <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono text-gray-700 dark:text-slate-300">
+                                                                <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
+                                                                    {sub.limits?.extensions ?? 0} Ext
+                                                                </span>
+                                                                <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
+                                                                    {sub.limits?.numbers ?? 0} DIDs
+                                                                </span>
+                                                                {sub.limits?.monitoring_extensions !== undefined && (
                                                                     <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
-                                                                        {sub.limits?.extensions ?? 0} Ext
-                                                                    </span>
-                                                                    <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
-                                                                        {sub.limits?.free_mins ?? 0} Mins
-                                                                    </span>
-                                                                </div>
-                                                                {sub.active_addons_count > 0 && (
-                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60">
-                                                                        <Layers className="h-3 w-3" />
-                                                                        {sub.active_addons_count} {sub.active_addons_count === 1 ? 'Add-on' : 'Add-ons'}
+                                                                        {sub.limits.monitoring_extensions} Mon
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -555,13 +652,7 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                                             <div className="space-y-0.5">
                                                                 <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
                                                                     <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                                                                    <span>
-                                                                        {new Date(sub.next_billing).toLocaleDateString(undefined, {
-                                                                            month: 'short',
-                                                                            day: 'numeric',
-                                                                            year: 'numeric'
-                                                                        })}
-                                                                    </span>
+                                                                    <span>{formatDate(sub.next_billing)}</span>
                                                                 </div>
                                                                 {daysLeft !== null && (
                                                                     <div className="text-xs font-medium text-gray-500 dark:text-slate-400 flex items-center gap-1">
@@ -575,16 +666,27 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                                         )}
                                                     </td>
 
-                                                    {/* Auto-Renew */}
+                                                    {/* Auto-Renew Interactive Toggle */}
                                                     <td className="px-4 py-3.5 text-center">
                                                         {t.hasSubscription && sub ? (
-                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                                                                sub.auto_renew
-                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                                                                    : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-slate-700'
-                                                            }`}>
-                                                                {sub.auto_renew ? 'ON' : 'OFF'}
-                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleToggleAutoRenew(sub.id, sub.auto_renew, t.tenantId)}
+                                                                disabled={isToggling || isOrgArchived}
+                                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition shadow-2xs ${
+                                                                    sub.auto_renew
+                                                                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+                                                                        : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-200'
+                                                                } disabled:opacity-50`}
+                                                                title="Click to toggle auto-renewal"
+                                                            >
+                                                                {isToggling ? (
+                                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                                ) : (
+                                                                    <span className={`h-2 w-2 rounded-full ${sub.auto_renew ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                                                )}
+                                                                <span>{sub.auto_renew ? 'ON' : 'OFF'}</span>
+                                                            </button>
                                                         ) : (
                                                             <span className="text-xs text-gray-400">—</span>
                                                         )}
@@ -595,35 +697,38 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                                                         <div className="text-sm font-extrabold text-gray-900 dark:text-white">
                                                             ${Number(t.wallet?.balance || 0).toFixed(2)}
                                                         </div>
-                                                        {t.wallet?.freeMins > 0 && (
-                                                            <div className="text-xs text-gray-400 dark:text-slate-500">
-                                                                {t.wallet.freeMins} free mins
-                                                            </div>
-                                                        )}
                                                     </td>
 
-                                                    {/* Actions: Change / Assign stacked on top of Manage */}
+                                                    {/* Actions */}
                                                     <td className="px-4 py-3.5 text-right">
                                                         <div className="flex flex-col items-end gap-1.5 ml-auto w-fit">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setModalTargetTenant(t);
-                                                                    setPlanSwitchModalOpen(true);
-                                                                }}
-                                                                disabled={isOrgArchived}
-                                                                title={isOrgArchived ? "Subscription changes disabled for deactivated tenants." : (t.hasSubscription ? "Change Plan" : "Assign Plan")}
-                                                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800/60 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                                                            >
-                                                                <Sparkles className="h-3 w-3" />
-                                                                <span>{t.hasSubscription ? 'Change' : 'Assign'}</span>
-                                                            </button>
+                                                            {t.hasSubscription && sub ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setRenewalModal({ isOpen: true, subscription: sub, tenantId: t.tenantId })}
+                                                                    disabled={isOrgArchived}
+                                                                    className="w-full inline-flex items-center justify-center gap-1 px-3 py-1 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition shadow-xs disabled:opacity-40"
+                                                                >
+                                                                    <RefreshCw className="h-3 w-3" />
+                                                                    <span>Renew</span>
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openActivationModal(t.tenantId)}
+                                                                    disabled={isOrgArchived}
+                                                                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800/60 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition shadow-xs disabled:opacity-40"
+                                                                >
+                                                                    <Sparkles className="h-3 w-3" />
+                                                                    <span>Assign Plan</span>
+                                                                </button>
+                                                            )}
 
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setSelectedTenantId(t.tenantId)}
-                                                                title="View detailed tenant subscriptions and add-ons"
-                                                                className="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-primary-600 text-white hover:bg-primary-700 transition shadow-xs active:scale-95"
+                                                                title="View detailed tenant subscriptions and capacity"
+                                                                className="w-full inline-flex items-center justify-center gap-1 px-3 py-1 rounded-lg text-xs font-bold bg-primary-600 text-white hover:bg-primary-700 transition shadow-xs active:scale-95"
                                                             >
                                                                 <span>Manage</span>
                                                                 <ChevronRight className="h-3.5 w-3.5" />
@@ -641,639 +746,669 @@ const TenantSubscriptionsView = ({ onBrowseCatalog, onBrowsePlans }) => {
                 </div>
             ) : (
                 /* ========================================================================= */
-                /* VIEW B: Single Tenant View (when a specific tenant is selected)            */
+                /* VIEW B: Single Tenant Detailed View                                       */
                 /* ========================================================================= */
-                <>
-                    {/* Deactivation Warning Banner */}
-                    {isArchived && (
-                        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 flex items-center gap-3 shadow-xs animate-in fade-in duration-200">
-                            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-                            <p className="text-sm font-semibold">
-                                This organization is deactivated. Subscriptions, recurring renewals, and add-on purchases are locked.
-                            </p>
-                        </div>
+                <div className="space-y-6">
+                    {/* Top navigation back to all tenants */}
+                    {isSuperAdmin && (
+                        <button
+                            type="button"
+                            onClick={() => setSelectedTenantId('all')}
+                            className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white transition"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            <span>Back to All Tenants Overview</span>
+                        </button>
                     )}
-                    {/* ========================================================================= */}
-                    {/* SECTION 2A: Primary Subscription Table                                    */}
-                    {/* ========================================================================= */}
+
+                    {/* Tenant Info & Capacity Card */}
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-gray-200/80 dark:border-slate-800 shadow-xs space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-gray-100 dark:border-slate-800">
+                            <div>
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-xl font-black text-gray-900 dark:text-white">
+                                        {currentTenant?.name || 'Organization Subscriptions'}
+                                    </h3>
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                        isArchived
+                                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                    }`}>
+                                        {isArchived ? 'Deactivated' : 'Active'}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                                    Customer Code: <span className="font-mono font-bold text-gray-700 dark:text-slate-300">{currentTenant?.customerCode || '—'}</span>
+                                    {currentTenant?.adminEmail && ` • Admin: ${currentTenant.adminEmail}`}
+                                </p>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-slate-500">Wallet Balance</span>
+                                    <div className="text-lg font-black font-mono text-gray-900 dark:text-white">
+                                        ${Number(tenantWallet?.balance || 0).toFixed(2)}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => openActivationModal(effectiveTenantId)}
+                                    disabled={isArchived}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white transition shadow-xs disabled:opacity-40"
+                                >
+                                    <Sparkles className="h-4 w-4" />
+                                    <span>Activate New Plan</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Resource Capacity Meters */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Extensions */}
+                            <div className="bg-gray-50/70 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-100 dark:border-slate-800">
+                                <div className="flex items-center justify-between text-xs font-bold mb-2">
+                                    <span className="text-gray-600 dark:text-slate-300 flex items-center gap-1.5">
+                                        <Users className="h-4 w-4 text-blue-500" />
+                                        Extensions
+                                    </span>
+                                    <span className="font-mono text-gray-900 dark:text-white">
+                                        {activeAssetsSummary.extensions.used} / {activeAssetsSummary.extensions.total}
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                                    <div
+                                        className="bg-blue-500 h-full rounded-full transition-all duration-300"
+                                        style={{ width: `${activeAssetsSummary.extensions.total ? Math.min(100, (activeAssetsSummary.extensions.used / activeAssetsSummary.extensions.total) * 100) : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Numbers */}
+                            <div className="bg-gray-50/70 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-100 dark:border-slate-800">
+                                <div className="flex items-center justify-between text-xs font-bold mb-2">
+                                    <span className="text-gray-600 dark:text-slate-300 flex items-center gap-1.5">
+                                        <Phone className="h-4 w-4 text-emerald-500" />
+                                        Phone Numbers / DIDs
+                                    </span>
+                                    <span className="font-mono text-gray-900 dark:text-white">
+                                        {activeAssetsSummary.numbers.used} / {activeAssetsSummary.numbers.total}
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                                    <div
+                                        className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                                        style={{ width: `${activeAssetsSummary.numbers.total ? Math.min(100, (activeAssetsSummary.numbers.used / activeAssetsSummary.numbers.total) * 100) : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Monitoring */}
+                            <div className="bg-gray-50/70 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-100 dark:border-slate-800">
+                                <div className="flex items-center justify-between text-xs font-bold mb-2">
+                                    <span className="text-gray-600 dark:text-slate-300 flex items-center gap-1.5">
+                                        <Shield className="h-4 w-4 text-purple-500" />
+                                        Monitoring Seats
+                                    </span>
+                                    <span className="font-mono text-gray-900 dark:text-white">
+                                        {activeAssetsSummary.monitoring_extensions.used} / {activeAssetsSummary.monitoring_extensions.total}
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                                    <div
+                                        className="bg-purple-500 h-full rounded-full transition-all duration-300"
+                                        style={{ width: `${activeAssetsSummary.monitoring_extensions.total ? Math.min(100, (activeAssetsSummary.monitoring_extensions.used / activeAssetsSummary.monitoring_extensions.total) * 100) : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Subscriptions List */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
-                            <Sparkles className="h-4 w-4" />
+                            <h4 className="text-base font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
+                                <Layers className="h-5 w-5 text-primary-600" />
+                                <span>Subscription Packages & Add-ons ({tenantSubscriptions.length})</span>
+                            </h4>
                         </div>
-                        <h3 className="text-base font-extrabold text-gray-900 dark:text-white tracking-tight">
-                            Primary Subscription
-                        </h3>
-                    </div>
-                </div>
 
-                {/* Scheduled Switch Pending Alert Banner */}
-                {subscription?.target_plan_name && (
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-500/15 dark:via-amber-950/30 dark:to-transparent border-2 border-amber-400/80 dark:border-amber-500/50 p-5 shadow-lg shadow-amber-500/5 backdrop-blur-xs transition-all animate-in fade-in slide-in-from-top-2 duration-300">
-                        {/* Left visual accent bar */}
-                        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-amber-500 to-amber-600 dark:from-amber-400 dark:to-amber-500" />
-
-                        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                            <div className="flex items-start sm:items-center gap-4">
-                                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/25 ring-4 ring-amber-100 dark:ring-amber-950/60">
-                                    <Clock className="h-6 w-6 stroke-[2.3] animate-pulse" />
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-xs font-black uppercase tracking-wider text-amber-950 dark:text-amber-200">
-                                            Scheduled Plan Switch Active
-                                        </span>
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-500 text-white shadow-xs">
-                                            <Calendar className="h-3 w-3" />
-                                            Effective {new Date(subscription.scheduled_switch_at || subscription.next_billing).toLocaleDateString(undefined, {
-                                                year: 'numeric',
-                                                month: 'short',
-                                                day: 'numeric'
-                                            })}
-                                        </span>
-                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide bg-amber-200/90 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
-                                            Next Billing Rollover
-                                        </span>
-                                    </div>
-                                    <p className="text-xs sm:text-sm text-gray-700 dark:text-slate-300 font-medium leading-relaxed">
-                                        Switching to <span className="font-extrabold text-gray-900 dark:text-white bg-amber-100/80 dark:bg-amber-950/70 px-2 py-0.5 rounded-md border border-amber-300/80 dark:border-amber-800/80 text-amber-900 dark:text-amber-300">{subscription.target_plan_name}</span> at <span className="font-mono font-bold text-gray-900 dark:text-white">${Number(subscription.target_plan_amount || 0).toFixed(2)}/mo</span>. Current limits & allocated minutes stay active until rollover.
-                                    </p>
-                                </div>
-                            </div>
-
-                            {isSuperAdmin && (
-                                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-amber-200/60 dark:border-amber-800/40">
-                                    <button
-                                        type="button"
-                                        disabled={isArchived}
-                                        title={isArchived ? "Subscription changes disabled for deactivated tenants." : "Change Target Plan"}
-                                        onClick={() => setPlanSwitchModalOpen(true)}
-                                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100 border border-amber-300/80 dark:border-slate-700 hover:bg-amber-50/70 dark:hover:bg-slate-700 hover:border-amber-400 transition shadow-sm active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <RefreshCw className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                                        <span>Change Target Plan</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={cancellingSchedule || isArchived}
-                                        title={isArchived ? "Operation disabled for deactivated tenants." : "Cancel Scheduled Switch"}
-                                        onClick={handleCancelScheduledSwitch}
-                                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200/90 dark:border-red-900/60 hover:bg-red-100 dark:hover:bg-red-900/50 transition shadow-sm disabled:opacity-50 active:scale-[0.98]"
-                                    >
-                                        {cancellingSchedule ? (
-                                            <>
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                <span>Cancelling...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <X className="h-3.5 w-3.5" />
-                                                <span>Cancel Switch</span>
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200/80 dark:border-slate-800 overflow-hidden">
-                    {subLoading ? (
-                        <div className="flex items-center justify-center py-12 gap-3 text-sm text-gray-500 dark:text-slate-400 font-medium">
-                            <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
-                            <span>Loading subscription details...</span>
-                        </div>
-                    ) : !subscription ? (
-                        !isSuperAdmin ? (
-                            <div className="py-12 px-6 text-center">
-                                <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white">No Active Subscription</h4>
-                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
-                                    You currently do not have an active subscription assigned. Please contact your system administrator or account representative to activate your plan.
+                        {tenantSubscriptions.length === 0 ? (
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-gray-200/80 dark:border-slate-800">
+                                <CreditCard className="h-10 w-10 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
+                                <h4 className="text-sm font-bold text-gray-900 dark:text-white">No Subscriptions Found</h4>
+                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                                    This tenant does not have any active or historical subscription packages.
                                 </p>
+                                <button
+                                    type="button"
+                                    onClick={() => openActivationModal(effectiveTenantId)}
+                                    className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white transition shadow-xs"
+                                >
+                                    <Sparkles className="h-4 w-4" />
+                                    <span>Activate First Subscription</span>
+                                </button>
                             </div>
                         ) : (
-                            <div className="py-12 px-6 text-center">
-                                <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white">No Active Subscription Found</h4>
-                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
-                                    You do not have an active billing plan assigned yet. Assign a plan now to unlock PBX features.
-                                </p>
-                                <div className="mt-5 flex items-center justify-center gap-3">
-                                    <button
-                                        onClick={() => setPlanSwitchModalOpen(true)}
-                                        disabled={isArchived}
-                                        title={isArchived ? "Subscription changes disabled for deactivated tenants." : "Assign Plan"}
-                                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 transition shadow-md shadow-primary-600/20 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <Sparkles className="h-4 w-4" />
-                                        Assign Plan / Subscribe
-                                    </button>
-                                    {onBrowsePlans && (
-                                        <button
-                                            onClick={onBrowsePlans}
-                                            disabled={isArchived}
-                                            title={isArchived ? "Subscription changes disabled for deactivated tenants." : "Browse Plans"}
-                                            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                            <div className="grid grid-cols-1 gap-4">
+                                {tenantSubscriptions.map((s) => {
+                                    const isActive = ['active', 'grace'].includes(s.status);
+                                    const daysLeft = s.current_period_end ? getDaysRemaining(s.current_period_end) : null;
+                                    const isToggling = togglingAutoRenewId === s.id;
+
+                                    return (
+                                        <div
+                                            key={s.id}
+                                            className={`bg-white dark:bg-slate-900 rounded-2xl p-6 border shadow-xs transition-all ${
+                                                isActive ? 'border-gray-200/80 dark:border-slate-800' : 'border-gray-100 dark:border-slate-800/60 opacity-80'
+                                            }`}
                                         >
-                                            Browse Plans
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-800 text-left">
-                                <thead className="bg-gray-50/70 dark:bg-slate-800/50">
-                                    <tr>
-                                        <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Plan Name</th>
-                                        <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Status</th>
-                                        <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Limits & Resources</th>
-                                        <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Billing Period / Dates</th>
-                                        <th className="px-6 py-4 text-center text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Auto-Renew</th>
-                                        {isSuperAdmin && (
-                                            <th className="px-6 py-4 text-center text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Actions</th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                                    <tr className="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                                        {/* Plan Name */}
-                                        <td className="px-6 py-5 whitespace-nowrap">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-xl bg-primary-50 dark:bg-primary-950/60 border border-primary-200/60 dark:border-primary-800/40 flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold">
-                                                    <Package className="h-5 w-5" />
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-extrabold text-gray-900 dark:text-white">
-                                                            {subscription.plan_name || subscription.name || 'Standard Plan'}
+                                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                                {/* Left: Info */}
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-3 flex-wrap">
+                                                        <h5 className="text-base font-extrabold text-gray-900 dark:text-white">
+                                                            {s.plan_name || 'Subscription Package'}
+                                                        </h5>
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                                            isActive
+                                                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                                                : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-slate-700'
+                                                        }`}>
+                                                            {s.status}
                                                         </span>
-                                                        {subscription.target_plan_name && (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                                                                <Clock className="h-2.5 w-2.5" />
-                                                                Switch to {subscription.target_plan_name} queued
+                                                        <span className="text-xs font-mono text-gray-400">
+                                                            ID: {s.subscription_id || s.id}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-slate-400 flex-wrap">
+                                                        <div>
+                                                            Period End: <span className="font-bold text-gray-800 dark:text-slate-200">{formatDate(s.current_period_end)}</span>
+                                                            {daysLeft !== null && (
+                                                                <span className="ml-1 text-amber-600 dark:text-amber-400 font-semibold">({daysLeft > 0 ? `${daysLeft}d left` : 'Due today'})</span>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            Renewal: <span className="font-bold font-mono text-gray-800 dark:text-slate-200">${Number(s.renewal_price || s.amount || 0).toFixed(2)} {s.currency_snapshot || 'USD'}</span>
+                                                        </div>
+                                                        <div>
+                                                            Duration: <span className="font-bold text-gray-800 dark:text-slate-200">{s.duration_count} {s.duration_unit}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Entitlement Badges */}
+                                                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                                                        {s.entitlement_snapshot?.extensions && (
+                                                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40">
+                                                                {s.usage?.extensions || 0} / {s.entitlement_snapshot.extensions} Extensions
+                                                            </span>
+                                                        )}
+                                                        {s.entitlement_snapshot?.numbers && (
+                                                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
+                                                                {s.usage?.numbers || 0} / {s.entitlement_snapshot.numbers} DIDs
+                                                            </span>
+                                                        )}
+                                                        {s.entitlement_snapshot?.monitoring_extensions && (
+                                                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/40">
+                                                                {s.usage?.monitoring_extensions || 0} / {s.entitlement_snapshot.monitoring_extensions} Monitoring
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-[11px] font-mono text-gray-400 dark:text-slate-500">
-                                                        ID: {subscription.plan_id || subscription.id || 'primary'}
-                                                    </div>
                                                 </div>
-                                            </div>
-                                        </td>
 
-                                        {/* Status */}
-                                        <td className="px-6 py-5 whitespace-nowrap">
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                                                <CheckCircle2 className="h-3 w-3" />
-                                                {subscription.status || 'ACTIVE'}
-                                            </span>
-                                        </td>
-
-                                        {/* Limits & Resources */}
-                                        <td className="px-6 py-5 whitespace-nowrap">
-                                            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-300 font-medium">
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 font-mono">
-                                                    {subscription?.limits?.extensions ?? 5} Ext
-                                                </span>
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 font-mono">
-                                                    {subscription?.limits?.free_mins ?? 500} Mins
-                                                </span>
-                                            </div>
-                                        </td>
-
-                                        {/* Billing Period / Dates */}
-                                        <td className="px-6 py-5 whitespace-nowrap">
-                                            <div className="space-y-1 text-xs">
-                                                <div className="flex items-center gap-1.5 text-gray-700 dark:text-slate-300">
-                                                    <span className="font-semibold text-gray-500 dark:text-slate-400">Started:</span>
-                                                    <span>
-                                                        {subscription.start_date
-                                                            ? new Date(subscription.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                                                            : (subscription.created_at
-                                                                ? new Date(subscription.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                                                                : '—')}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 text-gray-900 dark:text-white font-bold">
-                                                    <span className="font-semibold text-gray-500 dark:text-slate-400">Renews:</span>
-                                                    <span>
-                                                        {subscription.next_billing
-                                                            ? new Date(subscription.next_billing).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                                                            : '—'}
-                                                    </span>
-                                                </div>
-                                                {subscription.next_billing && getDaysRemaining(subscription.next_billing) !== null && (
-                                                    <div className="text-[11px] font-medium text-gray-500 dark:text-slate-400 flex items-center gap-1">
-                                                        <Clock className="h-3 w-3 text-amber-500" />
-                                                        <span>
-                                                            {getDaysRemaining(subscription.next_billing) > 0
-                                                                ? `${getDaysRemaining(subscription.next_billing)} days remaining`
-                                                                : 'Renews today'}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-
-                                        {/* Auto-Renew Toggle / Read-Only Badge */}
-                                        <td className="px-6 py-5 whitespace-nowrap text-center">
-                                            {isSuperAdmin ? (
-                                                <div className="inline-flex flex-col items-center gap-1">
+                                                {/* Right: Actions */}
+                                                <div className="flex items-center gap-2.5 flex-wrap lg:justify-end">
+                                                    {/* Auto-Renew Button */}
                                                     <button
                                                         type="button"
-                                                        role="switch"
-                                                        aria-checked={!!subscription.auto_renew}
-                                                        disabled={togglingPlanAutoRenew || isArchived}
-                                                        title={isArchived ? "Auto-renew disabled for deactivated tenants." : "Toggle Auto-Renew"}
-                                                        onClick={handleTogglePlanAutoRenew}
-                                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${subscription.auto_renew
-                                                                ? 'bg-primary-600'
-                                                                : 'bg-gray-200 dark:bg-slate-700'
-                                                            } ${togglingPlanAutoRenew || isArchived ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        onClick={() => handleToggleAutoRenew(s.id, s.auto_renew, effectiveTenantId)}
+                                                        disabled={isToggling}
+                                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition shadow-xs ${
+                                                            s.auto_renew
+                                                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+                                                                : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-200'
+                                                        }`}
                                                     >
-                                                        <span
-                                                            aria-hidden="true"
-                                                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${subscription.auto_renew ? 'translate-x-5' : 'translate-x-0'
-                                                                }`}
-                                                        />
+                                                        {isToggling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                                                        <span>Auto-Renew: {s.auto_renew ? 'ON' : 'OFF'}</span>
                                                     </button>
-                                                    <span className={`text-[10px] font-bold ${subscription.auto_renew
-                                                            ? 'text-primary-600 dark:text-primary-400'
-                                                            : 'text-gray-400 dark:text-slate-500'
-                                                        }`}>
-                                                        {subscription.auto_renew ? 'ON' : 'OFF'}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <span
-                                                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                                                        subscription.auto_renew
-                                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                                                            : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400 border border-gray-200 dark:border-slate-700'
-                                                    }`}
-                                                >
-                                                    {subscription.auto_renew ? 'Active (Auto-Renews)' : 'Manual (Off)'}
-                                                </span>
-                                            )}
-                                        </td>
 
-                                        {/* Actions: Upgrade / Downgrade (Super Admin Only) */}
-                                        {isSuperAdmin && (
-                                            <td className="px-6 py-5 whitespace-nowrap text-right">
-                                                <button
-                                                    type="button"
-                                                    disabled={isArchived}
-                                                    onClick={() => setPlanSwitchModalOpen(true)}
-                                                    title={isArchived ? "Subscription changes disabled for deactivated tenants." : "Change Plan"}
-                                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black text-primary-600 dark:text-primary-400 bg-white dark:bg-slate-800 ring-1 ring-inset ring-primary-200 dark:ring-primary-800/40 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition shadow-xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                                                >
-                                                    <ArrowUpDown className="h-3.5 w-3.5" />
-                                                    <span>{subscription.target_plan_name ? 'Modify Scheduled Plan' : 'Upgrade / Downgrade Plan'}</span>
-                                                </button>
-                                            </td>
-                                        )}
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            </div>
+                                                    {/* Renew Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setRenewalModal({ isOpen: true, subscription: s, tenantId: effectiveTenantId })}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs"
+                                                    >
+                                                        <RefreshCw className="h-3.5 w-3.5" />
+                                                        <span>Renew</span>
+                                                    </button>
 
-            {/* ========================================================================= */}
-            {/* SECTION: Subscription History (Previous Plans & Cycles)                   */}
-            {/* ========================================================================= */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                        <Clock className="h-4 w-4" />
-                    </div>
-                    <h3 className="text-base font-extrabold text-gray-900 dark:text-white tracking-tight">
-                        Subscription History
-                    </h3>
-                </div>
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200/80 dark:border-slate-800 overflow-hidden">
-                    {((subscription?.history && subscription.history.length > 0) || subscription?.previous_plan) ? (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-800 text-left">
-                                <thead className="bg-gray-50/70 dark:bg-slate-800/50">
-                                    <tr>
-                                        <th className="px-6 py-3.5 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                                            Plan
-                                        </th>
-                                        <th className="px-6 py-3.5 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                                            Amount
-                                        </th>
-                                        <th className="px-6 py-3.5 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                                            Billing Period
-                                        </th>
-                                        <th className="px-6 py-3.5 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                                            Type
-                                        </th>
-                                        <th className="px-6 py-3.5 text-center text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                                            Status
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                                    {((subscription?.history && subscription.history.length > 0)
-                                        ? subscription.history
-                                        : (subscription?.previous_plan ? [subscription.previous_plan] : [])
-                                    ).map((cycle, idx) => (
-                                        <tr key={cycle.id || idx} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="font-extrabold text-sm text-gray-900 dark:text-white">
-                                                    {cycle.plan_name}
-                                                </div>
-                                                <div className="text-[11px] text-gray-400 font-mono">
-                                                    {cycle.plan_id}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-sm text-gray-900 dark:text-white">
-                                                ${Number(cycle.amount || 0).toFixed(2)} {cycle.currency || 'USD'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-600 dark:text-slate-300">
-                                                {cycle.start_date ? new Date(cycle.start_date).toLocaleDateString() : '—'} 
-                                                {' → '}
-                                                {cycle.end_date ? new Date(cycle.end_date).toLocaleDateString() : '—'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300">
-                                                    {cycle.transition_type === 'plan_switch' ? 'Plan Switch' : 'Renewal'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                                                    {cycle.status || 'Completed'}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <div className="py-8 px-4 text-center text-xs text-gray-400 dark:text-slate-500">
-                            No previous billing history available for this account.
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* ========================================================================= */}
-            {/* SECTION 2B: Add-on Subscriptions Table                                    */}
-            {/* ========================================================================= */}
-            <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-                            <Layers className="h-4 w-4" />
-                        </div>
-                        <div>
-                            <h3 className="text-base font-extrabold text-gray-900 dark:text-white tracking-tight">
-                                Add-on Subscriptions
-                            </h3>
-                            <p className="text-xs text-gray-500 dark:text-slate-400">
-                                Extra extensions, numbers, and features provisioned for your tenant
-                            </p>
-                        </div>
-                    </div>
-
-                    {isSuperAdmin && onBrowseCatalog && (
-                        <button
-                            onClick={onBrowseCatalog}
-                            disabled={isArchived}
-                            title={isArchived ? "Add-on purchases disabled for deactivated tenants." : "Browse Add-on Catalog"}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 border border-primary-200/60 dark:border-primary-800/40 hover:bg-primary-100 transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                            <Zap className="h-3.5 w-3.5" />
-                            <span>Browse Add-on Catalog</span>
-                        </button>
-                    )}
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200/80 dark:border-slate-800 overflow-hidden">
-                    {addonsLoading ? (
-                        <div className="flex items-center justify-center py-12 gap-3 text-sm text-gray-500 dark:text-slate-400 font-medium">
-                            <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
-                            <span>Loading add-on subscriptions...</span>
-                        </div>
-                    ) : addons.length === 0 ? (
-                        <div className="py-12 px-6 text-center">
-                            <Layers className="h-10 w-10 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
-                            <h4 className="text-sm font-bold text-gray-900 dark:text-white">No Active Add-on Subscriptions</h4>
-                            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-                                You currently don't have any standalone add-ons. You can purchase additional extensions or DIDs anytime from the catalog.
-                            </p>
-                            {isSuperAdmin && onBrowseCatalog && (
-                                <button
-                                    onClick={onBrowseCatalog}
-                                    disabled={isArchived}
-                                    title={isArchived ? "Add-on purchases disabled for deactivated tenants." : "Get Extra Add-ons"}
-                                    className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    Get Extra Add-ons
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-800 text-left">
-                                <thead className="bg-gray-50/70 dark:bg-slate-800/50">
-                                    <tr>
-                                        <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Add-on Item</th>
-                                        <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Quantity</th>
-                                        <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Start Date</th>
-                                        <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Expiry Date</th>
-                                        <th className="px-6 py-4 text-center text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Auto-Renew</th>
-                                        {isSuperAdmin && (
-                                            <th className="px-6 py-4 text-center text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Actions</th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                                    {addons.map((addon) => {
-                                        const addonSubId = addon.id || addon.subscription_addon_id;
-                                        const isToggling = togglingAddonId === addonSubId;
-                                        const daysRemaining = getDaysRemaining(addon.expiration_date);
-
-                                        return (
-                                            <tr key={addonSubId || addon.addon_id} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                                                {/* Add-on Name */}
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold">
-                                                            <Package className="h-4 w-4" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-sm font-bold text-gray-900 dark:text-white">
-                                                                {addon.name || addon.addon_id}
-                                                            </div>
-                                                            <div className="text-[11px] font-mono text-gray-400 dark:text-slate-500">
-                                                                {addon.addon_id}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-
-                                                {/* Quantity */}
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200 dark:border-slate-700">
-                                                        × {addon.quantity || 1}
-                                                    </span>
-                                                </td>
-
-                                                {/* Start Date */}
-                                                <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-600 dark:text-slate-300 font-medium">
-                                                    {addon.created_at ? (
-                                                        <div className="flex items-center gap-1.5">
-                                                            <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                                                            <span>
-                                                                {new Date(addon.created_at).toLocaleDateString(undefined, {
-                                                                    year: 'numeric',
-                                                                    month: 'short',
-                                                                    day: 'numeric'
-                                                                })}
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-400">—</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Expiry Date */}
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    {addon.expiration_date ? (
-                                                        <div className="space-y-0.5">
-                                                            <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                                                                <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                                                                <span>
-                                                                    {new Date(addon.expiration_date).toLocaleDateString(undefined, {
-                                                                        year: 'numeric',
-                                                                        month: 'short',
-                                                                        day: 'numeric'
-                                                                    })}
-                                                                </span>
-                                                            </div>
-                                                            {daysRemaining !== null && (
-                                                                <div className="text-[11px] font-medium text-gray-500 dark:text-slate-400 flex items-center gap-1">
-                                                                    <Clock className="h-3 w-3 text-amber-500" />
-                                                                    {daysRemaining > 0
-                                                                        ? `${daysRemaining} days left`
-                                                                        : 'Expired'}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xs text-gray-400">—</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Auto-Renew Toggle / Read-Only Badge */}
-                                                <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                    {isSuperAdmin ? (
-                                                        <div className="flex w-full flex-col items-center justify-center gap-1">
-                                                            <button
-                                                                type="button"
-                                                                role="switch"
-                                                                aria-checked={!!addon.auto_renew}
-                                                                disabled={isToggling || isArchived}
-                                                                title={isArchived ? "Auto-renew disabled for deactivated tenants." : "Toggle Add-on Auto-Renew"}
-                                                                onClick={() => handleToggleAddonAutoRenew(addon)}
-                                                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${addon.auto_renew
-                                                                        ? 'bg-primary-600'
-                                                                        : 'bg-gray-200 dark:bg-slate-700'
-                                                                    } ${isToggling || isArchived ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                            >
-                                                                <span
-                                                                    aria-hidden="true"
-                                                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${addon.auto_renew ? 'translate-x-5' : 'translate-x-0'
-                                                                        }`}
-                                                                />
-                                                            </button>
-                                                            <span className={`text-[10px] font-bold ${addon.auto_renew
-                                                                    ? 'text-primary-600 dark:text-primary-400'
-                                                                    : 'text-gray-400 dark:text-slate-500'
-                                                                }`}>
-                                                                {addon.auto_renew ? 'ON' : 'OFF'}
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <span
-                                                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                                                                addon.auto_renew
-                                                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                                                                    : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400 border border-gray-200 dark:border-slate-700'
-                                                            }`}
+                                                    {/* Move Asset */}
+                                                    {Array.isArray(s.assets) && s.assets.length > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setReassignModal({ isOpen: true, tenantId: effectiveTenantId, asset: s.assets[0], targetSubscriptionId: '' })}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 border border-gray-200 dark:border-slate-700 transition shadow-xs"
                                                         >
-                                                            {addon.auto_renew ? 'Active (Auto-Renews)' : 'Manual (Off)'}
-                                                        </span>
+                                                            <MoveRight className="h-3.5 w-3.5" />
+                                                            <span>Move Asset</span>
+                                                        </button>
                                                     )}
-                                                </td>
 
-                                                {/* Actions */}
-                                                {isSuperAdmin && (
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="flex w-full items-center justify-center">
-                                                            <button
-                                                                type="button"
-                                                                disabled={isArchived}
-                                                                onClick={() => setAddonToCancel(addon)}
-                                                                title={isArchived ? "Add-on operations disabled for deactivated tenants." : "Cancel Add-on"}
-                                                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 dark:hover:border-rose-900/40 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                                                            >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                                <span>Cancel</span>
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                                    {/* History */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenHistory(s, effectiveTenantId)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 border border-gray-200 dark:border-slate-700 transition shadow-xs"
+                                                    >
+                                                        <History className="h-3.5 w-3.5" />
+                                                        <span>History</span>
+                                                    </button>
+
+                                                    {/* SuperAdmin Transition: Cancel / Freeze */}
+                                                    {isSuperAdmin && isActive && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleTransition(s.id, 'cancel', effectiveTenantId)}
+                                                            className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition shadow-xs"
+                                                            title="Cancel Subscription"
+                                                        >
+                                                            <span>Cancel</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
-            </>
             )}
 
-            {/* Plan Switch Modal */}
-            <PlanSwitchModal
-                isOpen={planSwitchModalOpen}
-                onClose={() => {
-                    setPlanSwitchModalOpen(false);
-                    setModalTargetTenant(null);
-                }}
-                currentPlan={modalTargetTenant ? modalTargetTenant.subscription : subscription}
-                customerId={modalTargetTenant ? modalTargetTenant.tenantId : effectiveTenantId}
-                isArchived={modalTargetTenant ? modalTargetTenant.tenantStatus === 'ARCHIVED' : isArchived}
-                onSuccess={() => {
-                    handleRefreshAll();
-                    setModalTargetTenant(null);
-                }}
-            />
+            {/* ========================================================================= */}
+            {/* MODAL 1: Plan Activation Modal                                            */}
+            {/* ========================================================================= */}
+            {activationModal.isOpen && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 dark:border-slate-800 space-y-5">
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 rounded-xl bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
+                                    <Sparkles className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold text-gray-900 dark:text-white">Activate Subscription Plan</h3>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400">Configure duration and payment for tenant activation</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setActivationModal(prev => ({ ...prev, isOpen: false }))}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
 
-            {/* Cancel Add-on Confirmation Modal */}
-            <ConfirmActionModal
-                isOpen={!!addonToCancel}
-                onClose={() => setAddonToCancel(null)}
-                onConfirm={handleConfirmCancelAddon}
-                title="Cancel Add-on Subscription"
-                message={`Are you sure you want to cancel the add-on "${addonToCancel?.name || addonToCancel?.addon_id}"? This item will not renew at expiration.`}
-                confirmText="Confirm Cancel"
-                cancelText="Keep Add-on"
-                isDanger={true}
-                loading={cancellingAddon}
-            />
+                        <form onSubmit={handleConfirmActivation} className="space-y-4">
+                            {/* Plan Selection */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+                                    Select Plan Package <span className="text-rose-500">*</span>
+                                </label>
+                                <select
+                                    required
+                                    value={activationModal.plan_id}
+                                    onChange={(e) => {
+                                        const p = plans.find(plan => (plan.plan_id || plan.id) === e.target.value);
+                                        setActivationModal(prev => ({
+                                            ...prev,
+                                            plan_id: e.target.value,
+                                            duration_unit: p?.duration_unit || 'months',
+                                            duration_count: p?.duration_count || p?.validity_months || 1
+                                        }));
+                                    }}
+                                    className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                >
+                                    <option value="">Choose a plan...</option>
+                                    {plans.map(p => (
+                                        <option key={p.plan_id || p.id} value={p.plan_id || p.id}>
+                                            {p.name} — ${p.amount} {p.currency || 'USD'} ({p.duration_count || p.validity_months || 1} {p.duration_unit || 'months'})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
 
+                            {/* Duration Count & Unit */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+                                        Duration Count
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="3660"
+                                        required
+                                        value={activationModal.duration_count}
+                                        onChange={(e) => setActivationModal(prev => ({ ...prev, duration_count: Number(e.target.value) }))}
+                                        className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+                                        Duration Unit
+                                    </label>
+                                    <select
+                                        value={activationModal.duration_unit}
+                                        onChange={(e) => setActivationModal(prev => ({ ...prev, duration_unit: e.target.value }))}
+                                        className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    >
+                                        <option value="months">Calendar Months</option>
+                                        <option value="days">Days</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Payment Mode */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+                                    Payment Mode
+                                </label>
+                                <select
+                                    value={activationModal.payment_mode}
+                                    onChange={(e) => setActivationModal(prev => ({ ...prev, payment_mode: e.target.value }))}
+                                    className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                >
+                                    <option value="wallet">Charge Tenant Wallet / Available Balance</option>
+                                    <option value="pending">Pending Activation (No service until paid)</option>
+                                    {isSuperAdmin && <option value="credit_override">Approved Credit Override (SuperAdmin)</option>}
+                                </select>
+                            </div>
+
+                            {/* Auto-renew checkbox */}
+                            <label className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-slate-300 cursor-pointer pt-1">
+                                <input
+                                    type="checkbox"
+                                    checked={activationModal.auto_renew}
+                                    onChange={(e) => setActivationModal(prev => ({ ...prev, auto_renew: e.target.checked }))}
+                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                />
+                                <span>Enable automatic recurring renewal for this subscription</span>
+                            </label>
+
+                            {/* Live Quote Breakdown */}
+                            {quoting ? (
+                                <div className="p-3.5 rounded-xl bg-gray-50 dark:bg-slate-800 flex items-center justify-center gap-2 text-xs text-gray-500 font-medium">
+                                    <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
+                                    <span>Calculating prorated price...</span>
+                                </div>
+                            ) : quote ? (
+                                <div className="p-4 rounded-xl bg-primary-50/60 dark:bg-primary-950/40 border border-primary-200/60 dark:border-primary-800/40 space-y-2">
+                                    <div className="flex items-center justify-between text-xs font-bold text-primary-900 dark:text-primary-200">
+                                        <span>Initial Charge:</span>
+                                        <span className="font-mono text-sm">${Number(quote.initial_charge || 0).toFixed(2)} {quote.currency}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[11px] text-gray-600 dark:text-slate-400">
+                                        <span>Renewal Price:</span>
+                                        <span className="font-mono">${Number(quote.renewal_price || 0).toFixed(2)} {quote.currency}</span>
+                                    </div>
+                                    {Number(quote.setup_fee || 0) > 0 && (
+                                        <div className="flex items-center justify-between text-[11px] text-gray-600 dark:text-slate-400">
+                                            <span>Includes Setup Fee:</span>
+                                            <span className="font-mono">${Number(quote.setup_fee).toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center justify-between text-[11px] text-gray-600 dark:text-slate-400">
+                                        <span>Initial End Date:</span>
+                                        <span>{formatDate(quote.end_date)}</span>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setActivationModal(prev => ({ ...prev, isOpen: false }))}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 dark:text-slate-300 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submittingActivation || quoting || !quote}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white transition shadow-xs disabled:opacity-40"
+                                >
+                                    {submittingActivation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                    <span>Confirm Activation</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* MODAL 2: Renewal Confirmation Modal                                       */}
+            {/* ========================================================================= */}
+            {renewalModal.isOpen && renewalModal.subscription && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-slate-800 space-y-5">
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                                    <RefreshCw className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold text-gray-900 dark:text-white">Confirm Manual Renewal</h3>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400">Extend subscription validity</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setRenewalModal({ isOpen: false, subscription: null, tenantId: '' })}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3 text-xs text-gray-600 dark:text-slate-300">
+                            <p>
+                                You are about to renew <span className="font-bold text-gray-900 dark:text-white">{renewalModal.subscription.plan_name}</span> for{' '}
+                                <span className="font-bold">{renewalModal.subscription.duration_count} {renewalModal.subscription.duration_unit}</span>.
+                            </p>
+                            <div className="p-3.5 rounded-xl bg-gray-50 dark:bg-slate-800 space-y-1.5 font-mono">
+                                <div className="flex justify-between">
+                                    <span>Renewal Cost:</span>
+                                    <span className="font-bold text-gray-900 dark:text-white">
+                                        ${Number(renewalModal.subscription.renewal_price || renewalModal.subscription.amount || 0).toFixed(2)} {renewalModal.subscription.currency_snapshot || 'USD'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Current Period End:</span>
+                                    <span>{formatDate(renewalModal.subscription.current_period_end)}</span>
+                                </div>
+                            </div>
+                            <p className="text-[11px] text-gray-400">
+                                Payment will be deducted from the tenant's wallet balance. Early renewal extends the current end date without losing remaining days.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setRenewalModal({ isOpen: false, subscription: null, tenantId: '' })}
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 dark:text-slate-300 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmRenewal}
+                                disabled={submittingRenewal}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs disabled:opacity-40"
+                            >
+                                {submittingRenewal ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                                <span>Confirm Payment</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* MODAL 3: Asset Reassignment Modal                                         */}
+            {/* ========================================================================= */}
+            {reassignModal.isOpen && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-slate-800 space-y-5">
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+                                    <MoveRight className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold text-gray-900 dark:text-white">Move Asset Between Plans</h3>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400">Reassign asset ownership without disrupting service</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setReassignModal({ isOpen: false, tenantId: '', asset: null, targetSubscriptionId: '' })}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleConfirmReassign} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+                                    Asset to Move
+                                </label>
+                                <input
+                                    type="text"
+                                    disabled
+                                    value={`${reassignModal.asset?.type?.toUpperCase()}: ${reassignModal.asset?.value || reassignModal.asset?.id}`}
+                                    className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 cursor-not-allowed"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+                                    Destination Active Subscription <span className="text-rose-500">*</span>
+                                </label>
+                                <select
+                                    required
+                                    value={reassignModal.targetSubscriptionId}
+                                    onChange={(e) => setReassignModal(prev => ({ ...prev, targetSubscriptionId: e.target.value }))}
+                                    className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                >
+                                    <option value="">Select active destination subscription...</option>
+                                    {activeSingleTenantSubs
+                                        .filter(s => s.id !== reassignModal.asset?.subscription_id)
+                                        .map(s => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.plan_name} ({s.subscription_id || s.id})
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setReassignModal({ isOpen: false, tenantId: '', asset: null, targetSubscriptionId: '' })}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 dark:text-slate-300 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submittingReassign || !reassignModal.targetSubscriptionId}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white transition shadow-xs disabled:opacity-40"
+                                >
+                                    {submittingReassign ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoveRight className="h-4 w-4" />}
+                                    <span>Confirm Move</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* MODAL 4: Subscription History Timeline Modal                              */}
+            {/* ========================================================================= */}
+            {historyModal.isOpen && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 dark:border-slate-800 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+                                    <History className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold text-gray-900 dark:text-white">Subscription Audit History</h3>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400">
+                                        Lifecycle log for {historyModal.subscription?.plan_name}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setHistoryModal({ isOpen: false, subscription: null, events: [], loading: false })}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {historyModal.loading ? (
+                            <div className="py-12 flex items-center justify-center gap-2 text-xs text-gray-500">
+                                <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
+                                <span>Loading history events...</span>
+                            </div>
+                        ) : historyModal.events.length === 0 ? (
+                            <div className="py-10 text-center text-xs text-gray-500">
+                                No audit events logged yet for this subscription.
+                            </div>
+                        ) : (
+                            <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 dark:divide-slate-800 pr-1">
+                                {historyModal.events.map((ev, idx) => (
+                                    <div key={idx} className="py-2.5 text-xs flex items-start justify-between gap-3">
+                                        <div>
+                                            <div className="font-bold text-gray-900 dark:text-white capitalize">
+                                                {ev.action || ev.event_type || 'Lifecycle Event'}
+                                            </div>
+                                            <div className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
+                                                Status: <span className="font-semibold text-gray-700 dark:text-slate-300">{ev.status_after || ev.status || 'recorded'}</span>
+                                                {ev.actor_id && ` • By: ${ev.actor_id}`}
+                                            </div>
+                                        </div>
+                                        <div className="text-[11px] font-mono text-gray-400 shrink-0">
+                                            {formatDate(ev.created_at)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-end pt-3 border-t border-gray-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setHistoryModal({ isOpen: false, subscription: null, events: [], loading: false })}
+                                className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-200 transition"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

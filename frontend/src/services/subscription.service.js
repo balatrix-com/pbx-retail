@@ -2,7 +2,7 @@ import api from './api';
 
 export const subscriptionService = {
     // ------------------------------------------------------------------------
-    // 1. EXISTING BACKEND API: GET /api/plans (Status: 200 OK)
+    // Plans Catalog
     // ------------------------------------------------------------------------
     getPlans: async () => {
         try {
@@ -32,7 +32,7 @@ export const subscriptionService = {
 
     getRateCards: async () => {
         try {
-            const res = await api.get('/plans/rate-cards').catch(() => api.get('/admin/rec-rate-cards'));
+            const res = await api.get('/admin/rec-rate-cards');
             const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
             return list;
         } catch (err) {
@@ -42,66 +42,81 @@ export const subscriptionService = {
     },
 
     // ------------------------------------------------------------------------
-    // 2. EXISTING BACKEND API: GET /api/wallet/subscription (Status: 200 OK)
+    // Authoritative PBX Subscriptions API (/api/subscriptions)
     // ------------------------------------------------------------------------
-    getSubscription: async (tenantId, params = {}) => {
-        try {
-            const res = await api.get('/wallet/subscription', {
-                params: {
-                    ...(tenantId ? { tenantId } : {}),
-                    ...params
-                }
-            });
-
-            return res.data;
-        } catch (e) {
-            console.warn('GET /wallet/subscription endpoint error:', e);
-            return null;
-        }
-    },
-
-    getAllSubscriptions: async (params = {}) => {
-        try {
-            const res = await api.get('/wallet/subscription', {
-                params: {
-                    tenantId: 'all',
-                    ...params
-                }
-            });
-            return res.data;
-        } catch (e) {
-            console.warn('GET /wallet/subscription?tenantId=all endpoint error:', e);
-            return { data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 1 } };
-        }
-    },
-
-    toggleAutoRenew: async (targetTenantId, auto_renew) => {
-        const res = await api.patch('/wallet/subscription/auto-renew', {
-            ...(targetTenantId && { targetTenantId }),
-            auto_renew
+    getSubscriptions: async (tenantId) => {
+        const res = await api.get('/subscriptions', {
+            params: tenantId ? { tenantId } : {}
         });
         return res.data;
     },
 
-    cancelScheduledSwitch: async (customerId) => {
-        const res = await api.post('/wallet/subscription/cancel-switch', {
-            targetTenantId: customerId
+    getAllSubscriptions: async () => {
+        const res = await api.get('/subscriptions', {
+            params: { tenantId: 'all' }
+        });
+        return res.data;
+    },
+
+    // Backward compatibility alias for useSubscriptionQuery
+    getSubscription: async (tenantId) => {
+        if (tenantId === 'all') {
+            return subscriptionService.getAllSubscriptions();
+        }
+        return subscriptionService.getSubscriptions(tenantId);
+    },
+
+    getQuote: async (payload) => {
+        const res = await api.post('/subscriptions/quote', payload);
+        return res.data;
+    },
+
+    activateSubscription: async (payload) => {
+        const res = await api.post('/subscriptions/activate', payload);
+        return res.data;
+    },
+
+    renewSubscription: async (id, payload) => {
+        const res = await api.post(`/subscriptions/${id}/renew`, payload);
+        return res.data;
+    },
+
+    toggleAutoRenew: async (id, auto_renew, tenantId) => {
+        const res = await api.patch(`/subscriptions/${id}/auto-renew`, {
+            auto_renew,
+            ...(tenantId ? { tenantId } : {})
+        });
+        return res.data;
+    },
+
+    reassignAsset: async (payload) => {
+        const res = await api.post('/subscriptions/assets/reassign', payload);
+        return res.data;
+    },
+
+    transitionSubscription: async (id, transition, tenantId) => {
+        const res = await api.post(`/subscriptions/${id}/${transition}`, {
+            ...(tenantId ? { tenantId } : {})
+        });
+        return res.data;
+    },
+
+    getSubscriptionHistory: async (id, tenantId) => {
+        const res = await api.get(`/subscriptions/${id}/history`, {
+            params: tenantId ? { tenantId } : {}
         });
         return res.data;
     },
 
     // ------------------------------------------------------------------------
-    // 3. ADD-ONS CATALOG (Connected to Backend API)
+    // Add-ons Catalog & Operations
     // ------------------------------------------------------------------------
     getCatalog: async () => {
         const res = await api.get('/addons/catalog');
         return res.data;
     },
 
-    // ------------------------------------------------------------------------
-    // 4. ADD-ON QUOTE CALCULATION (Connected to Backend API)
-    // ------------------------------------------------------------------------
-    getQuote: async (tenantId, addonId, quantity = 1) => {
+    getAddonQuote: async (tenantId, addonId, quantity = 1) => {
         const res = await api.post('/addons/quote', {
             tenantId,
             addonId,
@@ -110,9 +125,6 @@ export const subscriptionService = {
         return res.data;
     },
 
-    // ------------------------------------------------------------------------
-    // 5. ADD-ON PURCHASE (Connected to Backend API)
-    // ------------------------------------------------------------------------
     purchaseAddon: async (tenantId, addonId, quantity = 1) => {
         const res = await api.post('/addons/purchase', {
             tenantId,
@@ -122,14 +134,12 @@ export const subscriptionService = {
         return res.data;
     },
 
-    // ------------------------------------------------------------------------
-    // 6. PLAN SWITCH (Real backend API: POST /api/wallet/subscription)
-    // ------------------------------------------------------------------------
-    switchPlan: async (customerId, newPlanId, immediate = true) => {
-        const res = await api.post('/wallet/subscription', {
-            targetTenantId: customerId,
-            planId: newPlanId,
-            immediate
+    // Compatibility plan switch
+    switchPlan: async (customerId, newPlanId) => {
+        const res = await api.post('/subscriptions/activate', {
+            tenantId: customerId,
+            plan_id: newPlanId,
+            payment_mode: 'wallet'
         });
         return res.data;
     }

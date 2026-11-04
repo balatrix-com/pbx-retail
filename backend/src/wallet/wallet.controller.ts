@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, UseGuards, Query, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Query, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -42,55 +42,11 @@ export class WalletController {
     @Get('subscription')
     getSubscription(
         @GetUser() user: User,
-        @Query('tenantId') queryTenantId?: string,
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('search') search?: string,
-        @Query('status') status?: string,
-        @Query('hasSubscription') hasSubscription?: string
+        @Query('tenantId') queryTenantId?: string
     ) {
-        if (queryTenantId === 'all') {
-            if (user.role !== Role.SUPER_ADMIN) {
-                throw new ForbiddenException('Only SuperAdmin can view all subscriptions');
-            }
-            return this.walletService.getAllSubscriptions({
-                page: page ? parseInt(page, 10) : undefined,
-                limit: limit ? parseInt(limit, 10) : undefined,
-                search,
-                status,
-                hasSubscription: hasSubscription !== undefined ? hasSubscription === 'true' : undefined
-            });
-        }
-        if (user.role !== Role.SUPER_ADMIN && queryTenantId && queryTenantId !== user.tenantId) {
-            throw new ForbiddenException('Access denied: cannot view subscription for other tenants');
-        }
         const tenantId = (user.role === Role.SUPER_ADMIN && queryTenantId) ? queryTenantId : user.tenantId;
         if (!tenantId) return null;
         return this.walletService.getSubscription(tenantId);
-    }
-
-    @Patch('subscription/auto-renew')
-    @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-    toggleAutoRenew(
-        @GetUser() user: User,
-        @Body('targetTenantId') targetTenantId: string,
-        @Body('auto_renew') autoRenew: boolean
-    ) {
-        const tenantId = (user.role === Role.SUPER_ADMIN && targetTenantId) ? targetTenantId : user.tenantId;
-        if (!tenantId) throw new BadRequestException('Tenant ID is required');
-        if (typeof autoRenew !== 'boolean') throw new BadRequestException('auto_renew boolean is required');
-        return this.walletService.toggleSubscriptionAutoRenew(tenantId, autoRenew);
-    }
-
-    @Post('subscription/cancel-switch')
-    @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-    cancelScheduledSwitch(
-        @GetUser() user: User,
-        @Body('targetTenantId') targetTenantId?: string
-    ) {
-        const tenantId = (user.role === Role.SUPER_ADMIN && targetTenantId) ? targetTenantId : user.tenantId;
-        if (!tenantId) throw new BadRequestException('Tenant ID is required');
-        return this.walletService.cancelScheduledPlanSwitch(tenantId);
     }
 
     @Post('subscription')
@@ -163,9 +119,6 @@ export class WalletController {
         if (user.role !== Role.SUPER_ADMIN) {
             throw new ForbiddenException('Only Platform Owner can perform internal adjustments');
         }
-
-        // If user is ADMIN of their own tenant, they can maybe add funds? 
-        // Requirement says "internal-adjust (admin only)". Let's stick to standard RBAC.
 
         const tenantId = targetTenantId || user.tenantId!; // Default to self if not provided
         return this.walletService.adjustBalance(tenantId, amount, type, description, `MANUAL-ADJ-BY-${user.email}`);

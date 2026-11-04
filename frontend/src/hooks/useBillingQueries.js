@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { walletService } from '../services/wallet.service';
 import { usageService } from '../services/usage.service';
+import { subscriptionService } from '../services/subscription.service';
 import { useAuth } from '../context/AuthContext';
 
 export const useWalletQuery = (targetTenantId) => {
@@ -32,7 +33,7 @@ export const useSubscriptionQuery = (targetTenantId, params) => {
     const effectiveTenantId = targetTenantId || user?.tenantId;
     return useQuery({
         queryKey: ['subscription', effectiveTenantId, params || {}],
-        queryFn: () => walletService.getSubscription(effectiveTenantId, params || {}),
+        queryFn: () => subscriptionService.getSubscription(effectiveTenantId),
         enabled: !!effectiveTenantId,
     });
 };
