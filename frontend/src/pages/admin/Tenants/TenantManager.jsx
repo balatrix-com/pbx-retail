@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Wallet, Phone, Users, Info, Building2, Plus, Trash2, Loader, CreditCard, RefreshCw, User, LogIn, Sliders, ShieldAlert, Clock, Mic, Zap, Loader2, Radio, HardDrive, Activity, Package, Palette, Edit3, Save, Check, CheckCircle2, Globe, MapPin, Mail, Lock, Eye, EyeOff, Search, Pencil } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Wallet, Phone, Users, Info, Building2, Plus, Trash2, Loader, CreditCard, RefreshCw, User, LogIn, Sliders, ShieldAlert, Clock, Mic, Zap, Loader2, Radio, HardDrive, Activity, Package, Palette, Edit3, Save, Check, CheckCircle2, Globe, MapPin, Mail, Lock, Eye, EyeOff, Search, Pencil, ExternalLink, Calendar, Shield, Sparkles } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
@@ -143,7 +143,7 @@ const TenantManager = ({ tenantId, onClose }) => {
                         {activeTab === 'extensions' && <ExtensionsTab tenant={tenant} onUpdate={handleRefresh} />}
                         {activeTab === 'users' && <UsersTab tenant={tenant} />}
                         {activeTab === 'features' && <FeaturesTab tenant={tenant} onUpdate={handleRefresh} />}
-                        {activeTab === 'subscriptions' && <a className="text-primary-600 underline" href={`/super-admin/subscriptions?tenantId=${encodeURIComponent(tenant.id)}`}>Manage this tenant's subscriptions and allocated assets</a>}
+                        {activeTab === 'subscriptions' && <SubscriptionsTab tenant={tenant} subscription={subscription} onUpdate={handleRefresh} />}
                         {activeTab === 'customize' && <CustomizeTab tenant={tenant} onUpdate={handleRefresh} />}
                     </div>
                 </div>
@@ -249,6 +249,248 @@ const OverviewTab = ({ tenant, subscription, onToggleBlock, isBlockLoading }) =>
         </div>
     </div>
 );
+
+const SubscriptionsTab = ({ tenant, subscription, onUpdate }) => {
+    const subList = useMemo(() => {
+        if (!subscription) return [];
+        if (Array.isArray(subscription)) return subscription;
+        if (Array.isArray(subscription.data)) return subscription.data;
+        if (typeof subscription === 'object' && (subscription.id || subscription.plan_id || subscription.plan_name)) return [subscription];
+        return [];
+    }, [subscription]);
+
+    const activeSub = useMemo(() => {
+        return subList.find(s => s.status === 'ACTIVE') || subList[0] || (subscription?.plan ? subscription : null);
+    }, [subList, subscription]);
+
+    const limits = activeSub?.limits || activeSub?.plan?.limits || {};
+    const extUsed = tenant.stats?.extensions || tenant.extensionsCount || 0;
+    const extTotal = limits.extensions !== undefined ? Number(limits.extensions) : null;
+    const extPercent = extTotal ? Math.min(100, Math.round((extUsed / extTotal) * 100)) : 0;
+
+    const numUsed = tenant.stats?.numbers || tenant.numbersCount || 0;
+    const numTotal = limits.numbers !== undefined ? Number(limits.numbers) : null;
+    const numPercent = numTotal ? Math.min(100, Math.round((numUsed / numTotal) * 100)) : 0;
+
+    const monUsed = tenant.stats?.monitoring_extensions || tenant.stats?.monitoring || 0;
+    const monTotal = limits.monitoring_extensions !== undefined ? Number(limits.monitoring_extensions) : null;
+    const monPercent = monTotal ? Math.min(100, Math.round((monUsed / monTotal) * 100)) : 0;
+
+    const daysRemaining = activeSub?.next_billing ? Math.ceil((new Date(activeSub.next_billing).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+
+    const consoleUrl = `/super-admin/subscriptions?tenantId=${encodeURIComponent(tenant.id)}`;
+
+    return (
+        <div className="space-y-6 w-full animate-in fade-in duration-200">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+                        <CreditCard className="h-6 w-6 text-primary-600" />
+                        Subscriptions & Capacity
+                    </h3>
+                    <p className="text-sm font-medium text-gray-500 mt-1">
+                        Active plans, resource limits, and asset allocations for {tenant.name}.
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <a
+                        href={consoleUrl}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white shadow-xs transition-all active:scale-95"
+                    >
+                        <span>Manage in Subscriptions Console</span>
+                        <ExternalLink size={14} />
+                    </a>
+                </div>
+            </div>
+
+            {/* Active Subscription Summary Card */}
+            {activeSub ? (
+                <div className="bg-white p-6 rounded-2xl shadow-sm ring-1 ring-gray-200/80 space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                        <div className="flex items-center gap-3.5">
+                            <div className="h-12 w-12 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600">
+                                <Sparkles className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2.5">
+                                    <h4 className="text-lg font-black text-gray-900 tracking-tight">
+                                        {activeSub.plan_name || activeSub.plan?.name || 'Active Subscription Plan'}
+                                    </h4>
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
+                                        activeSub.status === 'ACTIVE'
+                                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
+                                            : activeSub.status === 'EXPIRED'
+                                            ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20'
+                                            : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
+                                    }`}>
+                                        {activeSub.status || 'ACTIVE'}
+                                    </span>
+                                </div>
+                                <p className="text-xs font-mono text-gray-500 mt-0.5">
+                                    ID: {activeSub.id || activeSub.subscription_id || 'sub-active'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="text-right sm:border-l sm:border-gray-100 sm:pl-6">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Recurring Amount</span>
+                            <div className="text-2xl font-mono font-black text-gray-900">
+                                ${Number(activeSub.renewal_price || activeSub.amount || activeSub.price || 0).toFixed(2)}
+                                <span className="text-xs font-bold text-gray-500 ml-1">/ {activeSub.duration_unit || activeSub.billing_period || 'cycle'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Metadata Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Renewal Date</span>
+                            <div className="flex items-center gap-2 text-sm font-extrabold text-gray-900">
+                                <Calendar size={16} className="text-gray-400" />
+                                <span>{activeSub.next_billing ? new Date(activeSub.next_billing).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                            </div>
+                            {daysRemaining !== null && (
+                                <span className="text-xs text-amber-600 font-semibold mt-1 flex items-center gap-1">
+                                    <Clock size={12} /> {daysRemaining > 0 ? `${daysRemaining} days remaining` : 'Renews today'}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Auto-Renewal</span>
+                            <div className="flex items-center gap-2 text-sm font-extrabold">
+                                <span className={`h-2.5 w-2.5 rounded-full ${activeSub.auto_renew ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                <span className={activeSub.auto_renew ? 'text-emerald-700' : 'text-gray-600'}>
+                                    {activeSub.auto_renew ? 'Enabled (Automatic)' : 'Disabled'}
+                                </span>
+                            </div>
+                            <span className="text-xs text-gray-400 mt-1 block">Charges tenant wallet balance</span>
+                        </div>
+
+                        <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Wallet Balance</span>
+                            <div className={`text-sm font-mono font-extrabold ${Number(tenant.wallet?.balance || 0) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                ${Number(tenant.wallet?.balance || 0).toFixed(2)}
+                            </div>
+                            <span className="text-xs text-gray-400 mt-1 block">Available for renewals</span>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-white p-8 rounded-2xl shadow-sm ring-1 ring-gray-200/80 text-center space-y-4">
+                    <div className="h-14 w-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                        <CreditCard size={28} />
+                    </div>
+                    <div>
+                        <h4 className="text-lg font-black text-gray-900 tracking-tight">No Active Subscription</h4>
+                        <p className="text-sm text-gray-500 max-w-md mx-auto mt-1">
+                            This tenant does not currently have an active recurring plan assigned. Assign a package to allocate extension limits and phone numbers.
+                        </p>
+                    </div>
+                    <div>
+                        <a
+                            href={consoleUrl}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white shadow-xs transition-all"
+                        >
+                            <Sparkles size={14} />
+                            <span>Assign Plan in Console</span>
+                        </a>
+                    </div>
+                </div>
+            )}
+
+            {/* Resource Capacity Allocation Meters */}
+            <div>
+                <h4 className="text-sm font-black uppercase tracking-wider text-gray-500 mb-3">Resource Capacity Allocation</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Extensions Meter */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                                <Users size={16} className="text-blue-500" />
+                                Extensions
+                            </span>
+                            <span className="text-xs font-mono font-bold text-gray-900">
+                                {extUsed} / {extTotal !== null ? extTotal : '∞'}
+                            </span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                            <div
+                                className="bg-blue-500 h-full rounded-full transition-all duration-300"
+                                style={{ width: extTotal ? `${extPercent}%` : (extUsed > 0 ? '100%' : '0%') }}
+                            />
+                        </div>
+                        <span className="text-[11px] text-gray-400 block font-medium">
+                            {extTotal ? `${extPercent}% capacity allocated` : 'Unlimited extension capacity'}
+                        </span>
+                    </div>
+
+                    {/* Phone Numbers Meter */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                                <Phone size={16} className="text-emerald-500" />
+                                Phone Numbers / DIDs
+                            </span>
+                            <span className="text-xs font-mono font-bold text-gray-900">
+                                {numUsed} / {numTotal !== null ? numTotal : '∞'}
+                            </span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                            <div
+                                className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                                style={{ width: numTotal ? `${numPercent}%` : (numUsed > 0 ? '100%' : '0%') }}
+                            />
+                        </div>
+                        <span className="text-[11px] text-gray-400 block font-medium">
+                            {numTotal ? `${numPercent}% capacity allocated` : 'Unlimited phone number capacity'}
+                        </span>
+                    </div>
+
+                    {/* Monitoring Seats Meter */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                                <Shield size={16} className="text-purple-500" />
+                                Monitoring Seats
+                            </span>
+                            <span className="text-xs font-mono font-bold text-gray-900">
+                                {monUsed} / {monTotal !== null ? monTotal : '∞'}
+                            </span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                            <div
+                                className="bg-purple-500 h-full rounded-full transition-all duration-300"
+                                style={{ width: monTotal ? `${monPercent}%` : (monUsed > 0 ? '100%' : '0%') }}
+                            />
+                        </div>
+                        <span className="text-[11px] text-gray-400 block font-medium">
+                            {monTotal ? `${monPercent}% capacity allocated` : 'Unlimited monitoring seats'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Quick Action Footer Callout */}
+            <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <Zap className="h-5 w-5 text-indigo-600 shrink-0" />
+                    <p className="text-xs font-semibold text-indigo-950">
+                        Need to adjust limits, assign mid-cycle add-ons, or reassign allocated assets? Manage complete tenant assets in the Subscriptions console.
+                    </p>
+                </div>
+                <a
+                    href={consoleUrl}
+                    className="inline-flex items-center gap-1.5 text-xs font-extrabold text-indigo-700 hover:text-indigo-900 hover:underline shrink-0"
+                >
+                    <span>Open Console</span>
+                    <ExternalLink size={12} />
+                </a>
+            </div>
+        </div>
+    );
+};
 
 const WalletTab = ({ tenant, onUpdate }) => {
     const [amount, setAmount] = useState('');
