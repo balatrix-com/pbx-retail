@@ -40,6 +40,7 @@ import { Menu, Transition } from '@headlessui/react';
 import { Fragment, useState, useEffect } from 'react';
 import { UserProfileModal } from '../profile';
 import { getMediaUrl } from '../../utils/media.utils';
+import api from '../../services/api';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
     const { user, logout } = useAuth();
@@ -49,6 +50,18 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     const [logoError, setLogoError] = useState(false);
     const location = useLocation();
     const role = user?.role;
+    const [voicemailEnabled, setVoicemailEnabled] = useState(false);
+    useEffect(() => {
+        if (!user?.tenantId || !['ADMIN', 'SUPPORT'].includes(role)) { setVoicemailEnabled(false); return; }
+        let active = true;
+        const refresh = () => api.get('/telecom/voicemail/capabilities')
+            .then(response => { if (active) setVoicemailEnabled(!!response.data.enabled); })
+            .catch(() => { if (active) setVoicemailEnabled(false); });
+        refresh();
+        const timer = window.setInterval(refresh, 30000);
+        window.addEventListener('focus', refresh);
+        return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+    }, [user?.tenantId, role]);
 
     const [isExtensionsOpen, setIsExtensionsOpen] = useState(
         location.pathname.startsWith('/extensions') || location.pathname.startsWith('/telecom/extensions')
@@ -111,6 +124,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     { name: 'Ring Groups', href: '/telecom/ring-groups', icon: UserCheck },
                     { name: 'IVR Menus', href: '/telecom/ivrs', icon: ListTree },
                     { name: 'Audio Library', href: '/telecom/audio', icon: Music },
+                    { name: 'Voicemail', href: '/telecom/voicemail', icon: Headphones },
                     { name: 'DID Forwards', href: '/telecom/did-forwards', icon: PhoneForwarded },
                     { name: 'Trunks & Carriers', href: '/telecom/trunks', icon: Server },
                     { name: 'Operational Time', href: '/telecom/schedules', icon: Clock },
@@ -139,6 +153,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     { name: 'Ring Groups', href: '/telecom/ring-groups', icon: UserCheck },
                     { name: 'IVR Menus', href: '/telecom/ivrs', icon: ListTree },
                     { name: 'Audio Library', href: '/telecom/audio', icon: Music },
+                    { name: 'Voicemail', href: '/telecom/voicemail', icon: Headphones },
                     { name: 'DID Forwards', href: '/telecom/did-forwards', icon: PhoneForwarded },
                     { name: 'Schedules', href: '/telecom/schedules', icon: Clock },
                     { name: 'Call Monitoring', href: '/monitoring', icon: Activity },
@@ -152,6 +167,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         if (!canMonitor) {
             items = items.filter(item => item.name !== 'Call Monitoring');
         }
+        if (!voicemailEnabled) items = items.filter(item => item.name !== 'Voicemail');
 
         // Apply tenant feature controls if the user is not a global SUPER_ADMIN
         if (role !== 'SUPER_ADMIN') {

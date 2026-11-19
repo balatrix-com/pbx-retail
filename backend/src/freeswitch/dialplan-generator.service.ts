@@ -49,7 +49,9 @@ export class DialplanGeneratorService {
     extensionNumber: string,
     sipServer?: string,
     enableRecording: boolean = false,
-    customerCode: string = ''
+    customerCode: string = '',
+    voicemailKey?: string,
+    voicemailTimeout: number = 20,
   ): string {
     const server = sipServer || this.sipServer;
     const recordingVariables = enableRecording && customerCode ? this.getRecordingVariablesBlock() : '';
@@ -63,14 +65,17 @@ export class DialplanGeneratorService {
     <context name="public">
       <extension name="${dialplanKey}_direct">
         <condition field="destination_number" expression="^${dialplanKey}$">
-          <action application="set" data="continue_on_fail=true"/>
-          <action application="set" data="call_timeout=20"/>
+          <action application="set" data="continue_on_fail=${voicemailKey ? 'USER_BUSY,NO_ANSWER,NO_USER_RESPONSE,SUBSCRIBER_ABSENT,USER_NOT_REGISTERED' : 'true'}"/>
+          <action application="set" data="call_timeout=${voicemailKey ? voicemailTimeout : 20}"/>
+          ${voicemailKey ? '<action application="set" data="hangup_after_bridge=true"/>' : ''}
           <action application="set" data="ignore_early_media=true"/>${recordingVariables}
           <action application="bridge" data="{ignore_early_media=true${executeOnAnswer}}sofia/internal/${extensionNumber}@${server}"/>
+          ${voicemailKey ? `<action application="transfer" data="${escapeXmlAttr(voicemailKey)} XML public"/>` : ''}
+          ${voicemailKey ? '' : `
           <action application="answer"/>
           <action application="sleep" data="200"/>
           <action application="playback" data="${AUDIO_UNAVAILABLE}"/>
-          <action application="hangup" data="NORMAL_CLEARING"/>
+          <action application="hangup" data="NORMAL_CLEARING"/>`}
         </condition>
       </extension>
     </context>
@@ -91,7 +96,8 @@ export class DialplanGeneratorService {
     sipServer?: string,
     enableRecording: boolean = false,
     customerCode: string = '',
-    gateway?: string
+    gateway?: string,
+    voicemailKey?: string,
   ): string {
     const server = sipServer || this.sipServer;
     const recordingVariables = enableRecording && customerCode ? this.getRecordingVariablesBlock() : '';
@@ -111,7 +117,8 @@ export class DialplanGeneratorService {
     <context name="public">
       <extension name="${dialplanKey}_with_forwarding">
         <condition field="destination_number" expression="^${dialplanKey}$">
-          <action application="set" data="continue_on_fail=true"/>
+          <action application="set" data="continue_on_fail=${voicemailKey ? 'USER_BUSY,NO_ANSWER,NO_USER_RESPONSE,SUBSCRIBER_ABSENT,USER_NOT_REGISTERED' : 'true'}"/>
+          ${voicemailKey ? '<action application="set" data="hangup_after_bridge=true"/>' : ''}
           <action application="set" data="call_timeout=${timeout}"/>
           <action application="set" data="ignore_early_media=true"/>${recordingVariables}
           <!-- Primary bridge -->
@@ -121,16 +128,42 @@ export class DialplanGeneratorService {
           <action application="sleep" data="200"/>
           <action application="playback" data="${AUDIO_NOINPUT}"/>
           <action application="bridge" data="{ignore_early_media=true${executeOnAnswerString}}${forwardBridge}"/>
+          ${voicemailKey ? `<action application="transfer" data="${escapeXmlAttr(voicemailKey)} XML public"/>` : ''}
+          ${voicemailKey ? '' : `
           <!-- Fallback -->
           <action application="answer"/>
           <action application="sleep" data="200"/>
           <action application="playback" data="${AUDIO_UNAVAILABLE}"/>
-          <action application="hangup" data="NORMAL_CLEARING"/>
+          <action application="hangup" data="NORMAL_CLEARING"/>`}
         </condition>
       </extension>
     </context>
   </section>
 </document>`;
+  }
+
+  generateVoicemailXML(key: string, tenantId: string, boxId: string, greetingPath?: string | null): string {
+    if (!/^vm[0-9]+_[A-Za-z0-9]+$/.test(key) || !/^[0-9a-f-]{36}$/i.test(tenantId) || !/^[0-9a-f-]{36}$/i.test(boxId))
+      throw new Error('Invalid voicemail dialplan identity');
+    const greeting = greetingPath || process.env.VOICEMAIL_DEFAULT_GREETING || '/opt/ivr_audio/system/voicemail_default.wav';
+    if (!/^\/[A-Za-z0-9_./-]+\.wav$/.test(greeting) || greeting.includes('..')) throw new Error('Invalid voicemail greeting path');
+    const beep = process.env.VOICEMAIL_BEEP || '/opt/ivr_audio/system/voicemail_beep.wav';
+    if (!/^\/[A-Za-z0-9_./-]+\.wav$/.test(beep) || beep.includes('..')) throw new Error('Invalid voicemail beep path');
+    const root = process.env.VOICEMAIL_STORAGE_ROOT || '/var/lib/pbx-voicemail';
+    if (!/^\/[A-Za-z0-9_./-]+$/.test(root) || root.includes('..')) throw new Error('Invalid voicemail storage root');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<document type="freeswitch/xml"><section name="dialplan"><context name="public">
+  <extension name="${key}"><condition field="destination_number" expression="^${key}$">
+    <action application="set" data="voicemail_tenant_id=${tenantId}"/>
+    <action application="set" data="voicemail_box_id=${boxId}"/>
+    <action application="set" data="record_rate=16000"/>
+    <action application="answer"/>
+    <action application="playback" data="${escapeXmlAttr(greeting)}"/>
+    <action application="playback" data="${escapeXmlAttr(beep)}"/>
+    <action application="record" data="${escapeXmlAttr(root)}/incoming/${tenantId}/${boxId}/\${uuid}.wav 120 200 5"/>
+    <action application="hangup" data="NORMAL_CLEARING"/>
+  </condition></extension>
+</context></section></document>`;
   }
 
   /**
@@ -406,7 +439,8 @@ ${actions}
   generateIVRXMLs(
     baseKey: string,
     greetingPath: string,
-    menu: any // Complex nested JSON
+    menu: any, // Complex nested JSON
+    fallbackVoicemailKey?: string,
   ): Map<string, string> {
     const result = new Map<string, string>();
 
@@ -416,7 +450,7 @@ ${actions}
 
     // data="1 1 {maxTries} {timeout} # {greeting} {invalid} main_choice {pattern} 2000"
     // Using defaults from user example: 3 tries, 5000ms timeout
-    const playDigitsData = `1 1 3 5000 # ${greetingPath} ${AUDIO_INVALID} main_choice ^[0-9]$ 2000`;
+    const playDigitsData = `1 1 3 5000 # ${greetingPath} ${AUDIO_INVALID} main_choice ^[0-9]$ 2000${fallbackVoicemailKey ? ' 999 XML public' : ''}`;
 
     const mainXML = `<?xml version="1.0" encoding="UTF-8"?>
 <document type="freeswitch/xml">
@@ -464,7 +498,7 @@ ${actions}
         <condition field="destination_number" expression="^${level1Code}$">
           <action application="set" data="continue_on_fail=true"/>
           <action application="set" data="call_timeout=25"/>
-          <action application="play_and_get_digits" data="${escapeXmlAttr(`1 1 3 5000 # ${subGreeting} ${AUDIO_INVALID} sub_choice ^[0-9]$ 2000`)}"/>
+          <action application="play_and_get_digits" data="${escapeXmlAttr(`1 1 3 5000 # ${subGreeting} ${AUDIO_INVALID} sub_choice ^[0-9]$ 2000${fallbackVoicemailKey ? ' 999 XML public' : ''}`)}"/>
           <action application="transfer" data="${subTransferData}"/>
         </condition>
       </extension>
@@ -488,6 +522,7 @@ ${actions}
       }
     }
 
+    if (fallbackVoicemailKey) this.generateActionXML(result, baseKey, '999', { type: 'voicemail', target: fallbackVoicemailKey });
     return result;
   }
 
@@ -539,6 +574,8 @@ ${actions}
     } else if (action.type === 'schedule') {
       // Target is "sched1_1001"
       // Condition is "^sched1_1001$"
+      dest = action.target;
+    } else if (action.type === 'voicemail') {
       dest = action.target;
     } else if (action.type === 'did_forward' || action.type === 'forward') {
       // Target is "fwd1_1001"

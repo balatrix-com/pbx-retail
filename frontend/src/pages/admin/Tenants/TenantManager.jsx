@@ -187,35 +187,32 @@ const OverviewTab = ({ tenant, subscription, onToggleBlock, isBlockLoading }) =>
             <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
                 <div className="relative z-10">
                     <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <div className={`h-1.5 w-1.5 rounded-full ${
-                            tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'bg-red-500' :
-                            tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-500' :
-                            tenant.serviceStatus === 'ARCHIVED' ? 'bg-slate-500' :
-                            'bg-green-500'
-                        }`}></div>
+                        <div className={`h-1.5 w-1.5 rounded-full ${tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'bg-red-500' :
+                                tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-500' :
+                                    tenant.serviceStatus === 'ARCHIVED' ? 'bg-slate-500' :
+                                        'bg-green-500'
+                            }`}></div>
                         System Status
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-2">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${
-                            tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'bg-red-50 text-red-700 ring-red-600/20' :
-                            tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-50 text-amber-700 ring-amber-600/20' :
-                            tenant.serviceStatus === 'ARCHIVED' ? 'bg-slate-50 text-slate-700 ring-slate-600/20' :
-                            'bg-green-50 text-green-700 ring-green-600/20'
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'bg-red-50 text-red-700 ring-red-600/20' :
+                                tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-50 text-amber-700 ring-amber-600/20' :
+                                    tenant.serviceStatus === 'ARCHIVED' ? 'bg-slate-50 text-slate-700 ring-slate-600/20' :
+                                        'bg-green-50 text-green-700 ring-green-600/20'
                             }`}>
                             {tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'Blocked' :
-                             tenant.serviceStatus === 'DEACTIVATED' ? 'Deactivated' :
-                             tenant.serviceStatus === 'ARCHIVED' ? 'Archived' : 'Active'}
+                                tenant.serviceStatus === 'DEACTIVATED' ? 'Deactivated' :
+                                    tenant.serviceStatus === 'ARCHIVED' ? 'Archived' : 'Active'}
                         </span>
                         {onToggleBlock && tenant.serviceStatus !== 'ARCHIVED' && (
                             <button
                                 type="button"
                                 onClick={onToggleBlock}
                                 disabled={isBlockLoading}
-                                className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all shadow-sm ${
-                                    tenant.serviceBlocked
+                                className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all shadow-sm ${tenant.serviceBlocked
                                         ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                                         : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
-                                }`}
+                                    }`}
                                 title={tenant.serviceBlocked ? "Unblock calls and portal access" : "Block calls and portal access"}
                             >
                                 {isBlockLoading ? 'Updating...' : tenant.serviceBlocked ? 'Unblock' : 'Block'}
@@ -1184,6 +1181,9 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
         schedulerLimit: 10,
         didForwardEnabled: true,
         didForwardLimit: 10,
+        voicemailEnabled: false,
+        voicemailBoxLimit: 0,
+        voicemailStorageLimitMb: 0,
     });
     const [updatingFeature, setUpdatingFeature] = useState(null);
     const [showRecordingModal, setShowRecordingModal] = useState(false);
@@ -1312,6 +1312,14 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
             description: 'Directly forward incoming phone numbers to external lines or specific destinations.',
             icon: Phone,
             color: 'text-blue-600 bg-blue-50 border-blue-100',
+        },
+        {
+            key: 'voicemailEnabled',
+            limitKey: 'voicemailBoxLimit',
+            title: 'Voicemail',
+            description: 'Let this tenant create mailboxes, upload greetings, and receive messages.',
+            icon: Mic,
+            color: 'text-blue-600 bg-blue-50 border-blue-100',
         }
     ];
 
@@ -1379,6 +1387,15 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                                             />
                                             <span className="text-[10px] text-gray-400 font-bold">resources</span>
                                         </div>
+                                    )}
+                                    {isEnabled && item.key === 'voicemailEnabled' && (
+                                        <label className="mt-3 flex items-center gap-2 text-xs font-bold text-gray-700">
+                                            Storage limit (MB, 0 = unlimited)
+                                            <input type="number" min="0" className="w-28 px-2 py-1 border rounded"
+                                                value={features.voicemailStorageLimitMb ?? 0}
+                                                onChange={e => setFeatures(prev => ({ ...prev, voicemailStorageLimitMb: e.target.value }))}
+                                                onBlur={e => handleLimitChange('voicemailStorageLimitMb', e.target.value || 0)} />
+                                        </label>
                                     )}
                                 </div>
                             </div>
@@ -1769,11 +1786,10 @@ const CustomizeTab = ({ tenant, onUpdate }) => {
                         </label>
                         {!isEditing ? (
                             <div className="mt-1">
-                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${
-                                    formData.customerType === 'company'
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${formData.customerType === 'company'
                                         ? 'bg-blue-50 text-blue-700 ring-blue-600/20'
                                         : 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
-                                }`}>
+                                    }`}>
                                     {formData.customerType === 'company' ? <Building2 size={13} /> : <User size={13} />}
                                     {formData.customerType === 'company' ? 'Company' : 'Individual'}
                                 </span>
@@ -1783,22 +1799,20 @@ const CustomizeTab = ({ tenant, onUpdate }) => {
                                 <button
                                     type="button"
                                     onClick={() => handleChange('customerType', 'company')}
-                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                                        formData.customerType === 'company'
+                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${formData.customerType === 'company'
                                             ? 'bg-white text-indigo-700 shadow-sm'
                                             : 'text-gray-500 hover:text-gray-900'
-                                    }`}
+                                        }`}
                                 >
                                     Company
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => handleChange('customerType', 'individual')}
-                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                                        formData.customerType === 'individual'
+                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${formData.customerType === 'individual'
                                             ? 'bg-white text-indigo-700 shadow-sm'
                                             : 'text-gray-500 hover:text-gray-900'
-                                    }`}
+                                        }`}
                                 >
                                     Individual
                                 </button>

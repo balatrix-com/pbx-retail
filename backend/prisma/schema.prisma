@@ -48,6 +48,8 @@ model Tenant {
   outboundCarriers     OutboundCarrier[]
   ownedOutboundEndpoints OutboundEndpoint[]   @relation("TenantOutboundEndpoints")
   inboundWhitelist     InboundWhitelist[]
+  voicemailBoxes       VoicemailBox[]
+  voicemailMessages    VoicemailMessage[]
 
   @@map("tenants")
 }
@@ -101,6 +103,7 @@ model Extension {
   isActive                   Boolean           @default(true)
   tenant                     Tenant            @relation(fields: [tenantId], references: [id])
   ringGroupMembers           RingGroupMember[]
+  voicemailBox               VoicemailBox?
 
   @@unique([tenantId, extensionNumber])
   @@index([tenantId])
@@ -353,6 +356,7 @@ model IVR {
   timeoutMs         Int      @default(5000)
   maxAttempts       Int      @default(3)
   menu              Json
+  fallbackVoicemailBoxId String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   sequenceId        Int      @default(0)
@@ -627,12 +631,67 @@ model TenantFeature {
   monitorEnabled    Boolean  @default(true)
   recordingEnabled  Boolean  @default(false)
   recordingAllowed  Boolean  @default(false)
+  voicemailEnabled  Boolean  @default(false)
+  voicemailBoxLimit Int      @default(0)
+  voicemailStorageLimitMb Int @default(0)
   createdAt         DateTime @default(now())
 
   updatedAt         DateTime @updatedAt
   tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_features")
+}
+
+enum VoicemailMessageStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+model VoicemailBox {
+  id              String   @id @default(uuid())
+  tenantId        String
+  extensionId     String?  @unique
+  sequenceId      Int
+  name            String
+  enabled         Boolean  @default(true)
+  greetingPath    String?
+  noAnswerSeconds Int      @default(20)
+  notifyByEmail   Boolean  @default(false)
+  notifyEmail     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  extension       Extension? @relation(fields: [extensionId], references: [id], onDelete: SetNull)
+  messages        VoicemailMessage[]
+
+  @@unique([tenantId, sequenceId])
+  @@index([tenantId, enabled])
+  @@map("voicemail_boxes")
+}
+
+model VoicemailMessage {
+  id           String @id @default(uuid())
+  tenantId     String
+  boxId        String
+  callUuid     String
+  callerId     String?
+  calledNumber String?
+  durationMs   Int?
+  audioKey     String?
+  audioBytes   BigInt @default(0)
+  status       VoicemailMessageStatus @default(PROCESSING)
+  readAt       DateTime?
+  notificationSentAt DateTime?
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+  tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  box          VoicemailBox @relation(fields: [boxId], references: [id], onDelete: Cascade)
+
+  @@unique([boxId, callUuid])
+  @@index([tenantId, boxId, createdAt])
+  @@index([tenantId, status, deletedAt])
+  @@map("voicemail_messages")
 }
 
 model Partner {

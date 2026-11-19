@@ -76,6 +76,7 @@ export class IVRsService {
         if (dto.menu) {
             await this.validateMenu(tenantId, dto.menu);
         }
+        if (dto.fallbackVoicemailBoxId) await this.validateMenu(tenantId, { '0': { type: 'voicemail', target: dto.fallbackVoicemailBoxId } });
 
         // Create IVR
         const last = await this.prisma.iVR.findFirst({
@@ -91,6 +92,7 @@ export class IVRsService {
                 name: dto.name,
                 greetingAudioPath: dto.greetingAudioPath,
                 menu: (dto.menu || {}) as any,
+                fallbackVoicemailBoxId: dto.fallbackVoicemailBoxId || null,
                 timeoutMs: dto.timeout || 5000,
                 maxAttempts: dto.maxFailures || 3,
             },
@@ -119,6 +121,7 @@ export class IVRsService {
         if (dto.menu) {
             await this.validateMenu(tenantId, dto.menu);
         }
+        if (dto.fallbackVoicemailBoxId) await this.validateMenu(tenantId, { '0': { type: 'voicemail', target: dto.fallbackVoicemailBoxId } });
 
         // Update
         const updated = await this.prisma.iVR.update({
@@ -127,6 +130,7 @@ export class IVRsService {
                 name: dto.name,
                 greetingAudioPath: dto.greetingAudioPath,
                 menu: dto.menu as any,
+                fallbackVoicemailBoxId: dto.fallbackVoicemailBoxId,
                 timeoutMs: dto.timeout,
                 maxAttempts: dto.maxFailures,
             },
@@ -193,7 +197,7 @@ export class IVRsService {
                 }
 
                 // Validate target exists for types that require one
-                if (['extension', 'ring_group', 'ivr', 'external', 'schedule', 'did_forward', 'forward'].includes(action.type)) {
+                if (['extension', 'ring_group', 'ivr', 'external', 'schedule', 'did_forward', 'forward', 'voicemail'].includes(action.type)) {
                     // External just needs a number string, no DB check
                     if (action.type === 'external') {
                         if (!action.target) throw new BadRequestException(`External number missing for digit "${digit}"`);
@@ -237,6 +241,12 @@ export class IVRsService {
                             where: { id: action.target, tenantId },
                         });
                         if (!schedule) throw new BadRequestException(`Schedule ${action.target} not found`);
+                    } else if (action.type === 'voicemail') {
+                        const [box, feature] = await Promise.all([
+                            this.prisma.voicemailBox.findFirst({ where: { id: action.target, tenantId, enabled: true } }),
+                            this.prisma.tenantFeature.findUnique({ where: { tenantId } }),
+                        ]);
+                        if (!box || !feature?.voicemailEnabled) throw new BadRequestException('Voicemail box is unavailable');
                     } else if (action.type === 'did_forward' || action.type === 'forward') {
                         const forward = await this.prisma.dIDForward.findFirst({
                             where: { id: action.target, tenantId },

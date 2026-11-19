@@ -21,6 +21,7 @@ function IVRForm() {
         greetingAudioPath: '',
         timeout: 5000,
         maxFailures: 3,
+        fallbackVoicemailBoxId: '',
         menu: {},
     });
 
@@ -34,7 +35,8 @@ function IVRForm() {
         ringGroups: [],
         ivrs: [],
         audioFiles: [],
-        didForwards: []
+        didForwards: [],
+        voicemailBoxes: []
     });
 
     // Upload state
@@ -59,7 +61,8 @@ function IVRForm() {
                 ringGroups: routingRes.data.ringGroups || [],
                 ivrs: routingRes.data.ivrs || [],
                 audioFiles: audioRes.data.files || [],
-                didForwards: routingRes.data.didForwards || []
+                didForwards: routingRes.data.didForwards || [],
+                voicemailBoxes: routingRes.data.voicemailBoxes || []
             });
         } catch (e) {
             console.error('Failed to fetch resources:', e);
@@ -347,6 +350,7 @@ function IVRForm() {
                             <option value="ring_group">Connect to Ring Group</option>
                             {depth === 0 && <option value="submenu">Submenu (Level 2)</option>}
                             <option value="ivr">Go to another IVR</option>
+                            {resources.voicemailBoxes?.length > 0 && <option value="voicemail">Voicemail box</option>}
                             <option value="did_forward">Connect to DID Forward</option>
                             <option value="external">Dial External Number</option>
                             <option value="back">Back to Previous Menu</option>
@@ -479,6 +483,11 @@ function IVRForm() {
                     }
                 </select>
             );
+        } else if (opt.type === 'voicemail') {
+            return <select className={selectClass} value={opt.target} onChange={e => handleUpdate(opt.id, 'target', e.target.value)} required>
+                <option value="">Select voicemail box...</option>
+                {resources.voicemailBoxes?.map(box => <option key={box.id} value={box.id}>{box.name}</option>)}
+            </select>;
         } else if (opt.type === 'did_forward' || opt.type === 'forward') {
             return (
                 <select
@@ -597,6 +606,13 @@ function IVRForm() {
                         </div>
 
                         {/* Audio Section */}
+                        {resources.voicemailBoxes?.length > 0 && <div className="pt-2">
+                            <label className="block text-sm font-bold text-gray-700 mb-2">No input / invalid input fallback</label>
+                            <select name="fallbackVoicemailBoxId" value={formData.fallbackVoicemailBoxId || ''} onChange={handleInputChange} className="border rounded-xl p-2 w-full max-w-xl">
+                                <option value="">No voicemail fallback</option>
+                                {resources.voicemailBoxes.map(box => <option key={box.id} value={box.id}>{box.name}</option>)}
+                            </select>
+                        </div>}
                         <div className="pt-2">
                             <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
                                 <FileAudio className="w-4 h-4 text-gray-400" />

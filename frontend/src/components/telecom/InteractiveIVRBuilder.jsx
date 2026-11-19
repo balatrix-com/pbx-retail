@@ -15,7 +15,7 @@ import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { PhoneCall, CornerDownRight, PhoneForwarded, Link, Repeat, PhoneOff, Trash2, Settings, Plus, X, KeySquare } from 'lucide-react';
 
-const ActionPalette = () => {
+const ActionPalette = ({ voicemailBoxes = [] }) => {
   const onDragStart = (event, nodeType, actionType) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.setData('actionType', actionType);
@@ -27,6 +27,7 @@ const ActionPalette = () => {
     { type: 'ring_group', label: 'Ring Group', icon: <PhoneForwarded size={16} />, color: 'indigo' },
     { type: 'submenu', label: 'Submenu', icon: <CornerDownRight size={16} />, color: 'purple' },
     { type: 'ivr', label: 'Route to IVR', icon: <Link size={16} />, color: 'emerald' },
+    ...(voicemailBoxes.length ? [{ type: 'voicemail', label: 'Voicemail', icon: <PhoneCall size={16} />, color: 'blue' }] : []),
     { type: 'did_forward', label: 'DID Forward', icon: <PhoneCall size={16} />, color: 'orange' },
     { type: 'external', label: 'External No.', icon: <PhoneCall size={16} />, color: 'orange' },
     { type: 'back', label: 'Go Back', icon: <CornerDownRight size={16} className="transform rotate-180" />, color: 'gray' },
@@ -99,6 +100,7 @@ const getActionDetails = (type) => {
         case 'ring_group': return { label: 'Ring Group', icon: <PhoneForwarded size={20} />, borderColor: 'border-indigo-400', iconBgColor: 'bg-indigo-50', iconColor: 'text-indigo-600' };
         case 'submenu': return { label: 'Submenu', icon: <CornerDownRight size={20} />, borderColor: 'border-purple-400', iconBgColor: 'bg-purple-50', iconColor: 'text-purple-600' };
         case 'ivr': return { label: 'Route to IVR', icon: <Link size={20} />, borderColor: 'border-emerald-400', iconBgColor: 'bg-emerald-50', iconColor: 'text-emerald-600' };
+        case 'voicemail': return { label: 'Voicemail', icon: <PhoneCall size={20} />, borderColor: 'border-blue-400', iconBgColor: 'bg-blue-50', iconColor: 'text-blue-600' };
         case 'did_forward':
         case 'forward': return { label: 'DID Forward', icon: <PhoneCall size={20} />, borderColor: 'border-orange-400', iconBgColor: 'bg-orange-50', iconColor: 'text-orange-600' };
         case 'external': return { label: 'External No.', icon: <PhoneCall size={20} />, borderColor: 'border-orange-400', iconBgColor: 'bg-orange-50', iconColor: 'text-orange-600' };
@@ -132,6 +134,7 @@ const InteractiveBuilderCore = ({ ivrName, resources, initialMenu, onChange }) =
           const ivr = resources.ivrs?.find(i => i.id === target);
           return ivr ? ivr.name : target;
       }
+      if (actionType === 'voicemail') return resources.voicemailBoxes?.find(b => b.id === target)?.name || '';
       if (actionType === 'external') {
           return target; // raw number
       }
@@ -362,7 +365,7 @@ const InteractiveBuilderCore = ({ ivrName, resources, initialMenu, onChange }) =
                   type: targetNode.data.actionType,
               };
 
-              if (['extension', 'ring_group', 'ivr', 'external', 'did_forward', 'forward'].includes(action.type)) {
+              if (['extension', 'ring_group', 'ivr', 'external', 'did_forward', 'forward', 'voicemail'].includes(action.type)) {
                   action.target = targetNode.data.target;
               }
 
@@ -383,7 +386,7 @@ const InteractiveBuilderCore = ({ ivrName, resources, initialMenu, onChange }) =
 
   return (
     <div className="flex h-[700px] bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-      <ActionPalette />
+      <ActionPalette voicemailBoxes={resources.voicemailBoxes} />
       
       <div className="flex-1 relative" ref={reactFlowWrapper}>
         <ReactFlow
@@ -558,6 +561,15 @@ const InteractiveBuilderCore = ({ ivrName, resources, initialMenu, onChange }) =
                                 {resources.ivrs.map(ivr => (
                                     <option key={ivr.id} value={ivr.id}>{ivr.name}</option>
                                 ))}
+                            </select>
+                        </div>
+                    )}
+                    {selectedNode.data.actionType === 'voicemail' && (
+                        <div><label className="text-xs font-bold text-gray-500">Select voicemail box</label>
+                            <select className="w-full rounded-lg border p-2" value={selectedNode.data.target || ''}
+                                onChange={e => updateNodeData(selectedNode.id, { target: e.target.value })}>
+                                <option value="">Select voicemail box...</option>
+                                {resources.voicemailBoxes?.map(box => <option key={box.id} value={box.id}>{box.name}</option>)}
                             </select>
                         </div>
                     )}

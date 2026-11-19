@@ -342,6 +342,12 @@ export class DIDsService {
             if (!ivr) {
                 throw new BadRequestException('IVR not found');
             }
+        } else if (routeType === 'voicemail') {
+            const [box, feature] = await Promise.all([
+                this.prisma.voicemailBox.findFirst({ where: { id: destinationId, tenantId, enabled: true } }),
+                this.prisma.tenantFeature.findUnique({ where: { tenantId } }),
+            ]);
+            if (!box || !feature?.voicemailEnabled) throw new BadRequestException('Voicemail box is unavailable');
         } else if (routeType === 'did_forward') {
             const forward = await this.prisma.dIDForward.findFirst({
                 where: { id: destinationId, tenantId },

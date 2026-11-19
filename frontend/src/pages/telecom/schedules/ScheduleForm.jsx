@@ -26,6 +26,7 @@ const ScheduleForm = () => {
     const [extensions, setExtensions] = useState([]);
     const [ringGroups, setRingGroups] = useState([]);
     const [ivrs, setIVRs] = useState([]);
+    const [voicemailBoxes, setVoicemailBoxes] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -58,7 +59,7 @@ const ScheduleForm = () => {
 
     const loadDropdownData = async () => {
         try {
-            const [extRes, rgRes, ivrRes] = await Promise.all([
+            const [extRes, rgRes, ivrRes, routingRes] = await Promise.all([
                 api.get('/telecom/extensions').catch(err => {
                     console.error('Failed to load extensions:', err);
                     return { data: [] };
@@ -71,10 +72,12 @@ const ScheduleForm = () => {
                     console.error('Failed to load ivrs:', err);
                     return { data: [] };
                 }),
+                api.get('/telecom/routing-options').catch(() => ({ data: {} })),
             ]);
             setExtensions(extRes.data || []);
             setRingGroups(rgRes.data || []);
             setIVRs(ivrRes.data || []);
+            setVoicemailBoxes(routingRes.data?.voicemailBoxes || []);
         } catch (err) {
             console.error('Error loading dropdown data:', err);
         }
@@ -182,6 +185,9 @@ const ScheduleForm = () => {
         } else if (routeType === 'ivr') {
             options = ivrs;
             placeholder = 'Select an IVR';
+        } else if (routeType === 'voicemail') {
+            options = voicemailBoxes;
+            placeholder = 'Select a voicemail box';
         }
 
         return (
@@ -368,6 +374,7 @@ const ScheduleForm = () => {
                                         <option value="extension">Extension</option>
                                         <option value="ring_group">Ring Group</option>
                                         <option value="ivr">IVR Menu</option>
+                                        {voicemailBoxes.length > 0 && <option value="voicemail">Voicemail</option>}
                                     </select>
                                 </div>
                                 <div>
@@ -399,6 +406,7 @@ const ScheduleForm = () => {
                                         <option value="extension">Extension</option>
                                         <option value="ring_group">Ring Group</option>
                                         <option value="ivr">IVR Menu</option>
+                                        {voicemailBoxes.length > 0 && <option value="voicemail">Voicemail</option>}
                                     </select>
                                 </div>
                                 {formData.afterHoursRouteType && (
@@ -432,6 +440,7 @@ const ScheduleForm = () => {
                                         <option value="extension">Extension</option>
                                         <option value="ring_group">Ring Group</option>
                                         <option value="ivr">IVR Menu</option>
+                                        {voicemailBoxes.length > 0 && <option value="voicemail">Voicemail</option>}
                                     </select>
                                 </div>
                                 {formData.weekendRouteType && (

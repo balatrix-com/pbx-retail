@@ -452,6 +452,9 @@ export class TenantsService {
         /** Required when enabling recordingAllowed (turning it from false → true).
          *  Must match a valid rec_rate_card.id. */
         recRateCardId?: number;
+        voicemailEnabled?: boolean;
+        voicemailBoxLimit?: number;
+        voicemailStorageLimitMb?: number;
     }) {
         const tenant = await this.prisma.tenant.findUnique({
             where: { id }
@@ -537,6 +540,10 @@ export class TenantsService {
             }
         }
 
+        if (dto.voicemailEnabled !== undefined && typeof dto.voicemailEnabled !== 'boolean') throw new BadRequestException('Invalid voicemail switch');
+        if (dto.voicemailBoxLimit !== undefined && (!Number.isInteger(dto.voicemailBoxLimit) || dto.voicemailBoxLimit < 0 || dto.voicemailBoxLimit > 10000)) throw new BadRequestException('Invalid mailbox limit');
+        if (dto.voicemailStorageLimitMb !== undefined && (!Number.isSafeInteger(dto.voicemailStorageLimitMb) || dto.voicemailStorageLimitMb < 0)) throw new BadRequestException('Invalid voicemail storage limit');
+
         const isDisablingRecording = dto.recordingAllowed === false;
 
         const updatedFeatures = await this.prisma.tenantFeature.upsert({
@@ -553,6 +560,9 @@ export class TenantsService {
                 didForwardLimit: dto.didForwardLimit ?? 10,
                 monitorEnabled: dto.monitorEnabled ?? true,
                 recordingAllowed: dto.recordingAllowed ?? false,
+                voicemailEnabled: dto.voicemailEnabled ?? false,
+                voicemailBoxLimit: dto.voicemailBoxLimit ?? 0,
+                voicemailStorageLimitMb: dto.voicemailStorageLimitMb ?? 0,
                 recordingEnabled: false,
             },
             update: {
@@ -566,6 +576,9 @@ export class TenantsService {
                 didForwardLimit: dto.didForwardLimit,
                 monitorEnabled: dto.monitorEnabled,
                 recordingAllowed: dto.recordingAllowed,
+                voicemailEnabled: dto.voicemailEnabled,
+                voicemailBoxLimit: dto.voicemailBoxLimit,
+                voicemailStorageLimitMb: dto.voicemailStorageLimitMb,
                 ...(isDisablingRecording ? { recordingEnabled: false } : {}),
             }
         });
@@ -577,6 +590,8 @@ export class TenantsService {
             });
             await this.freeSwitchSync.syncAllDialplans(id);
         }
+
+        if (dto.voicemailEnabled !== undefined) await this.freeSwitchSync.syncAllDialplans(id);
 
         return updatedFeatures;
     }

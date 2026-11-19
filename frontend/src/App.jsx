@@ -31,6 +31,9 @@ import DIDForwardsPage from './pages/telecom/did-forwards/DIDForwardsPage';
 import DIDForwardForm from './pages/telecom/did-forwards/DIDForwardForm';
 import RevenuePage from './pages/admin/RevenuePage';
 import SipTracesPage from './pages/admin/SipTracesPage';
+import VoicemailPage from './pages/telecom/VoicemailPage';
+import api from './services/api';
+import { useEffect, useState } from 'react';
 
 import UserManagement from './pages/admin/UserManagement';
 import SuperAdminUsers from './pages/admin/SuperAdminUsers';
@@ -68,6 +71,22 @@ const MonitoringRoute = ({ children }) => {
         return <Navigate to="/dashboard" replace />;
     }
     return children;
+};
+
+const VoicemailRoute = () => {
+    const [enabled, setEnabled] = useState(null);
+    useEffect(() => {
+        let mounted = true;
+        const refresh = () => api.get('/telecom/voicemail/capabilities')
+            .then(response => { if (mounted) setEnabled(!!response.data.enabled); })
+            .catch(() => { if (mounted) setEnabled(false); });
+        refresh();
+        const timer = window.setInterval(refresh, 30000);
+        window.addEventListener('focus', refresh);
+        return () => { mounted = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+    }, []);
+    if (enabled === null) return <div className="p-8">Loading…</div>;
+    return enabled ? <VoicemailPage /> : <Navigate to="/dashboard" replace />;
 };
 
 const AnalyticsPageDispatcher = () => {
@@ -143,6 +162,7 @@ function App() {
                                                 <Route path="/telecom/schedules/:id/edit" element={<ScheduleForm />} />
                                                 <Route path="/telecom/schedules/:id/edit" element={<ScheduleForm />} />
                                                 <Route path="/telecom/audio" element={<AudioLibrary />} />
+                                                <Route path="/telecom/voicemail" element={<VoicemailRoute />} />
                                                 <Route path="/analytics" element={<AnalyticsPageDispatcher />} />
                                                 <Route path="/monitoring" element={
                                                     <MonitoringRoute>

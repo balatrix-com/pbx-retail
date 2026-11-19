@@ -9,7 +9,7 @@ const RoutingModal = ({ isOpen, onClose, phoneNumber, tfn, onSave }) => {
     const { addToast } = useToast();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [options, setOptions] = useState({ extensions: [], ringGroups: [], ivrs: [], schedules: [], didForwards: [] });
+    const [options, setOptions] = useState({ extensions: [], ringGroups: [], ivrs: [], schedules: [], didForwards: [], voicemailBoxes: [] });
 
     const [routeType, setRouteType] = useState(currentNumber?.routeType || 'extension');
     const [targetId, setTargetId] = useState(currentNumber?.routeTargetId || '');
@@ -106,6 +106,7 @@ const RoutingModal = ({ isOpen, onClose, phoneNumber, tfn, onSave }) => {
                                     <option value="extension">Extension</option>
                                     <option value="ring_group">Ring Group</option>
                                     <option value="ivr">IVR Menu</option>
+                                    {options.voicemailBoxes?.length > 0 && <option value="voicemail">Voicemail</option>}
                                     {currentNumber?.type !== 'DID' && <option value="schedule">Schedule</option>}
                                     {currentNumber?.type !== 'TFN' && <option value="did_forward">External Number (Forward)</option>}
                                 </select>
@@ -159,6 +160,9 @@ const RoutingModal = ({ isOpen, onClose, phoneNumber, tfn, onSave }) => {
                                         ))}
 
                                         {routeType === 'schedule' && options.schedules.map(opt => (
+                                            <option key={opt.id} value={opt.id}>{opt.name}</option>
+                                        ))}
+                                        {routeType === 'voicemail' && options.voicemailBoxes?.map(opt => (
                                             <option key={opt.id} value={opt.id}>{opt.name}</option>
                                         ))}
                                     </select>
