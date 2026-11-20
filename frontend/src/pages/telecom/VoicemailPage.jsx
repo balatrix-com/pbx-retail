@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Mail, Plus, Trash2, Upload } from 'lucide-react';
+import { Download, Mail, Trash2, Upload } from 'lucide-react';
 import api from '../../services/api';
 
 const base = '/telecom/voicemail';
@@ -11,9 +11,6 @@ export default function VoicemailPage() {
   const [boxId, setBoxId] = useState('');
   const [page, setPage] = useState(1);
   const [totalMessages, setTotalMessages] = useState(0);
-  const [name, setName] = useState('');
-  const [extensionId, setExtensionId] = useState('');
-  const [extensions, setExtensions] = useState([]);
   const [audioUrl, setAudioUrl] = useState('');
   const [playingId, setPlayingId] = useState('');
   const [error, setError] = useState('');
@@ -23,13 +20,12 @@ export default function VoicemailPage() {
     const cap = (await api.get(`${base}/capabilities`)).data;
     setCapabilities(cap);
     if (!cap.enabled) return;
-    const [boxRes, messageRes, extensionRes] = await Promise.all([
-      api.get(`${base}/boxes`), api.get(`${base}/messages`, { params: { ...(boxId ? { boxId } : {}), page } }), api.get('/telecom/extensions'),
+    const [boxRes, messageRes] = await Promise.all([
+      api.get(`${base}/boxes`), api.get(`${base}/messages`, { params: { ...(boxId ? { boxId } : {}), page } }),
     ]);
     setBoxes(boxRes.data || []);
     setMessages(messageRes.data?.items || []);
     setTotalMessages(messageRes.data?.total || 0);
-    setExtensions(extensionRes.data || []);
   };
 
   useEffect(() => {
@@ -76,26 +72,15 @@ export default function VoicemailPage() {
 
   return <div className="p-6 md:p-8 space-y-6 max-w-6xl mx-auto">
     <div><h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2"><Mail /> Voicemail</h1>
-      <p className="text-slate-600">Create mailboxes, upload your own greetings, and listen to messages.</p></div>
+      <p className="text-slate-600">Manage automatically created mailboxes, upload greetings, and listen to messages.</p></div>
     {error && <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-red-800">{error}</div>}
     <section className="bg-white rounded-xl border p-5 space-y-4">
-      <h2 className="text-xl font-semibold">Mailboxes ({capabilities.boxCount} / {capabilities.boxLimit})</h2>
-      <div className="flex flex-wrap gap-2 items-end">
-        <label className="text-sm">Name<input className="block border rounded p-2" value={name} maxLength={100} onChange={e => setName(e.target.value)} placeholder="Sales" /></label>
-        <label className="text-sm">Extension (optional)<select className="block border rounded p-2" value={extensionId} onChange={e => setExtensionId(e.target.value)}>
-          <option value="">Company mailbox</option>{extensions.map(ext => <option key={ext.id} value={ext.id}>{ext.extensionNumber} — {ext.name}</option>)}
-        </select></label>
-        <button className="bg-indigo-600 text-white rounded px-4 py-2 flex gap-2 disabled:opacity-50" disabled={busy || !name.trim() || capabilities.boxCount >= capabilities.boxLimit}
-          onClick={() => action(async () => { await api.post(`${base}/boxes`, { name, extensionId: extensionId || null }); setName(''); setExtensionId(''); })}><Plus size={18} /> Add mailbox</button>
-      </div>
+      <h2 className="text-xl font-semibold">Mailboxes ({boxes.length})</h2>
+      <p className="text-sm text-slate-600">The company mailbox is on by default. Extension mailboxes start off; enable them from each extension’s settings. Each mailbox keeps its latest 20 messages.</p>
       <div className="divide-y">{boxes.map(box => <div key={box.id} className="py-3 flex flex-wrap items-center gap-3 justify-between">
         <div><strong>{box.name}</strong> <span className={box.enabled ? 'text-green-700' : 'text-slate-500'}>· {box.enabled ? 'On' : 'Off'}</span> {box.extension && <span className="text-slate-500">· Extension {box.extension.extensionNumber}</span>}
           <p className="text-xs text-slate-500">{box.greetingPath ? 'Custom greeting' : 'Default greeting'} · {box.noAnswerSeconds}s no-answer timeout</p></div>
         <div className="flex flex-wrap gap-2">
-          <label className="text-xs">Extension<select className="block border rounded p-2" value={box.extensionId || ''} disabled={busy}
-            onChange={e => action(() => api.patch(`${base}/boxes/${box.id}`, { extensionId: e.target.value || null }))}>
-            <option value="">Company mailbox</option>{extensions.map(ext => <option key={ext.id} value={ext.id}>{ext.extensionNumber} — {ext.name}</option>)}
-          </select></label>
           <label className="text-xs">No-answer seconds<input type="number" min="10" max="120" defaultValue={box.noAnswerSeconds} key={`${box.id}-${box.noAnswerSeconds}`}
             className="block border rounded p-2 w-24" disabled={busy} onBlur={e => { const value = Number(e.target.value); if (value !== box.noAnswerSeconds) action(() => api.patch(`${base}/boxes/${box.id}`, { noAnswerSeconds: value })); }} /></label>
           <label className="text-xs">Email notifications<input type="email" defaultValue={box.notifyEmail || ''} key={`${box.id}-${box.notifyEmail || ''}`}
@@ -109,7 +94,6 @@ export default function VoicemailPage() {
           <label className="border rounded px-3 py-2 cursor-pointer flex gap-2"><Upload size={16} /> Upload greeting<input type="file" accept="audio/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) action(async () => { const data = new FormData(); data.append('file', file); await api.put(`${base}/boxes/${box.id}/greeting`, data, { headers: { 'Content-Type': 'multipart/form-data' } }); }); e.target.value = ''; }} /></label>
           {box.greetingPath && <button className="border rounded px-3 py-2" disabled={busy} onClick={() => action(() => api.delete(`${base}/boxes/${box.id}/greeting`))}>Use default</button>}
           {box.greetingPath && <button className="border rounded px-3 py-2" onClick={() => previewGreeting(box.id)}>Preview</button>}
-          <button className="border rounded px-3 py-2 text-red-700" disabled={busy} title="Delete mailbox" onClick={() => { if (window.confirm(`Delete mailbox ${box.name}?`)) action(() => api.delete(`${base}/boxes/${box.id}`)); }}><Trash2 size={16} /></button>
         </div>
       </div>)}</div>
     </section>

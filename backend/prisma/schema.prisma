@@ -631,7 +631,7 @@ model TenantFeature {
   monitorEnabled    Boolean  @default(true)
   recordingEnabled  Boolean  @default(false)
   recordingAllowed  Boolean  @default(false)
-  voicemailEnabled  Boolean  @default(false)
+  voicemailEnabled  Boolean  @default(true)
   voicemailBoxLimit Int      @default(0)
   voicemailStorageLimitMb Int @default(0)
   createdAt         DateTime @default(now())
@@ -655,6 +655,7 @@ model VoicemailBox {
   sequenceId      Int
   name            String
   enabled         Boolean  @default(true)
+  retiredAt       DateTime?
   greetingPath    String?
   noAnswerSeconds Int      @default(20)
   notifyByEmail   Boolean  @default(false)

@@ -8,9 +8,10 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { FreeswitchModule } from '../../freeswitch/freeswitch.module';
 import { AuthModule } from '../../auth/auth.module';
 import { LookupRedisModule } from '../../redis/lookup-redis.module';
+import { VoicemailModule } from '../../voicemail/voicemail.module';
 
 @Module({
-    imports: [PrismaModule, FreeswitchModule, AuthModule, LookupRedisModule, HttpModule, ConfigModule],
+    imports: [PrismaModule, FreeswitchModule, AuthModule, LookupRedisModule, HttpModule, ConfigModule, VoicemailModule],
     controllers: [ExtensionsController],
     providers: [ExtensionsService, InternalServiceGuard],
     exports: [ExtensionsService], // Export for use in other modules (e.g., Ring Groups, DIDs)

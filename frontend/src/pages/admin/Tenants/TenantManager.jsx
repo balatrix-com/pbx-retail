@@ -1315,9 +1315,8 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
         },
         {
             key: 'voicemailEnabled',
-            limitKey: 'voicemailBoxLimit',
             title: 'Voicemail',
-            description: 'Let this tenant create mailboxes, upload greetings, and receive messages.',
+            description: 'On for new tenants: one active company mailbox and one off-by-default mailbox per extension.',
             icon: Mic,
             color: 'text-blue-600 bg-blue-50 border-blue-100',
         }
@@ -1389,13 +1388,16 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                                         </div>
                                     )}
                                     {isEnabled && item.key === 'voicemailEnabled' && (
-                                        <label className="mt-3 flex items-center gap-2 text-xs font-bold text-gray-700">
-                                            Storage limit (MB, 0 = unlimited)
-                                            <input type="number" min="0" className="w-28 px-2 py-1 border rounded"
-                                                value={features.voicemailStorageLimitMb ?? 0}
-                                                onChange={e => setFeatures(prev => ({ ...prev, voicemailStorageLimitMb: e.target.value }))}
-                                                onBlur={e => handleLimitChange('voicemailStorageLimitMb', e.target.value || 0)} />
-                                        </label>
+                                        <div className="mt-3 flex flex-wrap items-end gap-4">
+                                            <label className="flex flex-col gap-1 text-xs font-bold text-gray-700">
+                                                Storage limit (MB, 0 = unlimited)
+                                                <input type="number" min="0" className="w-28 px-2 py-1 border rounded"
+                                                    value={features.voicemailStorageLimitMb ?? 0}
+                                                    onChange={e => setFeatures(prev => ({ ...prev, voicemailStorageLimitMb: e.target.value }))}
+                                                    onBlur={e => handleLimitChange('voicemailStorageLimitMb', e.target.value || 0)} />
+                                            </label>
+                                            <p className="text-xs text-gray-500">Each mailbox keeps its latest 20 messages. When a new message arrives, the oldest is removed.</p>
+                                        </div>
                                     )}
                                 </div>
                             </div>

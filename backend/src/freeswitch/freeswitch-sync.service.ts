@@ -87,7 +87,7 @@ export class FreeSwitchSyncService {
         const box = await this.prisma.voicemailBox.findUnique({ where: { id: boxId }, include: { tenant: { include: { tenantFeatures: true } } } });
         if (!box?.tenant.customerCode) return;
         const key = `vm${box.sequenceId}_${box.tenant.customerCode}`;
-        if (box.enabled && box.tenant.tenantFeatures?.voicemailEnabled && !box.tenant.serviceBlocked && box.tenant.status === 'ACTIVE') {
+        if (box.enabled && !box.retiredAt && box.tenant.tenantFeatures?.voicemailEnabled && !box.tenant.serviceBlocked && box.tenant.status === 'ACTIVE') {
             await this.freeswitchDB.upsertDialplan(key, this.dialplanGenerator.generateVoicemailXML(key, box.tenantId, box.id, box.greetingPath));
         } else {
             await this.freeswitchDB.deleteDialplan(key);

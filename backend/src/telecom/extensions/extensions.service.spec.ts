@@ -6,6 +6,7 @@ import { FreeSwitchSyncService } from '../../freeswitch/freeswitch-sync.service'
 import { LookupRedisService } from '../../redis/lookup-redis.module';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
+import { VoicemailService } from '../../voicemail/voicemail.service';
 import { of, throwError } from 'rxjs';
 
 describe('ExtensionsService (Kamailio & Sub-Billing Auto-Sync)', () => {
@@ -72,6 +73,7 @@ describe('ExtensionsService (Kamailio & Sub-Billing Auto-Sync)', () => {
                 { provide: LookupRedisService, useValue: lookupRedis },
                 { provide: HttpService, useValue: httpService },
                 { provide: ConfigService, useValue: configService },
+                { provide: VoicemailService, useValue: { ensureDefaultBoxes: jest.fn().mockResolvedValue(undefined) } },
             ],
         }).compile();
 

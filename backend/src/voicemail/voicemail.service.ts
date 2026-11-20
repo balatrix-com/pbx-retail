@@ -28,12 +28,13 @@ export class VoicemailService {
     if (!tenant) throw new NotFoundException('Tenant not found');
     const enabled = tenant.status === TenantStatus.ACTIVE && !tenant.serviceBlocked && !!tenant.tenantFeatures?.voicemailEnabled;
     const [boxCount, bytes] = await Promise.all([
-      this.prisma.voicemailBox.count({ where: { tenantId } }),
+      this.prisma.voicemailBox.count({ where: { tenantId, retiredAt: null } }),
       this.prisma.voicemailMessage.aggregate({ where: { tenantId, deletedAt: null, status: 'READY' }, _sum: { audioBytes: true } }),
     ]);
     return {
       enabled,
       boxLimit: tenant.tenantFeatures?.voicemailBoxLimit ?? 0,
+      messageLimit: 20,
       boxCount,
       storageLimitBytes: (tenant.tenantFeatures?.voicemailStorageLimitMb ?? 0) * 1024 * 1024,
       storageUsedBytes: Number(bytes._sum.audioBytes ?? 0),
@@ -61,7 +62,35 @@ export class VoicemailService {
 
   async listBoxes(tenantId: string) {
     await this.assertEnabled(tenantId);
-    return this.prisma.voicemailBox.findMany({ where: { tenantId }, include: { extension: { select: { extensionNumber: true, name: true } }, _count: { select: { messages: true } } }, orderBy: { sequenceId: 'asc' } });
+    await this.ensureDefaultBoxes(tenantId);
+    return this.prisma.voicemailBox.findMany({ where: { tenantId, retiredAt: null }, include: { extension: { select: { extensionNumber: true, name: true } }, _count: { select: { messages: true } } }, orderBy: { sequenceId: 'asc' } });
+  }
+
+  /** Provision one company mailbox and one mailbox for every extension, without replacing existing boxes. */
+  async ensureDefaultBoxes(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: { tenantFeatures: true, extensions: { select: { id: true, extensionNumber: true } } },
+    });
+    if (!tenant?.tenantFeatures?.voicemailEnabled || tenant.status !== TenantStatus.ACTIVE || tenant.serviceBlocked) return;
+    const boxes = await this.prisma.voicemailBox.findMany({ where: { tenantId, retiredAt: null }, select: { extensionId: true } });
+    const existing = new Set(boxes.map(box => box.extensionId ?? '__company__'));
+    const missing = [
+      ...(!existing.has('__company__') ? [{ name: 'Company voicemail', extensionId: null, enabled: true }] : []),
+      ...tenant.extensions.filter(ext => !existing.has(ext.id)).map(ext => ({ name: `Extension ${ext.extensionNumber}`, extensionId: ext.id, enabled: false })),
+    ];
+    for (const mailbox of missing) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const current = await this.prisma.voicemailBox.findFirst({ where: { tenantId, extensionId: mailbox.extensionId, retiredAt: null } });
+        if (current) break;
+        try {
+          await this.createBox(tenantId, mailbox);
+          break;
+        } catch (error) {
+          if (attempt === 2) throw error;
+        }
+      }
+    }
   }
 
   async createBox(tenantId: string, input: BoxInput) {
@@ -77,8 +106,8 @@ export class VoicemailService {
       box = await this.prisma.$transaction(async tx => {
       const features = await tx.tenantFeature.findUnique({ where: { tenantId } });
       if (!features?.voicemailEnabled) throw new ForbiddenException('Voicemail is disabled');
-      const count = await tx.voicemailBox.count({ where: { tenantId } });
-      if (count >= features.voicemailBoxLimit) throw new ForbiddenException('Mailbox limit reached');
+      const existing = await tx.voicemailBox.findFirst({ where: { tenantId, extensionId: input.extensionId || null, retiredAt: null } });
+      if (existing) throw new ConflictException('Mailbox already exists for this extension or company');
       if (input.extensionId) {
         const ext = await tx.extension.findFirst({ where: { id: input.extensionId, tenantId } });
         if (!ext) throw new BadRequestException('Extension does not belong to this tenant');
@@ -86,7 +115,7 @@ export class VoicemailService {
       const last = await tx.voicemailBox.findFirst({ where: { tenantId }, orderBy: { sequenceId: 'desc' } });
       return tx.voicemailBox.create({ data: {
         id: boxId, tenantId, sequenceId: (last?.sequenceId ?? 0) + 1, name: input.name!.trim(),
-        extensionId: input.extensionId || null, noAnswerSeconds: input.noAnswerSeconds ?? 20,
+        extensionId: input.extensionId || null, enabled: input.enabled ?? true, noAnswerSeconds: input.noAnswerSeconds ?? 20,
         notifyByEmail: input.notifyByEmail ?? false, notifyEmail: input.notifyEmail || null,
       } });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -149,6 +178,23 @@ export class VoicemailService {
     if (box.extensionId) await this.sync.syncExtension(box.extensionId);
     await fs.rm(this.greetingPath(tenantId, id), { force: true });
     return { deleted: true };
+  }
+
+  async assertExtensionMailboxCanRetire(tenantId: string, extensionId: string) {
+    const box = await this.prisma.voicemailBox.findFirst({ where: { tenantId, extensionId, retiredAt: null } });
+    if (box) await this.assertNoDirectRoutes(tenantId, box.id);
+    return box?.id;
+  }
+
+  async retireExtensionMailbox(tenantId: string, boxId?: string) {
+    if (!boxId) return;
+    const box = await this.prisma.voicemailBox.findFirst({ where: { tenantId, id: boxId, retiredAt: null } });
+    if (!box) return;
+    await this.prisma.voicemailBox.update({
+      where: { id: box.id },
+      data: { enabled: false, retiredAt: new Date(), extensionId: null, name: `Former ${box.name}`.slice(0, 100) },
+    });
+    await this.sync.syncVoicemailBox(box.id);
   }
 
   private greetingPath(tenantId: string, boxId: string) {
@@ -263,7 +309,7 @@ export class VoicemailService {
     await this.assertEnabled(tenantId);
     const message = await this.getMessage(tenantId, id);
     await fs.rm(this.messagePath(tenantId, message.boxId, message.id), { force: true });
-    await this.prisma.voicemailMessage.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.prisma.voicemailMessage.update({ where: { id }, data: { deletedAt: new Date(), audioKey: null } });
     return { deleted: true };
   }
 }

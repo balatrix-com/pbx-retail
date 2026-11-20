@@ -8,6 +8,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { ExtensionsService } from '../telecom/extensions/extensions.service';
 import { MailService } from '../mail/mail.service';
 import { TenantArchiveService } from './tenant-archive.service';
+import { VoicemailService } from '../voicemail/voicemail.service';
 
 @Injectable()
 export class TenantsService {
@@ -22,6 +23,7 @@ export class TenantsService {
         private extensionsService: ExtensionsService,
         private mailService: MailService,
         private archives: TenantArchiveService,
+        private voicemail: VoicemailService,
     ) { }
 
     async listTenants(query: {
@@ -560,7 +562,7 @@ export class TenantsService {
                 didForwardLimit: dto.didForwardLimit ?? 10,
                 monitorEnabled: dto.monitorEnabled ?? true,
                 recordingAllowed: dto.recordingAllowed ?? false,
-                voicemailEnabled: dto.voicemailEnabled ?? false,
+                voicemailEnabled: dto.voicemailEnabled ?? true,
                 voicemailBoxLimit: dto.voicemailBoxLimit ?? 0,
                 voicemailStorageLimitMb: dto.voicemailStorageLimitMb ?? 0,
                 recordingEnabled: false,
@@ -591,6 +593,7 @@ export class TenantsService {
             await this.freeSwitchSync.syncAllDialplans(id);
         }
 
+        if (dto.voicemailEnabled === true) await this.voicemail.ensureDefaultBoxes(id);
         if (dto.voicemailEnabled !== undefined) await this.freeSwitchSync.syncAllDialplans(id);
 
         return updatedFeatures;
@@ -683,6 +686,9 @@ export class TenantsService {
                 }
             });
 
+            // Company voicemail is available by default; extension mailboxes are provisioned disabled.
+            await prisma.tenantFeature.create({ data: { tenantId: tenant.id, voicemailEnabled: true } });
+
             // 2. Create Wallet
             await prisma.wallet.create({
                 data: {
@@ -747,6 +753,9 @@ export class TenantsService {
         // 7. Auto-sync and provision extensions in PBX & Kamailio
         await this.extensionsService.syncMissingExtensionsFromSubBilling(result.tenant.id).catch(err => {
             this.logger.warn(`Post-tenant creation extension sync warning: ${err.message}`);
+        });
+        await this.voicemail.ensureDefaultBoxes(result.tenant.id).catch(err => {
+            this.logger.warn(`Post-tenant creation voicemail provisioning warning: ${err.message}`);
         });
 
         // 8. Send credentials email (fire-and-forget, non-blocking)

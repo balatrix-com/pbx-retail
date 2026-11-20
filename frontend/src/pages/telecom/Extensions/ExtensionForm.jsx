@@ -30,19 +30,13 @@ function ExtensionVoicemailPanel({ extensionId, extensionName, forwardAllEnabled
 
     if (!capabilities?.enabled) return null;
     const box = boxes.find(item => item.extensionId === extensionId);
-    const canCreate = capabilities.boxCount < capabilities.boxLimit;
 
     const toggle = async () => {
         setBusy(true);
         setError('');
         try {
-            if (box) {
-                await api.patch(`/telecom/voicemail/boxes/${box.id}`, { enabled: !box.enabled });
-            } else {
-                await api.post('/telecom/voicemail/boxes', {
-                    name: `${extensionName || 'Extension'} voicemail`, extensionId,
-                });
-            }
+            if (!box) throw new Error('Mailbox is still being provisioned. Refresh and try again.');
+            await api.patch(`/telecom/voicemail/boxes/${box.id}`, { enabled: !box.enabled });
             await refresh();
         } catch (e) {
             setError(e.response?.data?.message || 'Could not update voicemail');
@@ -57,19 +51,19 @@ function ExtensionVoicemailPanel({ extensionId, extensionName, forwardAllEnabled
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Extension Voicemail</h3>
         </div>
         <div className="p-6 space-y-3">
-            <p className="text-sm text-gray-600">Send busy, unavailable, or unanswered calls to this extension’s mailbox. The default ring time is 20 seconds.</p>
+            <p className="text-sm text-gray-600">Voicemail for {extensionName || 'this extension'} starts off. Turn it on to send busy, unavailable, or unanswered calls to its mailbox. The default ring time is 20 seconds.</p>
             {forwardAllEnabled && <p className="text-sm text-amber-700">Forward All takes priority, so calls forwarded immediately will not reach this extension’s voicemail.</p>}
             {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
             <div className="flex flex-wrap items-center gap-3">
-                <button type="button" disabled={busy || (!box && !canCreate)} onClick={toggle}
-                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                <button type="button" disabled={busy || !box} onClick={toggle} aria-pressed={!!box?.enabled}
+                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
                     {busy ? 'Saving…' : box?.enabled ? 'Turn voicemail off' : 'Turn voicemail on'}
                 </button>
                 {box && <span className="text-sm text-gray-600">Mailbox: {box.name} · {box.noAnswerSeconds}s no-answer timeout</span>}
                 <button type="button" className="text-sm font-semibold text-primary-700 underline"
                     onClick={() => navigate('/telecom/voicemail')}>Manage greeting and mailbox</button>
             </div>
-            {!box && !canCreate && <p className="text-sm text-amber-700">Mailbox limit reached. Reassign an unused mailbox or ask Super Admin to raise the limit.</p>}
+            {!box && <p className="text-sm text-amber-700">Mailbox is being provisioned. Refresh this page shortly.</p>}
         </div>
     </section>;
 }
