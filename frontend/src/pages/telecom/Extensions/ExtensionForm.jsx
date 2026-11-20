@@ -1,8 +1,79 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2, ArrowLeft, Settings as SettingsIcon, PhoneForwarded, Hash, Key } from 'lucide-react';
+import { Loader2, ArrowLeft, Settings as SettingsIcon, PhoneForwarded, Hash, Key, Mail } from 'lucide-react';
 import api from '../../../services/api';
 import { telecomService } from '../../../services/telecom.service';
+
+function ExtensionVoicemailPanel({ extensionId, extensionName, forwardAllEnabled }) {
+    const navigate = useNavigate();
+    const [capabilities, setCapabilities] = useState(null);
+    const [boxes, setBoxes] = useState([]);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    const refresh = async () => {
+        const capabilityResponse = await api.get('/telecom/voicemail/capabilities');
+        setCapabilities(capabilityResponse.data);
+        if (capabilityResponse.data.enabled) {
+            const boxResponse = await api.get('/telecom/voicemail/boxes');
+            setBoxes(boxResponse.data || []);
+        }
+    };
+
+    useEffect(() => {
+        const check = () => refresh().catch(() => setCapabilities(null));
+        check();
+        const timer = window.setInterval(check, 30000);
+        window.addEventListener('focus', check);
+        return () => { window.clearInterval(timer); window.removeEventListener('focus', check); };
+    }, [extensionId]);
+
+    if (!capabilities?.enabled) return null;
+    const box = boxes.find(item => item.extensionId === extensionId);
+    const canCreate = capabilities.boxCount < capabilities.boxLimit;
+
+    const toggle = async () => {
+        setBusy(true);
+        setError('');
+        try {
+            if (box) {
+                await api.patch(`/telecom/voicemail/boxes/${box.id}`, { enabled: !box.enabled });
+            } else {
+                await api.post('/telecom/voicemail/boxes', {
+                    name: `${extensionName || 'Extension'} voicemail`, extensionId,
+                });
+            }
+            await refresh();
+        } catch (e) {
+            setError(e.response?.data?.message || 'Could not update voicemail');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return <section className="bg-white shadow-sm ring-1 ring-gray-100 sm:rounded-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+            <Mail className="h-4 w-4 text-gray-500" />
+            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Extension Voicemail</h3>
+        </div>
+        <div className="p-6 space-y-3">
+            <p className="text-sm text-gray-600">Send busy, unavailable, or unanswered calls to this extension’s mailbox. The default ring time is 20 seconds.</p>
+            {forwardAllEnabled && <p className="text-sm text-amber-700">Forward All takes priority, so calls forwarded immediately will not reach this extension’s voicemail.</p>}
+            {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+            <div className="flex flex-wrap items-center gap-3">
+                <button type="button" disabled={busy || (!box && !canCreate)} onClick={toggle}
+                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                    {busy ? 'Saving…' : box?.enabled ? 'Turn voicemail off' : 'Turn voicemail on'}
+                </button>
+                {box && <span className="text-sm text-gray-600">Mailbox: {box.name} · {box.noAnswerSeconds}s no-answer timeout</span>}
+                <button type="button" className="text-sm font-semibold text-primary-700 underline"
+                    onClick={() => navigate('/telecom/voicemail')}>Manage greeting and mailbox</button>
+            </div>
+            {!box && !canCreate && <p className="text-sm text-amber-700">Mailbox limit reached. Reassign an unused mailbox or ask Super Admin to raise the limit.</p>}
+        </div>
+    </section>;
+}
+
 function ExtensionForm() {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -486,6 +557,7 @@ function ExtensionForm() {
                     </button>
                 </div>
             </form>
+            {isEditMode && <ExtensionVoicemailPanel extensionId={id} extensionName={formData.name} forwardAllEnabled={formData.forwardAllEnabled} />}
         </div>
     );
 }

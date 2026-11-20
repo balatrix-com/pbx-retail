@@ -36,6 +36,7 @@ function IVRForm() {
         ivrs: [],
         audioFiles: [],
         didForwards: [],
+        voicemailEnabled: false,
         voicemailBoxes: []
     });
 
@@ -62,6 +63,7 @@ function IVRForm() {
                 ivrs: routingRes.data.ivrs || [],
                 audioFiles: audioRes.data.files || [],
                 didForwards: routingRes.data.didForwards || [],
+                voicemailEnabled: !!routingRes.data.voicemailEnabled,
                 voicemailBoxes: routingRes.data.voicemailBoxes || []
             });
         } catch (e) {
@@ -547,6 +549,13 @@ function IVRForm() {
             {error && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 font-medium shadow-sm">
                     {error}
+                </div>
+            )}
+
+            {resources.voicemailEnabled && !resources.voicemailBoxes.length && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                    To route an IVR key or timeout to voicemail, create and enable a mailbox first.{' '}
+                    <button type="button" className="font-bold underline" onClick={() => navigate('/telecom/voicemail')}>Manage voicemail boxes</button>
                 </div>
             )}
 

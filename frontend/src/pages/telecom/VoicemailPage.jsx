@@ -89,7 +89,7 @@ export default function VoicemailPage() {
           onClick={() => action(async () => { await api.post(`${base}/boxes`, { name, extensionId: extensionId || null }); setName(''); setExtensionId(''); })}><Plus size={18} /> Add mailbox</button>
       </div>
       <div className="divide-y">{boxes.map(box => <div key={box.id} className="py-3 flex flex-wrap items-center gap-3 justify-between">
-        <div><strong>{box.name}</strong> {box.extension && <span className="text-slate-500">· Extension {box.extension.extensionNumber}</span>}
+        <div><strong>{box.name}</strong> <span className={box.enabled ? 'text-green-700' : 'text-slate-500'}>· {box.enabled ? 'On' : 'Off'}</span> {box.extension && <span className="text-slate-500">· Extension {box.extension.extensionNumber}</span>}
           <p className="text-xs text-slate-500">{box.greetingPath ? 'Custom greeting' : 'Default greeting'} · {box.noAnswerSeconds}s no-answer timeout</p></div>
         <div className="flex flex-wrap gap-2">
           <label className="text-xs">Extension<select className="block border rounded p-2" value={box.extensionId || ''} disabled={busy}
@@ -103,6 +103,9 @@ export default function VoicemailPage() {
             onBlur={e => { if (e.target.value !== (box.notifyEmail || '')) action(() => api.patch(`${base}/boxes/${box.id}`, { notifyEmail: e.target.value || null, notifyByEmail: !!e.target.value })); }} /></label>
         </div>
         <div className="flex items-center gap-2">
+          <button className="border rounded px-3 py-2" disabled={busy} onClick={() => action(() => api.patch(`${base}/boxes/${box.id}`, { enabled: !box.enabled }))}>
+            Turn {box.enabled ? 'off' : 'on'}
+          </button>
           <label className="border rounded px-3 py-2 cursor-pointer flex gap-2"><Upload size={16} /> Upload greeting<input type="file" accept="audio/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) action(async () => { const data = new FormData(); data.append('file', file); await api.put(`${base}/boxes/${box.id}/greeting`, data, { headers: { 'Content-Type': 'multipart/form-data' } }); }); e.target.value = ''; }} /></label>
           {box.greetingPath && <button className="border rounded px-3 py-2" disabled={busy} onClick={() => action(() => api.delete(`${base}/boxes/${box.id}/greeting`))}>Use default</button>}
           {box.greetingPath && <button className="border rounded px-3 py-2" onClick={() => previewGreeting(box.id)}>Preview</button>}

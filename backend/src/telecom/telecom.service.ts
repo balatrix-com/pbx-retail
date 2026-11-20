@@ -176,6 +176,7 @@ export class TelecomService implements OnModuleInit {
             ivrs,
             schedules,
             didForwards,
+            voicemailEnabled: !!feature?.voicemailEnabled,
             voicemailBoxes: feature?.voicemailEnabled ? await this.prisma.voicemailBox.findMany({ where: { tenantId, enabled: true }, select: { id: true, name: true } }) : [],
         };
     }
