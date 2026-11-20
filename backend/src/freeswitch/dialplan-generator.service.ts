@@ -143,7 +143,7 @@ export class DialplanGeneratorService {
   }
 
   generateVoicemailXML(key: string, tenantId: string, boxId: string, greetingPath?: string | null): string {
-    if (!/^vm[0-9]+_[A-Za-z0-9]+$/.test(key) || !/^[0-9a-f-]{36}$/i.test(tenantId) || !/^[0-9a-f-]{36}$/i.test(boxId))
+    if (!/^vm[0-9]+_[A-Za-z0-9_-]+$/i.test(key) || !/^[A-Za-z0-9_-]{1,64}$/.test(tenantId) || !/^[A-Za-z0-9_-]{1,64}$/.test(boxId))
       throw new Error('Invalid voicemail dialplan identity');
     const greeting = greetingPath || process.env.VOICEMAIL_DEFAULT_GREETING || '/opt/ivr_audio/system/voicemail_default.wav';
     if (!/^\/[A-Za-z0-9_./-]+\.wav$/.test(greeting) || greeting.includes('..')) throw new Error('Invalid voicemail greeting path');

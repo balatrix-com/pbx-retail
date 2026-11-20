@@ -18,4 +18,12 @@ describe('Voicemail dialplan', () => {
     expect(xml).toContain('record_rate=16000');
     expect(xml).toContain(`/incoming/${tenant}/${box}/${'${uuid}'}.wav 120 200 5`);
   });
+
+  it('supports alphanumeric tenant IDs like U1035', () => {
+    const tenant = 'U1035';
+    const box = '7b8ec897-b997-4c2a-9736-a4e831a20c11';
+    const xml = generator.generateVoicemailXML('vm1_u1035', tenant, box);
+    expect(xml).toContain('voicemail_tenant_id=U1035');
+    expect(xml).toContain('/incoming/U1035/' + box);
+  });
 });

@@ -48,7 +48,7 @@ export class VoicemailService {
     if (!input || typeof input !== 'object') throw new BadRequestException('Mailbox settings are required');
     if (input.name !== undefined && (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100))
       throw new BadRequestException('Mailbox name must be 1–100 characters');
-    if (input.extensionId !== undefined && input.extensionId !== null && (typeof input.extensionId !== 'string' || !/^[0-9a-f-]{36}$/i.test(input.extensionId)))
+    if (input.extensionId !== undefined && input.extensionId !== null && input.extensionId !== '' && (typeof input.extensionId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(input.extensionId)))
       throw new BadRequestException('Invalid extension ID');
     if (input.enabled !== undefined && typeof input.enabled !== 'boolean') throw new BadRequestException('enabled must be a boolean');
     if (input.notifyByEmail !== undefined && typeof input.notifyByEmail !== 'boolean') throw new BadRequestException('notifyByEmail must be a boolean');
