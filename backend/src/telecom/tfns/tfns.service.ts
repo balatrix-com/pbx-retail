@@ -165,8 +165,7 @@ export class TFNsService {
                     tenantId: null, status: 'AVAILABLE', routeType: null, routeTargetId: null,
                     forwardEnabled: false, forwardNumber: null,
                 } });
-            } else {
-                await this.prisma.tFN.delete({ where: { id: tfn.id } });
+                    await this.prisma.tFN.delete({ where: { id: tfn.id } });
             }
             throw error;
         }

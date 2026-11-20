@@ -147,8 +147,10 @@ export class DialplanGeneratorService {
       throw new Error('Invalid voicemail dialplan identity');
     const greeting = greetingPath || process.env.VOICEMAIL_DEFAULT_GREETING || '/opt/ivr_audio/system/voicemail_default.wav';
     if (!/^\/[A-Za-z0-9_./-]+\.wav$/.test(greeting) || greeting.includes('..')) throw new Error('Invalid voicemail greeting path');
-    const beep = process.env.VOICEMAIL_BEEP || '/opt/ivr_audio/system/voicemail_beep.wav';
-    if (!/^\/[A-Za-z0-9_./-]+\.wav$/.test(beep) || beep.includes('..')) throw new Error('Invalid voicemail beep path');
+    const beep = process.env.VOICEMAIL_BEEP || 'tone_stream://L=1;%(500,0,1000)';
+    if (!beep.startsWith('tone_stream://') && (!/^\/[A-Za-z0-9_./-]+\.wav$/.test(beep) || beep.includes('..'))) {
+      throw new Error('Invalid voicemail beep path');
+    }
     const root = process.env.VOICEMAIL_STORAGE_ROOT || '/var/lib/pbx-voicemail';
     if (!/^\/[A-Za-z0-9_./-]+$/.test(root) || root.includes('..')) throw new Error('Invalid voicemail storage root');
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -160,6 +162,7 @@ export class DialplanGeneratorService {
     <action application="answer"/>
     <action application="playback" data="${escapeXmlAttr(greeting)}"/>
     <action application="playback" data="${escapeXmlAttr(beep)}"/>
+    <action application="system" data="mkdir -p ${escapeXmlAttr(root)}/incoming/${tenantId}/${boxId}"/>
     <action application="record" data="${escapeXmlAttr(root)}/incoming/${tenantId}/${boxId}/\${uuid}.wav 120 200 5"/>
     <action application="hangup" data="NORMAL_CLEARING"/>
   </condition></extension>
