@@ -135,11 +135,12 @@ export const subscriptionService = {
     },
 
     // Compatibility plan switch
-    switchPlan: async (customerId, newPlanId) => {
-        const res = await api.post('/subscriptions/activate', {
-            tenantId: customerId,
-            plan_id: newPlanId,
-            payment_mode: 'wallet'
+    switchPlan: async (tenantId, newPlanId, immediate = true) => {
+        // The onboarding compatibility endpoint supplies a stable activation key.
+        const res = await api.post('/wallet/subscription', {
+            targetTenantId: tenantId,
+            planId: newPlanId,
+            immediate,
         });
         return res.data;
     }
