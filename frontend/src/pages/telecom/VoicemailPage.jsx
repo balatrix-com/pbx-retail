@@ -86,7 +86,7 @@ export default function VoicemailPage() {
         <div><strong>{box.name}</strong> <span className={box.enabled ? 'text-green-700' : 'text-slate-500'}>· {box.enabled ? 'On' : 'Off'}</span> {box.extension && <span className="text-slate-500">· Extension {box.extension.extensionNumber}</span>}
           <p className="text-xs text-slate-500">{box.noAnswerSeconds}s no-answer timeout</p>
           <p className={box.greetingPath ? 'text-sm font-medium text-green-700' : 'text-sm text-slate-600'} aria-live="polite">
-            Greeting set: {box.greetingPath ? (box.greetingAudioName || 'Custom greeting (source name unavailable)') : 'System default'}
+            Greeting set: {box.greetingPath ? (box.greetingAudioName || 'Custom greeting (preview it or select its Audio Library source again to show the name)') : 'System default'}
           </p></div>
         <div className="flex flex-wrap gap-2">
           <label className="text-xs">Greeting from Audio Library<select className="block border rounded p-2 max-w-64" value={box.greetingPath && library.some(file => file.id === box.greetingAudioFileId) ? box.greetingAudioFileId : ''} disabled={busy || !library.length}
