@@ -98,9 +98,11 @@ export class VoicemailService {
     this.validateInput(input);
     if (!input.name) throw new BadRequestException('Mailbox name is required');
     const boxId = randomUUID();
-    const incomingDirectory = join(this.storageRoot, 'incoming', tenantId, boxId);
-    await fs.mkdir(incomingDirectory, { recursive: true, mode: 0o2770 });
-    await fs.chmod(incomingDirectory, 0o2770);
+    const tenantIncomingDir = join(this.storageRoot, 'incoming', tenantId);
+    const incomingDirectory = join(tenantIncomingDir, boxId);
+    await fs.mkdir(incomingDirectory, { recursive: true, mode: 0o777 });
+    await fs.chmod(tenantIncomingDir, 0o777).catch(() => {});
+    await fs.chmod(incomingDirectory, 0o777).catch(() => {});
     let box;
     try {
       box = await this.prisma.$transaction(async tx => {
