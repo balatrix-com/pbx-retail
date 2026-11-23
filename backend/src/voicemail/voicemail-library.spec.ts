@@ -21,12 +21,14 @@ describe('voicemail Audio Library selection', () => {
   });
 
   it('allows one library source to supply multiple mailboxes through the existing conversion path', async () => {
-    const { service, storage, save } = setup({ size: 100, storageUrl: '/opt/ivr_audio/tenant-1/greeting.mp3' });
+    const { service, storage, save } = setup({ id: 'audio', name: 'Company welcome', size: 100, storageUrl: '/opt/ivr_audio/tenant-1/greeting.mp3' });
     await service.selectLibraryGreeting('tenant-1', 'box-1', 'audio');
     await service.selectLibraryGreeting('tenant-1', 'box-2', 'audio');
     expect(storage.readAudio).toHaveBeenCalledWith('/opt/ivr_audio/tenant-1/greeting.mp3');
-    expect(save).toHaveBeenCalledWith('tenant-1', 'box-1', Buffer.from('audio'), 50 * 1024 * 1024);
-    expect(save).toHaveBeenCalledWith('tenant-1', 'box-2', Buffer.from('audio'), 50 * 1024 * 1024);
+    expect(save).toHaveBeenCalledWith('tenant-1', 'box-1', Buffer.from('audio'), 50 * 1024 * 1024,
+      { audioFileId: 'audio', audioName: 'Company welcome' });
+    expect(save).toHaveBeenCalledWith('tenant-1', 'box-2', Buffer.from('audio'), 50 * 1024 * 1024,
+      { audioFileId: 'audio', audioName: 'Company welcome' });
   });
 });
 

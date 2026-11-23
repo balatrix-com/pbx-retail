@@ -657,6 +657,8 @@ model VoicemailBox {
   enabled         Boolean  @default(true)
   retiredAt       DateTime?
   greetingPath    String?
+  greetingAudioFileId String?
+  greetingAudioName   String?
   noAnswerSeconds Int      @default(20)
   notifyByEmail   Boolean  @default(false)
   notifyEmail     String?

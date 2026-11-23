@@ -84,11 +84,14 @@ export default function VoicemailPage() {
       <p className="text-sm text-slate-600">Upload a greeting once in <Link to="/telecom/audio" className="text-indigo-700 underline">Audio Library</Link>, then select it for any mailbox. Selecting a file saves a copy of its first 60 seconds; later library changes do not change that greeting.</p>
       <div className="divide-y">{boxes.map(box => <div key={box.id} className="py-3 flex flex-wrap items-center gap-3 justify-between">
         <div><strong>{box.name}</strong> <span className={box.enabled ? 'text-green-700' : 'text-slate-500'}>· {box.enabled ? 'On' : 'Off'}</span> {box.extension && <span className="text-slate-500">· Extension {box.extension.extensionNumber}</span>}
-          <p className="text-xs text-slate-500">{box.greetingPath ? 'Custom greeting' : 'Default greeting'} · {box.noAnswerSeconds}s no-answer timeout</p></div>
+          <p className="text-xs text-slate-500">{box.noAnswerSeconds}s no-answer timeout</p>
+          <p className={box.greetingPath ? 'text-sm font-medium text-green-700' : 'text-sm text-slate-600'} aria-live="polite">
+            Greeting set: {box.greetingPath ? (box.greetingAudioName || 'Custom greeting (source name unavailable)') : 'System default'}
+          </p></div>
         <div className="flex flex-wrap gap-2">
-          <label className="text-xs">Greeting from Audio Library<select className="block border rounded p-2 max-w-64" value="" disabled={busy || !library.length}
+          <label className="text-xs">Greeting from Audio Library<select className="block border rounded p-2 max-w-64" value={box.greetingPath && library.some(file => file.id === box.greetingAudioFileId) ? box.greetingAudioFileId : ''} disabled={busy || !library.length}
             onChange={e => { const audioFileId = e.target.value; if (audioFileId) action(() => api.put(`${base}/boxes/${box.id}/greeting/library`, { audioFileId })); }}>
-            <option value="">{library.length ? 'Choose greeting…' : 'Upload audio in Audio Library first'}</option>
+            <option value="">{library.length ? (box.greetingPath ? 'Choose a different greeting…' : 'Choose greeting…') : 'Upload audio in Audio Library first'}</option>
             {library.map(file => <option key={file.id} value={file.id}>{file.name || file.originalName}</option>)}
           </select></label>
           <label className="text-xs">No-answer seconds<input type="number" min="10" max="120" defaultValue={box.noAnswerSeconds} key={`${box.id}-${box.noAnswerSeconds}`}
