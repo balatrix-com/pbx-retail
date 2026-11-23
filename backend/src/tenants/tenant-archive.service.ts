@@ -28,7 +28,7 @@ export class TenantArchiveService implements OnModuleInit, OnModuleDestroy {
     }
     async request(id: string, actor: string) {
         await this.prisma.$transaction(async tx => {
-            await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', `tenant-archive:${id}`);
+            await tx.$queryRawUnsafe('SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext($1))', `tenant-archive:${id}`);
             const tenant = await tx.tenant.findUnique({ where: { id } });
             if (!tenant) throw new NotFoundException('Tenant not found');
             if (await tx.user.count({ where: { tenantId: id, role: 'SUPER_ADMIN', status: { not: 'DELETED' } } })) throw new BadRequestException('Cannot archive a tenant containing platform Super Admins');
@@ -168,7 +168,7 @@ export class TenantArchiveService implements OnModuleInit, OnModuleDestroy {
         if (tenant.status !== 'ARCHIVED') throw new BadRequestException('Tenant must be archived before releasing held numbers');
         await this.billing(tenant, 'release-numbers', { ...input, actor_id: actor });
         await this.prisma.$transaction(async tx => {
-            await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', `tenant-number-release:${id}`);
+            await tx.$queryRawUnsafe('SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext($1))', `tenant-number-release:${id}`);
             await tx.tFN.updateMany({ where: { tenantId: id, status: 'HELD' }, data: { tenantId: null, status: 'AVAILABLE', routeType: null, routeTargetId: null } });
             await tx.dID.deleteMany({ where: { tenantId: id, isActive: false } });
             await tx.$executeRawUnsafe("UPDATE held_number_inventory SET status='RELEASED',released_at=now() WHERE tenant_id=$1 AND status='HELD'", id);

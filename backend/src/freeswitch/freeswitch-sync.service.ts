@@ -111,7 +111,7 @@ export class FreeSwitchSyncService {
         const rg = await client.ringGroup.findUnique({
             where: { id: ringGroupId },
             include: {
-                members: { 
+                members: {
                     include: { extension: true },
                     orderBy: [{ priority: 'asc' }, { position: 'asc' }]
                 },
@@ -286,11 +286,11 @@ export class FreeSwitchSyncService {
      */
     async deleteDID(did: any): Promise<void> {
         if (!did) return;
-        
+
         // DIDs and TFNs share the removal logic in FreeSwitchDBService
         // But DIDs also need sequence-based forwarding XMLs removed
         const normalizedNumber = this.normalizeNumber(did.number);
-        
+
         // 1. Remove from did_routes and dialplan_xml (exact match)
         await this.freeswitchDB.removeDID(normalizedNumber, normalizedNumber);
 
@@ -418,14 +418,14 @@ export class FreeSwitchSyncService {
     async deleteTFN(tfn: any): Promise<void> {
         if (!tfn) return;
         const normalizedNumber = this.normalizeNumber(tfn.number);
-        
+
         // 1. Remove from did_routes and dialplan_xml (exact match)
         await this.freeswitchDB.removeDID(normalizedNumber, normalizedNumber);
 
         // 2. Clean up potential forwarding XMLs
         // TFNs use: fwd_tfn_{number}
         await this.freeswitchDB.deleteDialplanPattern(`fwd_tfn_${tfn.number}`);
-        
+
         // DIDs (and sometimes TFNs if passed same object) use: fwd_{seqId}_{customerCode}
         if (tfn.tenant && tfn.sequenceId !== undefined) {
             await this.freeswitchDB.deleteDialplanPattern(`fwd_${tfn.sequenceId}_${tfn.tenant.customerCode}`);
@@ -442,10 +442,10 @@ export class FreeSwitchSyncService {
      */
     async bulkDeleteTenantData(customerCode: string, strict = false): Promise<void> {
         if (!customerCode) return;
-        
+
         try {
             const customerId = customerCode;
-            
+
             // 1. Bulk delete from did_routes
             if (customerId) {
                 await this.freeswitchDB.deleteRoutesByCustomer(customerId);
