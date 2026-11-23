@@ -43,7 +43,19 @@ export class SubscriptionsController {
     if (body.payment_mode === 'credit_override' && user.role !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Credit override requires Super Admin approval');
     }
-    return this.service.activate(this.scope(user, body.tenantId), body, user.id);
+    const tenantId = this.scope(user, body.tenantId);
+    // Older tenant-creation bundles send only these three fields. Give that
+    // specific Super Admin flow the same retry key as /wallet/subscription.
+    if (user.role === Role.SUPER_ADMIN && body.tenantId && typeof body.plan_id === 'string' &&
+        body.payment_mode === 'wallet' && body.operation_key == null &&
+        body.duration_unit == null && body.duration_count == null && body.auto_renew == null) {
+      return this.service.activate(tenantId, {
+        ...body,
+        auto_renew: false,
+        operation_key: `wallet-activation:${tenantId}:${body.plan_id}`,
+      }, user.id);
+    }
+    return this.service.activate(tenantId, body, user.id);
   }
 
   @Post('assets/reassign')
