@@ -1,5 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -35,11 +34,10 @@ export class VoicemailController {
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   deleteBox(@GetUser() user: any, @Param('id') id: string) { return this.voicemail.deleteBox(this.tenant(user), id); }
 
-  @Put('boxes/:id/greeting')
+  @Put('boxes/:id/greeting/library')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
-  greeting(@GetUser() user: any, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
-    return this.voicemail.uploadGreeting(this.tenant(user), id, file);
+  libraryGreeting(@GetUser() user: any, @Param('id') id: string, @Body() body: { audioFileId: string }) {
+    return this.voicemail.selectLibraryGreeting(this.tenant(user), id, body?.audioFileId);
   }
 
   @Delete('boxes/:id/greeting')

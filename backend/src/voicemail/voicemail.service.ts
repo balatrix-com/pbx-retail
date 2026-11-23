@@ -1,11 +1,12 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma, TenantStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
+import { AudioUploadService } from '../freeswitch/audio-upload.service';
 import { createReadStream, promises as fs } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { exec, spawn } from 'child_process';
+import { spawn } from 'child_process';
 
 type BoxInput = {
   name?: string;
@@ -21,18 +22,40 @@ export class VoicemailService implements OnModuleInit {
   private readonly storageRoot = process.env.VOICEMAIL_STORAGE_ROOT || '/var/lib/pbx-voicemail';
   private readonly greetingRoot = process.env.VOICEMAIL_GREETING_ROOT || '/opt/ivr_audio';
 
-  constructor(private readonly prisma: PrismaService, private readonly sync: FreeSwitchSyncService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sync: FreeSwitchSyncService,
+    private readonly audioStorage: AudioUploadService,
+  ) { }
 
   async onModuleInit() {
     try {
       const incomingRoot = join(this.storageRoot, 'incoming');
-      await fs.mkdir(incomingRoot, { recursive: true, mode: 0o777 });
-      await fs.chmod(this.storageRoot, 0o777).catch(() => {});
-      await fs.chmod(incomingRoot, 0o777).catch(() => {});
+      await fs.mkdir(incomingRoot, { recursive: true, mode: 0o2770 });
+      await this.setPermissions(this.storageRoot, 0o2770).catch(() => { });
+      await this.setPermissions(incomingRoot, 0o2770).catch(() => { });
+    } catch { }
+  }
+
+  private async setPermissions(targetPath: string, mode: number) {
+    const stat = await fs.lstat(targetPath);
+    if (stat.isSymbolicLink()) throw new BadRequestException('Symbolic links are not allowed');
+    const gidStr = process.env.VOICEMAIL_SHARED_GID;
+    if (gidStr) {
+      const gid = Number(gidStr);
+      if (!Number.isInteger(gid) || gid < 0) {
+        throw new ServiceUnavailableException('Invalid VOICEMAIL_SHARED_GID');
+      }
       try {
-        exec(`chown -R freeswitch:freeswitch "${this.storageRoot}" 2>/dev/null && chmod -R 777 "${this.storageRoot}" 2>/dev/null`);
-      } catch {}
-    } catch {}
+        await fs.chown(targetPath, -1, gid);
+      } catch (err) {
+        throw new ServiceUnavailableException('Failed to set voicemail shared group permissions');
+      }
+      await fs.chmod(targetPath, mode);
+    } else {
+      const fallbackMode = (mode & 0o777) === 0o640 ? 0o666 : 0o777;
+      await fs.chmod(targetPath, fallbackMode).catch(() => { });
+    }
   }
 
   async capabilities(tenantId: string) {
@@ -112,29 +135,28 @@ export class VoicemailService implements OnModuleInit {
     const boxId = randomUUID();
     const tenantIncomingDir = join(this.storageRoot, 'incoming', tenantId);
     const incomingDirectory = join(tenantIncomingDir, boxId);
-    await fs.mkdir(incomingDirectory, { recursive: true, mode: 0o777 });
-    await fs.chmod(tenantIncomingDir, 0o777).catch(() => {});
-    await fs.chmod(incomingDirectory, 0o777).catch(() => {});
-    try {
-      exec(`chown -R freeswitch:freeswitch "${tenantIncomingDir}" 2>/dev/null && chmod -R 777 "${tenantIncomingDir}" 2>/dev/null`);
-    } catch {}
+    await fs.mkdir(incomingDirectory, { recursive: true, mode: 0o2770 });
+    await this.setPermissions(tenantIncomingDir, 0o2770).catch(() => { });
+    await this.setPermissions(incomingDirectory, 0o2770).catch(() => { });
     let box;
     try {
       box = await this.prisma.$transaction(async tx => {
-      const features = await tx.tenantFeature.findUnique({ where: { tenantId } });
-      if (!features?.voicemailEnabled) throw new ForbiddenException('Voicemail is disabled');
-      const existing = await tx.voicemailBox.findFirst({ where: { tenantId, extensionId: input.extensionId || null, retiredAt: null } });
-      if (existing) throw new ConflictException('Mailbox already exists for this extension or company');
-      if (input.extensionId) {
-        const ext = await tx.extension.findFirst({ where: { id: input.extensionId, tenantId } });
-        if (!ext) throw new BadRequestException('Extension does not belong to this tenant');
-      }
-      const last = await tx.voicemailBox.findFirst({ where: { tenantId }, orderBy: { sequenceId: 'desc' } });
-      return tx.voicemailBox.create({ data: {
-        id: boxId, tenantId, sequenceId: (last?.sequenceId ?? 0) + 1, name: input.name!.trim(),
-        extensionId: input.extensionId || null, enabled: input.enabled ?? true, noAnswerSeconds: input.noAnswerSeconds ?? 20,
-        notifyByEmail: input.notifyByEmail ?? false, notifyEmail: input.notifyEmail || null,
-      } });
+        const features = await tx.tenantFeature.findUnique({ where: { tenantId } });
+        if (!features?.voicemailEnabled) throw new ForbiddenException('Voicemail is disabled');
+        const existing = await tx.voicemailBox.findFirst({ where: { tenantId, extensionId: input.extensionId || null, retiredAt: null } });
+        if (existing) throw new ConflictException('Mailbox already exists for this extension or company');
+        if (input.extensionId) {
+          const ext = await tx.extension.findFirst({ where: { id: input.extensionId, tenantId } });
+          if (!ext) throw new BadRequestException('Extension does not belong to this tenant');
+        }
+        const last = await tx.voicemailBox.findFirst({ where: { tenantId }, orderBy: { sequenceId: 'desc' } });
+        return tx.voicemailBox.create({
+          data: {
+            id: boxId, tenantId, sequenceId: (last?.sequenceId ?? 0) + 1, name: input.name!.trim(),
+            extensionId: input.extensionId || null, enabled: input.enabled ?? true, noAnswerSeconds: input.noAnswerSeconds ?? 20,
+            notifyByEmail: input.notifyByEmail ?? false, notifyEmail: input.notifyEmail || null,
+          }
+        });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
       await fs.rm(incomingDirectory, { recursive: true, force: true });
@@ -156,10 +178,12 @@ export class VoicemailService implements OnModuleInit {
       if (assigned) throw new ConflictException('Extension already has a voicemail box');
     }
     if (input.enabled === false && existing.enabled) await this.assertNoDirectRoutes(tenantId, id);
-    const box = await this.prisma.voicemailBox.update({ where: { id }, data: {
-      name: input.name?.trim(), enabled: input.enabled, extensionId: input.extensionId === '' ? null : input.extensionId,
-      noAnswerSeconds: input.noAnswerSeconds, notifyByEmail: input.notifyByEmail, notifyEmail: input.notifyEmail,
-    } });
+    const box = await this.prisma.voicemailBox.update({
+      where: { id }, data: {
+        name: input.name?.trim(), enabled: input.enabled, extensionId: input.extensionId === '' ? null : input.extensionId,
+        noAnswerSeconds: input.noAnswerSeconds, notifyByEmail: input.notifyByEmail, notifyEmail: input.notifyEmail,
+      }
+    });
     await this.sync.syncVoicemailBox(id);
     if (existing.extensionId) await this.sync.syncExtension(existing.extensionId);
     if (box.extensionId && box.extensionId !== existing.extensionId) await this.sync.syncExtension(box.extensionId);
@@ -227,32 +251,45 @@ export class VoicemailService implements OnModuleInit {
     });
   }
 
-  async uploadGreeting(tenantId: string, id: string, file: Express.Multer.File) {
+  async selectLibraryGreeting(tenantId: string, id: string, audioFileId: string) {
     await this.assertEnabled(tenantId);
     await this.getBox(tenantId, id);
-    if (!file?.buffer?.length || file.size > 10 * 1024 * 1024) throw new BadRequestException('Greeting must be 1–10 MB');
+    if (!audioFileId) throw new BadRequestException('Audio file ID is required');
+    const audio = await this.prisma.audioFile.findFirst({ where: { id: audioFileId, tenantId } });
+    if (!audio) throw new NotFoundException('Audio file not found in library');
+    const buffer = await this.audioStorage.readAudio(audio.storageUrl);
+    return this.saveGreeting(tenantId, id, buffer, 50 * 1024 * 1024);
+  }
+
+  private async saveGreeting(tenantId: string, id: string, buffer: Buffer, maxBytes = 10 * 1024 * 1024) {
+    if (!buffer?.length || buffer.length > maxBytes) throw new BadRequestException('Greeting exceeds size limit');
     const path = this.greetingPath(tenantId, id);
     const greetingDir = join(this.greetingRoot, tenantId, 'voicemail', id);
-    await fs.mkdir(greetingDir, { recursive: true, mode: 0o777 });
-    await fs.chmod(greetingDir, 0o777).catch(() => {});
+    await fs.mkdir(greetingDir, { recursive: true, mode: 0o2750 });
+    await this.setPermissions(greetingDir, 0o2750).catch(() => { });
     const source = `${path}.${randomUUID()}.upload`;
     const converted = `${path}.${randomUUID()}.wav`;
     try {
-      await fs.writeFile(source, file.buffer, { mode: 0o600 });
+      await fs.writeFile(source, buffer, { mode: 0o600 });
       await this.convertAudio(source, converted);
+      await this.setPermissions(converted, 0o640);
       await fs.rename(converted, path);
-      await fs.chmod(path, 0o666).catch(() => {});
-      try {
-        exec(`chown -R freeswitch:freeswitch "${greetingDir}" 2>/dev/null && chmod -R 777 "${greetingDir}" 2>/dev/null`);
-      } catch {}
       await this.prisma.voicemailBox.update({ where: { id }, data: { greetingPath: path } });
       await this.sync.syncVoicemailBox(id);
       return { uploaded: true };
-    } catch {
+    } catch (error) {
+      if ((error as any)?.status === 503) throw error;
       throw new BadRequestException('Greeting could not be converted to WAV');
     } finally {
       await Promise.all([fs.rm(source, { force: true }), fs.rm(converted, { force: true })]);
     }
+  }
+
+  async uploadGreeting(tenantId: string, id: string, file: Express.Multer.File) {
+    await this.assertEnabled(tenantId);
+    await this.getBox(tenantId, id);
+    if (!file?.buffer?.length || file.size > 10 * 1024 * 1024) throw new BadRequestException('Greeting must be 1–10 MB');
+    return this.saveGreeting(tenantId, id, file.buffer, 10 * 1024 * 1024);
   }
 
   async removeGreeting(tenantId: string, id: string) {

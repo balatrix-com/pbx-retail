@@ -15,6 +15,21 @@ export class AudioUploadService {
     };
     private readonly basePath = process.env.FS_AUDIO_BASE_PATH || '/opt/ivr_audio';
 
+    async readAudio(remotePath: string): Promise<Buffer> {
+        if (this.sftpConfig.host === 'localhost' || this.sftpConfig.host === '127.0.0.1') {
+            return fs.readFile(remotePath);
+        }
+        const sftp = new SftpClient();
+        try {
+            await sftp.connect(this.sftpConfig);
+            const contents = await sftp.get(remotePath);
+            if (!Buffer.isBuffer(contents)) throw new Error('Audio download did not return a file');
+            return contents;
+        } finally {
+            await sftp.end();
+        }
+    }
+
     /**
      * Upload audio file to SFTP server
      * @param tenantId - Tenant ID for directory isolation

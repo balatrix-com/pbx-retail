@@ -162,7 +162,6 @@ export class DialplanGeneratorService {
     <action application="answer"/>
     <action application="playback" data="${escapeXmlAttr(greeting)}"/>
     <action application="playback" data="${escapeXmlAttr(beep)}"/>
-    <action application="system" data="mkdir -p ${escapeXmlAttr(root)}/incoming/${tenantId}/${boxId}"/>
     <action application="record" data="${escapeXmlAttr(root)}/incoming/${tenantId}/${boxId}/\${uuid}.wav 120 200 5"/>
     <action application="hangup" data="NORMAL_CLEARING"/>
   </condition></extension>

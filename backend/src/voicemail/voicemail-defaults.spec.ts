@@ -22,7 +22,7 @@ describe('automatic voicemail defaults', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
     };
-    const service = new VoicemailService(prisma as any, {} as any);
+    const service = new VoicemailService(prisma as any, {} as any, {} as any);
     const createBox = jest.spyOn(service, 'createBox').mockResolvedValue({} as any);
     return { service, createBox };
   }
