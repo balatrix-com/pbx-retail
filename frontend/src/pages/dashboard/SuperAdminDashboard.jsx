@@ -74,7 +74,6 @@ const SuperAdminDashboard = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tenant</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Billing ID</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Balance</th>
-                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Free Mins</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -94,9 +93,6 @@ const SuperAdminDashboard = () => {
                                             <span className={b.balance < 10 ? 'text-red-600' : 'text-gray-900'}>
                                                 ${b.balance.toFixed(2)}
                                             </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-mono font-bold text-gray-500">
-                                            {b.freeMins}m
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <button className="text-primary-600 hover:text-primary-900 font-bold text-xs uppercase tracking-wider flex items-center gap-1 justify-end ml-auto">

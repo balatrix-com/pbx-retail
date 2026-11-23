@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Search, Filter, DollarSign, PhoneOff, ArrowDownRight, ArrowUpRight, History, Calendar, Play, Pause, Loader2, Users, Wallet, Info } from 'lucide-react';
+import { Download, Search, Filter, DollarSign, PhoneOff, ArrowDownRight, ArrowUpRight, History, Calendar, Play, Pause, Loader2, Users, Info } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, startOfMonth } from 'date-fns';
 import { telecomService } from '../../services/telecom.service';
 import api from '../../services/api';
-import { useWalletQuery, useSubscriptionQuery } from '../../hooks/useBillingQueries';
-import { useBillingIntelligence } from '../../hooks/useBillingIntelligence';
 import { useAuth } from '../../context/AuthContext';
 
 
@@ -140,9 +138,6 @@ const CdrsPage = () => {
     const [tenantList, setTenantList] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState('ALL');
 
-    const { data: wallet } = useWalletQuery();
-    const { data: subscription } = useSubscriptionQuery();
-    const intelligence = useBillingIntelligence(wallet, subscription);
 
     useEffect(() => {
         if (isSuperAdmin) {
@@ -293,31 +288,6 @@ const CdrsPage = () => {
                     <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Call Records (CDRs)</h1>
                     <p className="text-gray-500 mt-1 font-medium">Manage and analyze your communication history</p>
                 </div>
-
-                {/* Free Minutes Summary Widget */}
-                {intelligence.usage.totalMins > 0 && !isSuperAdmin && (
-                    <div className="bg-white px-4 py-3 rounded-2xl shadow-sm ring-1 ring-gray-200 flex items-center gap-4 animate-in fade-in zoom-in duration-300">
-                        <div className="bg-purple-50 p-2 rounded-xl ring-1 ring-purple-100">
-                            <Wallet className="h-5 w-5 text-purple-600" />
-                        </div>
-                        <div>
-                            <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest leading-none mb-1">Free Minutes Used</div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg font-bold text-gray-900 leading-none">{intelligence.usage.usedMins} <span className="text-xs text-gray-400 font-medium">/ {intelligence.usage.totalMins}</span></span>
-                                <div className="w-20 bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-purple-600 transition-all duration-1000"
-                                        style={{ width: `${intelligence.usage.usedPercent}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="ml-2 pl-4 border-l border-gray-100">
-                            <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest leading-none mb-1">Balance</div>
-                            <span className="text-lg font-mono font-bold text-gray-900 leading-none">${Number(wallet?.balance || 0).toFixed(2)}</span>
-                        </div>
-                    </div>
-                )}
 
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2 bg-white rounded-xl shadow-sm ring-1 ring-gray-200 p-1">

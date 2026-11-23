@@ -57,11 +57,6 @@ export const telecomService = {
         return response.data;
     },
 
-    reportUsage: async (minutes) => {
-        const response = await api.post('/usage/report', { minutes });
-        return response.data;
-    },
-
     getCDRs: async (params = {}) => {
         const response = await api.get('/usage/cdrs', { params });
         return response.data;

@@ -7,7 +7,6 @@ import { useBillingIntelligence } from '../../hooks/useBillingIntelligence';
 import { useWalletQuery, useWalletTransactionsQuery, useSubscriptionQuery, useUsageSummaryQuery, useServiceStateQuery, useWalletActions } from '../../hooks/useBillingQueries';
 import {
     Wallet,
-    Phone,
     ArrowUpRight,
     AlertTriangle,
     CheckCircle,
@@ -263,35 +262,6 @@ const AdminDashboard = () => {
                         <p className="mt-2 text-sm font-medium text-gray-500 flex items-center">
                             <TrendingUp className="mr-1.5 h-4 w-4 text-green-500" />
                             Burn: ~${intelligence.financial.burnRate.toFixed(2)}/day
-                        </p>
-                    </div>
-                </div>
-
-                {/* Total Usage Card */}
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
-                    <Phone className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10 flex items-center justify-between">
-                        <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                            <Phone className="h-4 w-4 stroke-[2.2]" />
-                        </div>
-                    </div>
-                    <div className="relative z-10 mt-4">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Free Minutes Usage</h3>
-                        <p className="mt-2 flex items-baseline gap-x-2">
-                            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                                {intelligence.usage.usedMins}
-                            </span>
-                            <span className="text-sm font-bold text-gray-400 uppercase">/ {intelligence.usage.totalMins} min</span>
-                        </p>
-                        <div className="mt-3 w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
-                            <div
-                                className={`h-full transition-all duration-1000 ${intelligence.usage.usedPercent > 90 ? 'bg-red-500' : intelligence.usage.usedPercent > 75 ? 'bg-amber-500' : 'bg-primary-600'}`}
-                                style={{ width: `${intelligence.usage.usedPercent}%` }}
-                            ></div>
-                        </div>
-                        <p className="mt-2 text-[10px] font-extrabold text-gray-400 uppercase tracking-widest flex justify-between">
-                            <span>{intelligence.usage.usedPercent.toFixed(1)}% Consumed</span>
-                            <span>{intelligence.usage.totalMins - intelligence.usage.usedMins} mins left</span>
                         </p>
                     </div>
                 </div>

@@ -4,10 +4,9 @@ import { UsageController } from './usage.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { HttpModule } from '@nestjs/axios';
-import { EnforcementModule } from '../enforcement/enforcement.module';
 
 @Module({
-  imports: [PrismaModule, WalletModule, EnforcementModule, HttpModule],
+  imports: [PrismaModule, WalletModule, HttpModule],
   controllers: [UsageController],
   providers: [UsageService],
 })

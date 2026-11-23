@@ -168,14 +168,6 @@ const WalletPage = () => {
                     <div className="bg-purple-50/50 dark:bg-purple-950/40 px-6 py-3 border-t border-purple-100 dark:border-purple-900/40 relative z-10">
                         <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
                             <span>{subscription?.limits?.extensions || 0} Extensions</span>
-                            <div className="h-1 w-1 bg-purple-400 dark:bg-purple-500 rounded-full"></div>
-                            <span>{intelligence.usage.usedMins} / {intelligence.usage.totalMins} Mins Used</span>
-                        </div>
-                        <div className="mt-2 w-full bg-purple-100/60 dark:bg-purple-900/50 rounded-full h-1 overflow-hidden">
-                            <div
-                                className="h-full bg-purple-600 dark:bg-purple-400 transition-all duration-1000"
-                                style={{ width: `${intelligence.usage.usedPercent}%` }}
-                            ></div>
                         </div>
                     </div>
                 </div>
