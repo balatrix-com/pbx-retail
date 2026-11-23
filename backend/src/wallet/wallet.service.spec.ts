@@ -143,4 +143,15 @@ describe('WalletService (switchSubscriptionPlan & Kamailio Sync)', () => {
             expect(prisma.subscription.create).not.toHaveBeenCalled();
         });
     });
+
+    it('uses one transaction ID for repeated initial funding and rejects a mismatched key', async () => {
+        await service.adjustBalance('U1010', 100, 'CREDIT' as any, 'Initial Funding', 'admin', undefined, 'onboarding-funding:U1010');
+        await service.adjustBalance('U1010', 100, 'CREDIT' as any, 'Initial Funding', 'admin', undefined, 'onboarding-funding:U1010');
+        expect(httpService.post.mock.calls.map(([, body]) => body.tx_id)).toEqual([
+            'onboarding-funding:U1010', 'onboarding-funding:U1010',
+        ]);
+        await expect(service.adjustBalance('U1010', 100, 'CREDIT' as any, 'Initial Funding', 'admin', undefined, 'onboarding-funding:OTHER'))
+            .rejects.toThrow('Invalid initial funding operation key');
+        expect(httpService.post).toHaveBeenCalledTimes(2);
+    });
 });

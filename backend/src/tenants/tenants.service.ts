@@ -770,7 +770,7 @@ export class TenantsService {
                 .join('') || 'None';
             const extHtml = `<div style="text-align:left;display:inline-block;margin:10px auto;">${extList}</div>`;
 
-            await this.mailService.sendOnboardingCompletionEmail(
+            const emailSent = await this.mailService.sendOnboardingCompletionEmail(
                 data.adminEmail,
                 `${data.firstName} ${data.lastName}`,
                 result.tenant.customerCode || '',
@@ -781,7 +781,8 @@ export class TenantsService {
                 'N/A',
                 data.adminPassword,
             );
-            this.logger.log(`Credentials email sent to ${data.adminEmail} for tenant ${result.tenant.id}`);
+            if (emailSent) this.logger.log(`Credentials email sent to ${data.adminEmail} for tenant ${result.tenant.id}`);
+            else this.logger.warn(`Credentials email was not delivered to ${data.adminEmail} for tenant ${result.tenant.id}`);
         } catch (emailErr: any) {
             this.logger.error(`Failed to send credentials email to ${data.adminEmail}: ${emailErr.message}`);
         }

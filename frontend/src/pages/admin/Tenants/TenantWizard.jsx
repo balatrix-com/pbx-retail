@@ -271,7 +271,8 @@ const TenantWizard = ({ onClose, onSuccess }) => {
                     targetTenantId: tenantId,
                     amount: fundingAmount,
                     type: 'CREDIT',
-                    description: walletDescription || 'Initial Funding'
+                    description: walletDescription || 'Initial Funding',
+                    operationKey: `onboarding-funding:${tenantId}`
                 });
                 setWalletFunded(true);
             }
