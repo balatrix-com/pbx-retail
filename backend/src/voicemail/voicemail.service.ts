@@ -1,11 +1,11 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Prisma, TenantStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
 import { createReadStream, promises as fs } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { spawn } from 'child_process';
+import { exec, spawn } from 'child_process';
 
 type BoxInput = {
   name?: string;
@@ -17,11 +17,23 @@ type BoxInput = {
 };
 
 @Injectable()
-export class VoicemailService {
+export class VoicemailService implements OnModuleInit {
   private readonly storageRoot = process.env.VOICEMAIL_STORAGE_ROOT || '/var/lib/pbx-voicemail';
   private readonly greetingRoot = process.env.VOICEMAIL_GREETING_ROOT || '/opt/ivr_audio';
 
   constructor(private readonly prisma: PrismaService, private readonly sync: FreeSwitchSyncService) {}
+
+  async onModuleInit() {
+    try {
+      const incomingRoot = join(this.storageRoot, 'incoming');
+      await fs.mkdir(incomingRoot, { recursive: true, mode: 0o777 });
+      await fs.chmod(this.storageRoot, 0o777).catch(() => {});
+      await fs.chmod(incomingRoot, 0o777).catch(() => {});
+      try {
+        exec(`chown -R freeswitch:freeswitch "${this.storageRoot}" 2>/dev/null && chmod -R 777 "${this.storageRoot}" 2>/dev/null`);
+      } catch {}
+    } catch {}
+  }
 
   async capabilities(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, include: { tenantFeatures: true } });
@@ -103,6 +115,9 @@ export class VoicemailService {
     await fs.mkdir(incomingDirectory, { recursive: true, mode: 0o777 });
     await fs.chmod(tenantIncomingDir, 0o777).catch(() => {});
     await fs.chmod(incomingDirectory, 0o777).catch(() => {});
+    try {
+      exec(`chown -R freeswitch:freeswitch "${tenantIncomingDir}" 2>/dev/null && chmod -R 777 "${tenantIncomingDir}" 2>/dev/null`);
+    } catch {}
     let box;
     try {
       box = await this.prisma.$transaction(async tx => {
@@ -217,13 +232,19 @@ export class VoicemailService {
     await this.getBox(tenantId, id);
     if (!file?.buffer?.length || file.size > 10 * 1024 * 1024) throw new BadRequestException('Greeting must be 1–10 MB');
     const path = this.greetingPath(tenantId, id);
-    await fs.mkdir(join(this.greetingRoot, tenantId, 'voicemail', id), { recursive: true });
+    const greetingDir = join(this.greetingRoot, tenantId, 'voicemail', id);
+    await fs.mkdir(greetingDir, { recursive: true, mode: 0o777 });
+    await fs.chmod(greetingDir, 0o777).catch(() => {});
     const source = `${path}.${randomUUID()}.upload`;
     const converted = `${path}.${randomUUID()}.wav`;
     try {
       await fs.writeFile(source, file.buffer, { mode: 0o600 });
       await this.convertAudio(source, converted);
       await fs.rename(converted, path);
+      await fs.chmod(path, 0o666).catch(() => {});
+      try {
+        exec(`chown -R freeswitch:freeswitch "${greetingDir}" 2>/dev/null && chmod -R 777 "${greetingDir}" 2>/dev/null`);
+      } catch {}
       await this.prisma.voicemailBox.update({ where: { id }, data: { greetingPath: path } });
       await this.sync.syncVoicemailBox(id);
       return { uploaded: true };
