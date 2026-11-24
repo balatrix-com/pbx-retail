@@ -10,7 +10,6 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EnforcementModule } from '../enforcement/enforcement.module';
 import { MailModule } from '../mail/mail.module';
-import { NotificationsModule } from '../notifications/notifications.module';
 
 import { RolesGuard } from './guards/roles.guard';
 import { FeatureGuard } from './guards/feature.guard';
@@ -20,7 +19,6 @@ import { FeatureGuard } from './guards/feature.guard';
     PrismaModule,
     EnforcementModule,
     MailModule,
-    NotificationsModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

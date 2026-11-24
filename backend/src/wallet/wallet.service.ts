@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { TransactionType, Prisma } from '@prisma/client';
 import { BillingService } from '../billing/billing.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -20,7 +19,6 @@ export class WalletService {
     constructor(
         private prisma: PrismaService,
         private billingService: BillingService,
-        private notificationsService: NotificationsService,
         private httpService: HttpService,
         private configService: ConfigService,
         private freeSwitchSync: FreeSwitchSyncService,

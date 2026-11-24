@@ -30,7 +30,6 @@ model Tenant {
   extensions           Extension[]
   ivrs                 IVR[]
   monitoringAddOn      MonitoringAddOn?
-  notifications        Notification[]
   operationalSchedules OperationalSchedule[]
   paymentMethods       PaymentMethod[]
   ringGroups           RingGroup[]
@@ -212,7 +211,6 @@ model User {
   forcePasswordChange Boolean          @default(false)
   resetToken          String?          @unique
   resetTokenExpiry    DateTime?
-  notifications       Notification[]
   managedSupportUsers SupportProfile[] @relation("AdminUser")
   supportProfile      SupportProfile?  @relation("SupportUser")
   actorAuditLogs      UserAuditLog[]   @relation("Actor")
@@ -502,23 +500,6 @@ model InvoiceAdjustment {
   invoice      Invoice  @relation(fields: [invoiceId], references: [id])
 
   @@map("invoice_adjustments")
-}
-
-model Notification {
-  id        String   @id @default(uuid())
-  tenantId  String
-  userId    String?
-  type      String
-  title     String
-  message   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@index([userId])
-  @@map("notifications")
 }
 
 model tenant_config_versions {

@@ -18,7 +18,6 @@ import { Role, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { MailService } from '../mail/mail.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { assertTenantServiceAccess } from './tenant-service-access';
 
 @Injectable()
@@ -29,7 +28,6 @@ export class AuthService {
         private configService: ConfigService,
         private enforcementService: EnforcementService,
         private mailService: MailService,
-        private notificationsService: NotificationsService,
         @Optional() @Inject(REDIS_CLIENT) private readonly redisClient?: RedisClientType,
     ) { }
 
@@ -103,15 +101,6 @@ export class AuthService {
                     role: Role.ADMIN,
                     tenantId: tenant.id,
                 },
-            });
-
-            // Create Welcome Notification
-            await this.notificationsService.createNotification({
-                tenantId: tenant.id,
-                userId: user.id,
-                type: 'system',
-                title: 'Welcome to Cloud PBX!',
-                message: 'Your telecom infrastructure dashboard is ready. Explore the features and start commanding your network.',
             });
 
             return { user, tenant };

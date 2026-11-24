@@ -8,7 +8,6 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
 import { StripeService } from '../payments/stripe.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { LookupRedisService } from '../redis/lookup-redis.module';
 import { HttpService } from '@nestjs/axios';
 import { MailService } from '../mail/mail.service';
@@ -59,7 +58,6 @@ describe('OnboardingService (Unit)', () => {
                 { provide: ConfigService, useValue: { get: jest.fn() } },
                 { provide: FreeSwitchSyncService, useValue: { syncTFN: jest.fn().mockResolvedValue({}) } },
                 { provide: StripeService, useValue: {} },
-                { provide: NotificationsService, useValue: { createNotification: jest.fn() } },
                 { provide: LookupRedisService, useValue: { updateExtensionLookup: jest.fn(), updateNumberLookup: jest.fn() } },
                 { provide: HttpService, useValue: { get: jest.fn(), post: jest.fn() } },
                 { provide: MailService, useValue: { sendOnboardingCompletionEmail: jest.fn() } },

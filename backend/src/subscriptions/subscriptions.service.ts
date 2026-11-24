@@ -218,15 +218,10 @@ export class SubscriptionsService {
     const done = await this.prisma.$queryRawUnsafe<any[]>('SELECT event_id FROM subscription_event_receipts WHERE event_id=$1', input.event_id);
     if (done.length) return { success: true };
     await this.reconcile(t.id);
-    await this.prisma.$transaction(async tx => {
-      const inserted = await tx.$executeRawUnsafe('INSERT INTO subscription_event_receipts(event_id,tenant_id) VALUES($1,$2) ON CONFLICT DO NOTHING', input.event_id, t.id);
-      if (inserted && (['grace', 'freeze', 'reactivate', 'release'].includes(input.action) || String(input.action).startsWith('retention_reminder_'))) await tx.notification.create({ data: {
-        tenantId: t.id, type: 'SUBSCRIPTION', title: `Subscription ${input.action}`, message: `Subscription ${input.subscription_id}: ${input.action}. Check Subscriptions for assets and recovery options.` } });
-      if(inserted && (['grace','freeze','release'].includes(input.action) || String(input.action).startsWith('retention_reminder_'))) {
-        const admins=await tx.user.findMany({where:{role:'SUPER_ADMIN',status:'ACTIVE'},select:{id:true,tenantId:true}});
-        for(const admin of admins)await tx.notification.create({data:{tenantId:admin.tenantId || t.id,userId:admin.id,type:'SUBSCRIPTION',title:`${t.customerCode}: subscription ${input.action}`,message:`Subscription ${input.subscription_id}: ${input.action}. Review tenant subscriptions for recovery or retention.`}});
-      }
-    });
+    await this.prisma.$executeRawUnsafe(
+      'INSERT INTO subscription_event_receipts(event_id,tenant_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
+      input.event_id, t.id,
+    );
     return { success: true };
   }
   async reconcile(tenantId: string) {

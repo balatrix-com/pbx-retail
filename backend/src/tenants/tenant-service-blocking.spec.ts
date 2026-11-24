@@ -47,7 +47,7 @@ describe('Tenant service blocking', () => {
     it('denies login and leaves token generation untouched', async () => {
         prisma.tenant.findUnique.mockResolvedValue({ serviceBlocked: true });
         const tokens = { signAsync: jest.fn() };
-        const auth = new AuthService(prisma, tokens as any, {} as any, {} as any, {} as any, {} as any);
+        const auth = new AuthService(prisma, tokens as any, {} as any, {} as any, {} as any);
         await expect(auth.login({ role: 'ADMIN', tenantId: 'tenant-1' } as any)).rejects.toThrow('suspended');
         expect(tokens.signAsync).not.toHaveBeenCalled();
     });
@@ -60,7 +60,7 @@ describe('Tenant service blocking', () => {
         prisma.tenant.findUnique.mockResolvedValue({ serviceBlocked: true });
         prisma.user.findUnique.mockResolvedValue({ id: 'admin-1', role: 'ADMIN', tenantId: 'tenant-1', refreshToken: await bcrypt.hash('refresh-value', 4) });
         const tokens = { signAsync: jest.fn() };
-        const auth = new AuthService(prisma, tokens as any, {} as any, {} as any, {} as any, {} as any);
+        const auth = new AuthService(prisma, tokens as any, {} as any, {} as any, {} as any);
         await expect(auth.refreshTokens('admin-1', 'refresh-value')).rejects.toThrow('suspended');
         expect(tokens.signAsync).not.toHaveBeenCalled();
     });

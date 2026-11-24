@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WalletService } from './wallet.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from '../billing/billing.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
@@ -99,7 +98,6 @@ describe('WalletService (switchSubscriptionPlan & Kamailio Sync)', () => {
                 WalletService,
                 { provide: PrismaService, useValue: prisma },
                 { provide: BillingService, useValue: {} },
-                { provide: NotificationsService, useValue: {} },
                 { provide: HttpService, useValue: httpService },
                 { provide: ConfigService, useValue: configService },
                 { provide: FreeSwitchSyncService, useValue: freeSwitchSync },

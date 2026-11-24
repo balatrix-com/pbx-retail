@@ -1,8 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useGlobalMetrics } from '../../context/GlobalMetricsContext';
-import { Bell, LogOut, Activity, Menu, X, Sun, Moon } from 'lucide-react';
-import NotificationPanel from './NotificationPanel';
+import { LogOut, Activity, Menu, X, Sun, Moon } from 'lucide-react';
 import { formatCustomerId } from '../../utils/billing.utils';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -81,9 +80,6 @@ const Header = ({ onMenuClick }) => {
                 <div className="hidden xs:flex items-center bg-gray-900 rounded-lg px-2 py-1 md:px-3 md:py-1.5 border border-gray-800 font-mono font-bold text-xs md:text-sm shadow-sm text-white hover:bg-black transition-colors ring-1 ring-inset ring-white/10">
                     <span className="text-gray-400 font-sans text-[10px] md:text-xs uppercase tracking-widest mr-1 md:mr-2 font-bold">Balance</span> ${Number(balance || 0).toFixed(2)}
                 </div>
-
-                {/* Notifications */}
-                <NotificationPanel />
 
                 {/* Dark Mode Toggle */}
                 <button
