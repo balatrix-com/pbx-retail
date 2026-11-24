@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { VoicemailService } from './voicemail.service';
 import { promises as fs } from 'fs';
+import { join } from 'path';
 
 describe('voicemail Audio Library selection', () => {
   function setup(audio: any) {
@@ -59,5 +60,28 @@ describe('voicemail permission enforcement', () => {
     await (service as any).setPermissions('/greeting.wav', 0o640);
     expect(chown).toHaveBeenCalledWith('/greeting.wav', -1, 1005);
     expect(chmod).toHaveBeenCalledWith('/greeting.wav', 0o640);
+  });
+
+  it('sets traversal permissions on every greeting directory', async () => {
+    const service = new VoicemailService({} as any, {} as any, {} as any);
+    jest.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+    const permissions = jest.spyOn(service as any, 'setPermissions').mockResolvedValue(undefined);
+    await (service as any).prepareGreetingDirectory('U1052', 'box-1');
+    expect(permissions.mock.calls).toEqual([
+      [join('/opt/ivr_audio', 'U1052'), 0o2770],
+      [join('/opt/ivr_audio', 'U1052', 'voicemail'), 0o2770],
+      [join('/opt/ivr_audio', 'U1052', 'voicemail', 'box-1'), 0o2750],
+    ]);
+  });
+
+  it('does not save a greeting when its directory permissions cannot be set', async () => {
+    const update = jest.fn();
+    const service = new VoicemailService({ voicemailBox: { update } } as any, {} as any, {} as any);
+    jest.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'setPermissions').mockRejectedValue(new Error('EPERM'));
+    const writeFile = jest.spyOn(fs, 'writeFile');
+    await expect((service as any).saveGreeting('U1052', 'box-1', Buffer.from('audio'))).rejects.toThrow('EPERM');
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 });

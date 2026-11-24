@@ -242,6 +242,18 @@ export class VoicemailService implements OnModuleInit {
     return join(this.greetingRoot, tenantId, 'voicemail', boxId, 'greeting.wav');
   }
 
+  private async prepareGreetingDirectory(tenantId: string, boxId: string) {
+    const tenantDir = join(this.greetingRoot, tenantId);
+    const voicemailDir = join(tenantDir, 'voicemail');
+    const boxDir = join(voicemailDir, boxId);
+    await fs.mkdir(tenantDir, { recursive: true, mode: 0o2770 });
+    await this.setPermissions(tenantDir, 0o2770);
+    await fs.mkdir(voicemailDir, { recursive: true, mode: 0o2770 });
+    await this.setPermissions(voicemailDir, 0o2770);
+    await fs.mkdir(boxDir, { recursive: true, mode: 0o2750 });
+    await this.setPermissions(boxDir, 0o2750);
+  }
+
   private async convertAudio(input: string, output: string) {
     await new Promise<void>((resolve, reject) => {
       const child = spawn(process.env.FFMPEG_BINARY || 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-i', input, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', '-t', '60', output], { stdio: 'ignore' });
@@ -267,9 +279,7 @@ export class VoicemailService implements OnModuleInit {
   private async saveGreeting(tenantId: string, id: string, buffer: Buffer, maxBytes = 10 * 1024 * 1024, librarySource?: { audioFileId: string; audioName: string }) {
     if (!buffer?.length || buffer.length > maxBytes) throw new BadRequestException('Greeting exceeds size limit');
     const path = this.greetingPath(tenantId, id);
-    const greetingDir = join(this.greetingRoot, tenantId, 'voicemail', id);
-    await fs.mkdir(greetingDir, { recursive: true, mode: 0o2750 });
-    await this.setPermissions(greetingDir, 0o2750).catch(() => { });
+    await this.prepareGreetingDirectory(tenantId, id);
     const source = `${path}.${randomUUID()}.upload`;
     const converted = `${path}.${randomUUID()}.wav`;
     try {
