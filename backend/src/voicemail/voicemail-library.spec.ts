@@ -1,0 +1,92 @@
+import { NotFoundException } from '@nestjs/common';
+import { VoicemailService } from './voicemail.service';
+import { promises as fs } from 'fs';
+import { join } from 'path';
+
+describe('voicemail Audio Library selection', () => {
+  function setup(audio: any) {
+    const prisma = { audioFile: { findFirst: jest.fn().mockResolvedValue(audio) } };
+    const storage = { readAudio: jest.fn().mockResolvedValue(Buffer.from('audio')) };
+    const service = new VoicemailService(prisma as any, {} as any, storage as any);
+    jest.spyOn(service, 'assertEnabled').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'getBox').mockResolvedValue({ id: 'box' });
+    const save = jest.spyOn(service as any, 'saveGreeting').mockResolvedValue({ uploaded: true });
+    return { prisma, storage, service, save };
+  }
+
+  it('rejects library files that do not belong to the current tenant before reading storage', async () => {
+    const { service, prisma, storage } = setup(null);
+    await expect(service.selectLibraryGreeting('tenant-1', 'box', 'foreign-audio')).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.audioFile.findFirst).toHaveBeenCalledWith({ where: { id: 'foreign-audio', tenantId: 'tenant-1' } });
+    expect(storage.readAudio).not.toHaveBeenCalled();
+  });
+
+  it('allows one library source to supply multiple mailboxes through the existing conversion path', async () => {
+    const { service, storage, save } = setup({ id: 'audio', name: 'Company welcome', size: 100, storageUrl: '/opt/ivr_audio/tenant-1/greeting.mp3' });
+    await service.selectLibraryGreeting('tenant-1', 'box-1', 'audio');
+    await service.selectLibraryGreeting('tenant-1', 'box-2', 'audio');
+    expect(storage.readAudio).toHaveBeenCalledWith('/opt/ivr_audio/tenant-1/greeting.mp3');
+    expect(save).toHaveBeenCalledWith('tenant-1', 'box-1', Buffer.from('audio'), 50 * 1024 * 1024,
+      { audioFileId: 'audio', audioName: 'Company welcome' });
+    expect(save).toHaveBeenCalledWith('tenant-1', 'box-2', Buffer.from('audio'), 50 * 1024 * 1024,
+      { audioFileId: 'audio', audioName: 'Company welcome' });
+  });
+});
+
+describe('voicemail permission enforcement', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('reports a permission error instead of succeeding when group ownership cannot be set', async () => {
+    const service = new VoicemailService({} as any, {} as any, {} as any);
+    jest.spyOn(service as any, 'getFreeSwitchGid').mockResolvedValue(996);
+    jest.spyOn(fs, 'lstat').mockResolvedValue({ isSymbolicLink: () => false } as any);
+    jest.spyOn(fs, 'chown').mockRejectedValue(new Error('EPERM'));
+    const chmod = jest.spyOn(fs, 'chmod').mockResolvedValue(undefined);
+    await expect((service as any).setPermissions('/greeting.wav', 0o640)).rejects.toMatchObject({ status: 503 });
+    expect(chmod).not.toHaveBeenCalled();
+  });
+
+  it('sets shared-group ownership and a non-public greeting mode', async () => {
+    const service = new VoicemailService({} as any, {} as any, {} as any);
+    jest.spyOn(service as any, 'getFreeSwitchGid').mockResolvedValue(996);
+    jest.spyOn(fs, 'lstat').mockResolvedValue({ isSymbolicLink: () => false } as any);
+    const chown = jest.spyOn(fs, 'chown').mockResolvedValue(undefined);
+    const chmod = jest.spyOn(fs, 'chmod').mockResolvedValue(undefined);
+    await (service as any).setPermissions('/greeting.wav', 0o640);
+    expect(chown).toHaveBeenCalledWith('/greeting.wav', -1, 996);
+    expect(chmod).toHaveBeenCalledWith('/greeting.wav', 0o640);
+  });
+
+  it('sets traversal permissions on every greeting directory', async () => {
+    const service = new VoicemailService({} as any, {} as any, {} as any);
+    jest.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+    const permissions = jest.spyOn(service as any, 'setPermissions').mockResolvedValue(undefined);
+    await (service as any).prepareGreetingDirectory('U1052', 'box-1');
+    expect(permissions.mock.calls).toEqual([
+      [join('/opt/ivr_audio', 'U1052'), 0o2770],
+      [join('/opt/ivr_audio', 'U1052', 'voicemail'), 0o2770],
+      [join('/opt/ivr_audio', 'U1052', 'voicemail', 'box-1'), 0o2750],
+    ]);
+    permissions.mockClear();
+    await (service as any).prepareIncomingDirectory('U1052', 'box-1');
+    expect(permissions.mock.calls).toEqual([
+      ['/var/lib/pbx-voicemail', 0o2770],
+      [join('/var/lib/pbx-voicemail', 'incoming'), 0o2770],
+      [join('/var/lib/pbx-voicemail', 'incoming', 'U1052'), 0o2770],
+      [join('/var/lib/pbx-voicemail', 'incoming', 'U1052', 'box-1'), 0o2770],
+    ]);
+  });
+
+  it('does not save a greeting when its directory permissions cannot be set', async () => {
+    const update = jest.fn();
+    const service = new VoicemailService({ voicemailBox: { update } } as any, {} as any, {} as any);
+    jest.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'setPermissions').mockRejectedValue(new Error('EPERM'));
+    const writeFile = jest.spyOn(fs, 'writeFile');
+    await expect((service as any).saveGreeting('U1052', 'box-1', Buffer.from('audio'))).rejects.toThrow('EPERM');
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+});

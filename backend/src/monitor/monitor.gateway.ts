@@ -127,17 +127,17 @@ export class MonitorGateway implements OnGatewayInit, OnGatewayConnection, OnGat
             }) : [];
             const accountsById = new Map(accounts.map(account => [account.id, account]));
             const activeSockets = sockets.filter(socket => {
-
+                if (socket.data.user?.role === 'SUPER_ADMIN') return true;
                 if (!socket.data.user?.sub) return true;
                 if (this.matchesCurrentAccount(socket.data.user, accountsById.get(socket.data.user?.sub))) return true;
                 socket.disconnect(true);
                 return false;
             });
-            const tenantIds = new Set(activeSockets.filter(s => s.data.user?.role !== 'SUPER_ADMIN').map(s => s.data.user?.tenantId).filter(Boolean));
+            const tenantIds = new Set(activeSockets.filter(s => s.data.user.role !== 'SUPER_ADMIN').map(s => s.data.user.tenantId).filter(Boolean));
             for (const tenantId of tenantIds) {
                 const tenant = await this.prismaService.tenant.findUnique({ where: { id: tenantId }, select: { serviceBlocked: true } });
                 if (tenant && !tenant.serviceBlocked) continue;
-                for (const socket of activeSockets) if (socket.data.user?.tenantId === tenantId && socket.data.user?.role !== 'SUPER_ADMIN') socket.disconnect(true);
+                for (const socket of activeSockets) if (socket.data.user.tenantId === tenantId && socket.data.user.role !== 'SUPER_ADMIN') socket.disconnect(true);
             }
         } catch (error) { this.logger.warn(`Tenant socket state check failed: ${error.message}`); }
     }

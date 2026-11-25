@@ -184,6 +184,7 @@ const PhoneNumbersPage = () => {
             ring_group: 'Ring Group',
             ivr: 'IVR Menu',
             schedule: 'Schedule',
+            voicemail: 'Voicemail',
             did_forward: 'External Forward',
             forward: 'Forward'
         };

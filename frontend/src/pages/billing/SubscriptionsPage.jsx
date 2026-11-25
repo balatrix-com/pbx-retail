@@ -517,3 +517,4 @@ export default function SubscriptionsPage() {
     </div>
   );
 }
+export { default } from '../admin/SubscriptionsPage';

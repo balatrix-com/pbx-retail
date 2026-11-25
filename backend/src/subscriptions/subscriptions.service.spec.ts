@@ -47,4 +47,26 @@ describe('Subscription ownership and projection recovery',()=>{
   it('a frozen asset cannot be edited through routing endpoints',async()=>{
     prior={status:'frozen'};await expect(service.assertEditable('did','did')).rejects.toThrow('frozen');
   });
+  it('listAll correlates tenants with sub-billing subscriptions and generates summary KPIs', async () => {
+    prisma.tenant = {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 't1', name: 'Tenant 1', customerCode: 'U1001', status: 'ACTIVE', wallet: { balance: 100 } },
+        { id: 't2', name: 'Tenant 2', customerCode: 'U1002', status: 'INACTIVE', wallet: { balance: 0 } },
+      ])
+    };
+    jest.spyOn(service, 'request').mockResolvedValue([
+      { id: 'sub-1', customer_id: 'U1001', plan_name: 'Pro Plan', status: 'active', current_period_end: '2027-01-01', entitlement_snapshot: { extensions: 5 } }
+    ]);
+
+    const res = await service.listAll();
+    expect(res.summary.totalTenants).toBe(2);
+    expect(res.summary.activeSubscriptions).toBe(1);
+    expect(res.summary.noActivePlan).toBe(1);
+    expect(res.summary.deactivatedOrgs).toBe(1);
+    expect(res.data).toHaveLength(2);
+    expect(res.data[0].hasSubscription).toBe(true);
+    expect(res.data[0].subscription.plan_name).toBe('Pro Plan');
+    expect(res.data[1].hasSubscription).toBe(false);
+    expect(res.data[1].subscription).toBeNull();
+  });
 });

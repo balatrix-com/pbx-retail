@@ -5,6 +5,7 @@ import { useBranding } from '../../context/BrandingContext';
 import { useGlobalMetrics } from '../../context/GlobalMetricsContext';
 import { LogOut, Activity, Sun, Moon, User } from 'lucide-react';
 import { Menu as HeadlessMenu, Transition } from '@headlessui/react';
+import { LogOut, Activity, Menu, X, Sun, Moon } from 'lucide-react';
 import { formatCustomerId } from '../../utils/billing.utils';
 import { useTheme } from '../../context/ThemeContext';
 import { getMediaUrl } from '../../utils/media.utils';
@@ -185,6 +186,43 @@ const Header = () => {
 
             <UserProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
         </>
+                {/* Dark Mode Toggle */}
+                <button
+                    onClick={toggleTheme}
+                    className="relative inline-flex items-center justify-center h-9 w-9 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] text-[var(--color-ink-mute)] hover:text-amber-500 hover:border-amber-400/50 dark:hover:text-amber-400 dark:hover:border-amber-500/40 transition-all duration-200 focus:outline-none shadow-xs active:scale-95"
+                    title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                    id="dark-mode-toggle"
+                >
+                    <div className="relative h-5 w-5 flex items-center justify-center">
+                        <Sun
+                            className={`absolute inset-0 h-5 w-5 transition-all duration-300 ${isDark
+                                ? 'opacity-100 rotate-0 scale-100 text-amber-400'
+                                : 'opacity-0 rotate-90 scale-0'
+                                }`}
+                        />
+                        <Moon
+                            className={`absolute inset-0 h-5 w-5 transition-all duration-300 ${isDark
+                                ? 'opacity-0 -rotate-90 scale-0'
+                                : 'opacity-100 rotate-0 scale-100 text-slate-600'
+                                }`}
+                        />
+                    </div>
+                </button>
+
+                {/* Logout Button */}
+                <button
+                    onClick={() => {
+                        if (window.confirm("Are you sure you want to sign out?")) {
+                            logout();
+                        }
+                    }}
+                    className="flex items-center p-1.5 md:p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all ring-1 ring-gray-200 hover:ring-red-300 shadow-sm focus:outline-none"
+                    title="Logout"
+                >
+                    <LogOut className="h-4 w-4 md:h-5 md:w-5 ml-0.5" />
+                </button>
+            </div>
+        </header>
     );
 };
 

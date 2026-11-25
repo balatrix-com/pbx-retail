@@ -146,7 +146,7 @@ export class TelecomService implements OnModuleInit {
     // --- Routing Interconnection Logic ---
 
     async getRoutingOptions(tenantId: string) {
-        const [extensions, ringGroups, ivrs, schedules, didForwards] = await Promise.all([
+        const [extensions, ringGroups, ivrs, schedules, didForwards, feature] = await Promise.all([
             this.prisma.extension.findMany({
                 where: { tenantId },
                 select: { id: true, name: true, extensionNumber: true }
@@ -166,7 +166,8 @@ export class TelecomService implements OnModuleInit {
             this.prisma.dIDForward.findMany({
                 where: { tenantId },
                 select: { id: true, name: true, destinationNumber: true }
-            })
+            }),
+            this.prisma.tenantFeature.findUnique({ where: { tenantId } }),
         ]);
 
         return {
@@ -175,6 +176,8 @@ export class TelecomService implements OnModuleInit {
             ivrs,
             schedules,
             didForwards,
+            voicemailEnabled: !!feature?.voicemailEnabled,
+            voicemailBoxes: feature?.voicemailEnabled ? await this.prisma.voicemailBox.findMany({ where: { tenantId, enabled: true }, select: { id: true, name: true } }) : [],
         };
     }
 
@@ -235,6 +238,13 @@ export class TelecomService implements OnModuleInit {
             case 'schedule':
                 const sched = await this.prisma.operationalSchedule.findFirst({ where: { id: targetId, tenantId } });
                 valid = !!sched;
+                break;
+            case 'voicemail':
+                const [box, feature] = await Promise.all([
+                    this.prisma.voicemailBox.findFirst({ where: { id: targetId, tenantId, enabled: true } }),
+                    this.prisma.tenantFeature.findUnique({ where: { tenantId } }),
+                ]);
+                valid = !!box && !!feature?.voicemailEnabled;
                 break;
             case 'forward':
                 // targetId not needed for forward, used forwardNumber instead, but if passed:

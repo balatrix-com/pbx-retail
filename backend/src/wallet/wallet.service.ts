@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { TransactionType, Prisma } from '@prisma/client';
 import { BillingService } from '../billing/billing.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -20,7 +19,6 @@ export class WalletService {
     constructor(
         private prisma: PrismaService,
         private billingService: BillingService,
-        private notificationsService: NotificationsService,
         private httpService: HttpService,
         private configService: ConfigService,
         private freeSwitchSync: FreeSwitchSyncService,
@@ -112,7 +110,10 @@ export class WalletService {
         }
     }
 
-    async adjustBalance(tenantId: string, amount: number, type: TransactionType, description: string, referenceId?: string, tx?: Prisma.TransactionClient) {
+    async adjustBalance(tenantId: string, amount: number, type: TransactionType, description: string, referenceId?: string, tx?: Prisma.TransactionClient, operationKey?: string) {
+        if (operationKey !== undefined && (typeof operationKey !== 'string' || operationKey.length > 255 || operationKey !== `onboarding-funding:${tenantId}` || type !== TransactionType.CREDIT)) {
+            throw new BadRequestException('Invalid initial funding operation key');
+        }
         const customerId = await this.getSubBillingCustomerId(tenantId);
         const signedAmount = type === 'DEBIT' ? -Math.abs(amount) : Math.abs(amount);
 
@@ -122,7 +123,7 @@ export class WalletService {
                     customer_id: customerId,
                     amount: signedAmount,
                     currency: 'usd',
-                    tx_id: referenceId ? `${referenceId}-${Date.now()}` : `MANUAL-${Date.now()}`,
+                    tx_id: operationKey || (referenceId ? `${referenceId}-${Date.now()}` : `MANUAL-${Date.now()}`),
                     payment_type: 'pbx_admin_adjust',
                     description: description || `Admin adjustment: ${type}`
                 })

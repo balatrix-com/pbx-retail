@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Wallet, Phone, Users, Info, Building2, Plus, Trash2, Loader, CreditCard, RefreshCw, User, LogIn, Sliders, ShieldAlert, Clock, Mic, Zap, Loader2, Radio, HardDrive, Activity, Package, Palette, Edit3, Save, Check, CheckCircle2, Globe, MapPin, Mail, Lock, Eye, EyeOff, Search, Pencil, Shield, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Wallet, Phone, Users, Info, Building2, Plus, Trash2, Loader, CreditCard, RefreshCw, User, LogIn, Sliders, ShieldAlert, Clock, Mic, Zap, Loader2, Radio, HardDrive, Activity, Package, Palette, Edit3, Save, Check, CheckCircle2, Globe, MapPin, Mail, Lock, Eye, EyeOff, Search, Pencil, ExternalLink, Calendar, Shield, Sparkles } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
@@ -62,6 +64,24 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
     };
 
     const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
+
+    const [isBlockLoading, setIsBlockLoading] = useState(false);
+    const handleToggleBlock = async () => {
+        if (!tenant) return;
+        const willBlock = !tenant.serviceBlocked;
+        if (willBlock && !window.confirm(`Block customer ${tenant.name}? Outbound and inbound calls will be stopped and portal access will be disabled.`)) {
+            return;
+        }
+        setIsBlockLoading(true);
+        try {
+            await api.patch(`/tenants/${tenant.id}/block`, { blocked: willBlock });
+            handleRefresh();
+        } catch (err) {
+            alert('Failed to update service status: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsBlockLoading(false);
+        }
+    };
 
     if (loading && !tenant) {
         return (
@@ -191,6 +211,15 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
                     <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 font-medium shrink-0">
                         <span className="w-2 h-2 rounded-full bg-teal-500 animate-ping" />
                         <span>Live Console</span>
+                    {/* Tab Content */}
+                    <div className="flex-1 min-h-0 overflow-y-auto p-8 bg-white">
+                        {activeTab === 'overview' && (<OverviewTab tenant={tenant} subscription={subscription} onToggleBlock={handleToggleBlock} isBlockLoading={isBlockLoading} />)}
+                        {activeTab === 'wallet' && <WalletTab tenant={tenant} onUpdate={handleRefresh} />}
+                        {activeTab === 'extensions' && <ExtensionsTab tenant={tenant} onUpdate={handleRefresh} />}
+                        {activeTab === 'users' && <UsersTab tenant={tenant} />}
+                        {activeTab === 'features' && <FeaturesTab tenant={tenant} onUpdate={handleRefresh} />}
+                        {activeTab === 'subscriptions' && <SubscriptionsTab tenant={tenant} subscription={subscription} onUpdate={handleRefresh} />}
+                        {activeTab === 'customize' && <CustomizeTab tenant={tenant} onUpdate={handleRefresh} />}
                     </div>
                 </div>
 
@@ -211,7 +240,7 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
 
 // --- Sub-Components ---
 
-const OverviewTab = ({ tenant, subscription }) => (
+const OverviewTab = ({ tenant, subscription, onToggleBlock, isBlockLoading }) => (
     <div className="space-y-6 w-full">
         <div>
             <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight font-display">Organization Overview</h3>
@@ -265,9 +294,333 @@ const OverviewTab = ({ tenant, subscription }) => (
                 trend="Subscribed"
                 trendUp={true}
             />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="relative z-10">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+                        Company Code
+                    </div>
+                    <p className="text-2xl font-mono font-extrabold text-gray-900">{formatCustomerId(tenant.customerCode)}</p>
+                </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="relative z-10">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-purple-500"></div>
+                        Created At
+                    </div>
+                    <p className="text-2xl font-extrabold text-gray-900 tracking-tight">
+                        {new Date(tenant.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="relative z-10">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                        <div className={`h-1.5 w-1.5 rounded-full ${tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'bg-red-500' :
+                                tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-500' :
+                                    tenant.serviceStatus === 'ARCHIVED' ? 'bg-slate-500' :
+                                        'bg-green-500'
+                            }`}></div>
+                        System Status
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'bg-red-50 text-red-700 ring-red-600/20' :
+                                tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-50 text-amber-700 ring-amber-600/20' :
+                                    tenant.serviceStatus === 'ARCHIVED' ? 'bg-slate-50 text-slate-700 ring-slate-600/20' :
+                                        'bg-green-50 text-green-700 ring-green-600/20'
+                            }`}>
+                            {tenant.serviceStatus === 'BLOCKED' || tenant.serviceBlocked ? 'Blocked' :
+                                tenant.serviceStatus === 'DEACTIVATED' ? 'Deactivated' :
+                                    tenant.serviceStatus === 'ARCHIVED' ? 'Archived' : 'Active'}
+                        </span>
+                        {onToggleBlock && tenant.serviceStatus !== 'ARCHIVED' && (
+                            <button
+                                type="button"
+                                onClick={onToggleBlock}
+                                disabled={isBlockLoading}
+                                className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all shadow-sm ${tenant.serviceBlocked
+                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                        : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                                    }`}
+                                title={tenant.serviceBlocked ? "Unblock calls and portal access" : "Block calls and portal access"}
+                            >
+                                {isBlockLoading ? 'Updating...' : tenant.serviceBlocked ? 'Unblock' : 'Block'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="relative z-10">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-indigo-500"></div>
+                        Total Users
+                    </div>
+                    <p className="text-2xl font-extrabold text-gray-900 font-mono tracking-tight">{tenant.stats?.users || 0}</p>
+                </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="relative z-10">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+                        Current Subscription
+                    </div>
+                    <p className="text-2xl font-mono font-extrabold text-gray-900">
+                        {subscription?.plan?.name || subscription?.planName || subscription?.plan_name || 'No Active Plan'}
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 );
+
+const SubscriptionsTab = ({ tenant, subscription, onUpdate }) => {
+    const subList = useMemo(() => {
+        if (!subscription) return [];
+        if (Array.isArray(subscription)) return subscription;
+        if (Array.isArray(subscription.data)) return subscription.data;
+        if (typeof subscription === 'object' && (subscription.id || subscription.plan_id || subscription.plan_name)) return [subscription];
+        return [];
+    }, [subscription]);
+
+    const activeSub = useMemo(() => {
+        return subList.find(s => s.status === 'ACTIVE') || subList[0] || (subscription?.plan ? subscription : null);
+    }, [subList, subscription]);
+
+    const limits = activeSub?.limits || activeSub?.plan?.limits || {};
+    const extUsed = tenant.stats?.extensions || tenant.extensionsCount || 0;
+    const extTotal = limits.extensions !== undefined ? Number(limits.extensions) : null;
+    const extPercent = extTotal ? Math.min(100, Math.round((extUsed / extTotal) * 100)) : 0;
+
+    const numUsed = tenant.stats?.numbers || tenant.numbersCount || 0;
+    const numTotal = limits.numbers !== undefined ? Number(limits.numbers) : null;
+    const numPercent = numTotal ? Math.min(100, Math.round((numUsed / numTotal) * 100)) : 0;
+
+    const monUsed = tenant.stats?.monitoring_extensions || tenant.stats?.monitoring || 0;
+    const monTotal = limits.monitoring_extensions !== undefined ? Number(limits.monitoring_extensions) : null;
+    const monPercent = monTotal ? Math.min(100, Math.round((monUsed / monTotal) * 100)) : 0;
+
+    const daysRemaining = activeSub?.next_billing ? Math.ceil((new Date(activeSub.next_billing).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+
+    const consoleUrl = `/super-admin/subscriptions?tenantId=${encodeURIComponent(tenant.id)}`;
+
+    return (
+        <div className="space-y-6 w-full animate-in fade-in duration-200">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+                        <CreditCard className="h-6 w-6 text-primary-600" />
+                        Subscriptions & Capacity
+                    </h3>
+                    <p className="text-sm font-medium text-gray-500 mt-1">
+                        Active plans, resource limits, and asset allocations for {tenant.name}.
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <a
+                        href={consoleUrl}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white shadow-xs transition-all active:scale-95"
+                    >
+                        <span>Manage in Subscriptions Console</span>
+                        <ExternalLink size={14} />
+                    </a>
+                </div>
+            </div>
+
+            {/* Active Subscription Summary Card */}
+            {activeSub ? (
+                <div className="bg-white p-6 rounded-2xl shadow-sm ring-1 ring-gray-200/80 space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                        <div className="flex items-center gap-3.5">
+                            <div className="h-12 w-12 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600">
+                                <Sparkles className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2.5">
+                                    <h4 className="text-lg font-black text-gray-900 tracking-tight">
+                                        {activeSub.plan_name || activeSub.plan?.name || 'Active Subscription Plan'}
+                                    </h4>
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
+                                        activeSub.status === 'ACTIVE'
+                                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
+                                            : activeSub.status === 'EXPIRED'
+                                            ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20'
+                                            : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
+                                    }`}>
+                                        {activeSub.status || 'ACTIVE'}
+                                    </span>
+                                </div>
+                                <p className="text-xs font-mono text-gray-500 mt-0.5">
+                                    ID: {activeSub.id || activeSub.subscription_id || 'sub-active'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="text-right sm:border-l sm:border-gray-100 sm:pl-6">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Recurring Amount</span>
+                            <div className="text-2xl font-mono font-black text-gray-900">
+                                ${Number(activeSub.renewal_price || activeSub.amount || activeSub.price || 0).toFixed(2)}
+                                <span className="text-xs font-bold text-gray-500 ml-1">/ {activeSub.duration_unit || activeSub.billing_period || 'cycle'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Metadata Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Renewal Date</span>
+                            <div className="flex items-center gap-2 text-sm font-extrabold text-gray-900">
+                                <Calendar size={16} className="text-gray-400" />
+                                <span>{activeSub.next_billing ? new Date(activeSub.next_billing).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                            </div>
+                            {daysRemaining !== null && (
+                                <span className="text-xs text-amber-600 font-semibold mt-1 flex items-center gap-1">
+                                    <Clock size={12} /> {daysRemaining > 0 ? `${daysRemaining} days remaining` : 'Renews today'}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Auto-Renewal</span>
+                            <div className="flex items-center gap-2 text-sm font-extrabold">
+                                <span className={`h-2.5 w-2.5 rounded-full ${activeSub.auto_renew ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                <span className={activeSub.auto_renew ? 'text-emerald-700' : 'text-gray-600'}>
+                                    {activeSub.auto_renew ? 'Enabled (Automatic)' : 'Disabled'}
+                                </span>
+                            </div>
+                            <span className="text-xs text-gray-400 mt-1 block">Charges tenant wallet balance</span>
+                        </div>
+
+                        <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Wallet Balance</span>
+                            <div className={`text-sm font-mono font-extrabold ${Number(tenant.wallet?.balance || 0) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                ${Number(tenant.wallet?.balance || 0).toFixed(2)}
+                            </div>
+                            <span className="text-xs text-gray-400 mt-1 block">Available for renewals</span>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-white p-8 rounded-2xl shadow-sm ring-1 ring-gray-200/80 text-center space-y-4">
+                    <div className="h-14 w-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                        <CreditCard size={28} />
+                    </div>
+                    <div>
+                        <h4 className="text-lg font-black text-gray-900 tracking-tight">No Active Subscription</h4>
+                        <p className="text-sm text-gray-500 max-w-md mx-auto mt-1">
+                            This tenant does not currently have an active recurring plan assigned. Assign a package to allocate extension limits and phone numbers.
+                        </p>
+                    </div>
+                    <div>
+                        <a
+                            href={consoleUrl}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white shadow-xs transition-all"
+                        >
+                            <Sparkles size={14} />
+                            <span>Assign Plan in Console</span>
+                        </a>
+                    </div>
+                </div>
+            )}
+
+            {/* Resource Capacity Allocation Meters */}
+            <div>
+                <h4 className="text-sm font-black uppercase tracking-wider text-gray-500 mb-3">Resource Capacity Allocation</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Extensions Meter */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                                <Users size={16} className="text-blue-500" />
+                                Extensions
+                            </span>
+                            <span className="text-xs font-mono font-bold text-gray-900">
+                                {extUsed} / {extTotal !== null ? extTotal : '∞'}
+                            </span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                            <div
+                                className="bg-blue-500 h-full rounded-full transition-all duration-300"
+                                style={{ width: extTotal ? `${extPercent}%` : (extUsed > 0 ? '100%' : '0%') }}
+                            />
+                        </div>
+                        <span className="text-[11px] text-gray-400 block font-medium">
+                            {extTotal ? `${extPercent}% capacity allocated` : 'Unlimited extension capacity'}
+                        </span>
+                    </div>
+
+                    {/* Phone Numbers Meter */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                                <Phone size={16} className="text-emerald-500" />
+                                Phone Numbers / DIDs
+                            </span>
+                            <span className="text-xs font-mono font-bold text-gray-900">
+                                {numUsed} / {numTotal !== null ? numTotal : '∞'}
+                            </span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                            <div
+                                className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                                style={{ width: numTotal ? `${numPercent}%` : (numUsed > 0 ? '100%' : '0%') }}
+                            />
+                        </div>
+                        <span className="text-[11px] text-gray-400 block font-medium">
+                            {numTotal ? `${numPercent}% capacity allocated` : 'Unlimited phone number capacity'}
+                        </span>
+                    </div>
+
+                    {/* Monitoring Seats Meter */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                                <Shield size={16} className="text-purple-500" />
+                                Monitoring Seats
+                            </span>
+                            <span className="text-xs font-mono font-bold text-gray-900">
+                                {monUsed} / {monTotal !== null ? monTotal : '∞'}
+                            </span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                            <div
+                                className="bg-purple-500 h-full rounded-full transition-all duration-300"
+                                style={{ width: monTotal ? `${monPercent}%` : (monUsed > 0 ? '100%' : '0%') }}
+                            />
+                        </div>
+                        <span className="text-[11px] text-gray-400 block font-medium">
+                            {monTotal ? `${monPercent}% capacity allocated` : 'Unlimited monitoring seats'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Quick Action Footer Callout */}
+            <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <Zap className="h-5 w-5 text-indigo-600 shrink-0" />
+                    <p className="text-xs font-semibold text-indigo-950">
+                        Need to adjust limits, assign mid-cycle add-ons, or reassign allocated assets? Manage complete tenant assets in the Subscriptions console.
+                    </p>
+                </div>
+                <a
+                    href={consoleUrl}
+                    className="inline-flex items-center gap-1.5 text-xs font-extrabold text-indigo-700 hover:text-indigo-900 hover:underline shrink-0"
+                >
+                    <span>Open Console</span>
+                    <ExternalLink size={12} />
+                </a>
+            </div>
+        </div>
+    );
+};
 
 const WalletTab = ({ tenant, onUpdate }) => {
     const [amount, setAmount] = useState('');
@@ -826,6 +1179,186 @@ const UsersTab = ({ tenant }) => {
     );
 };
 
+const RecordingRateCardModal = ({ onClose, onConfirm, customerId }) => {
+    const [rateCards, setRateCards] = useState([]);
+    const [selectedCardId, setSelectedCardId] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchCards = async () => {
+            setLoading(true);
+            setError('');
+            try {
+                const res = await api.get('/admin/rec-rate-cards');
+                const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+                if (!isMounted) return;
+                setRateCards(list);
+                if (list.length > 0) {
+                    setSelectedCardId(String(list[0].id));
+                }
+
+                // If customer has an existing recording rate card mapping, pre-select it
+                if (customerId) {
+                    try {
+                        const mapRes = await api.get(`/admin/rec-rate-cards/customer/${customerId}`);
+                        const mappedId = mapRes.data?.rec_rc_id || mapRes.data?.id;
+                        if (mappedId && list.some(c => String(c.id) === String(mappedId))) {
+                            if (isMounted) setSelectedCardId(String(mappedId));
+                        }
+                    } catch (e) {
+                        // Ignore if no mapping exists yet
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load recording rate cards:', err);
+                if (isMounted) {
+                    setError(err.response?.data?.message || err.message || 'Failed to load recording rate cards');
+                }
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        fetchCards();
+        return () => { isMounted = false; };
+    }, [customerId]);
+
+    const selectedCard = rateCards.find(c => String(c.id) === String(selectedCardId));
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!selectedCardId) return;
+        setSubmitting(true);
+        try {
+            await onConfirm(Number(selectedCardId));
+        } catch (err) {
+            // Error handled by onConfirm
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col ring-1 ring-gray-200">
+                <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                            <Mic className="h-5 w-5" />
+                        </div>
+                        <div className="text-left">
+                            <h4 className="text-lg font-extrabold text-gray-900 tracking-tight">Enable Call Recording</h4>
+                            <p className="text-xs font-medium text-gray-500 mt-0.5">
+                                Select a recording rate card for this tenant
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-xl p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-4 text-left">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-8 gap-2">
+                            <Loader2 className="h-7 w-7 animate-spin text-primary-600" />
+                            <span className="text-xs font-medium text-gray-500">Loading recording rate cards...</span>
+                        </div>
+                    ) : error ? (
+                        <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-xs font-medium">
+                            {error}
+                        </div>
+                    ) : rateCards.length === 0 ? (
+                        <div className="text-center py-8">
+                            <Mic className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                            <p className="text-sm font-bold text-gray-700">No recording rate cards available</p>
+                            <p className="text-xs text-gray-400 mt-1">Please create a recording rate card in Rate Cards Management first.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-2">
+                                    Recording Rate Card <span className="text-rose-500">*</span>
+                                </label>
+                                <select
+                                    className="block w-full rounded-xl border border-gray-300 py-2.5 px-3.5 text-gray-900 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm font-semibold bg-white"
+                                    value={selectedCardId}
+                                    onChange={(e) => setSelectedCardId(e.target.value)}
+                                    required
+                                >
+                                    <option value="" disabled>Select a Rate Card</option>
+                                    {rateCards.map((card) => {
+                                        const rate = card.rate_per_min ?? card.ratePerMin;
+                                        const rateStr = rate !== undefined && rate !== null ? `${parseFloat(rate).toFixed(4)}/min` : '';
+                                        const retention = card.retention_period ?? card.retentionPeriod;
+                                        const retentionStr = retention ? `${retention}d retention` : '';
+                                        const parts = [rateStr, retentionStr].filter(Boolean).join(', ');
+                                        return (
+                                            <option key={card.id} value={card.id}>
+                                                {card.name}{parts ? ` — ${parts}` : ''}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+
+                            {selectedCard && (
+                                <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 space-y-1.5 text-xs text-gray-600">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">Rate:</span>
+                                        <span className="font-bold font-mono text-gray-900">
+                                            ${parseFloat(selectedCard.rate_per_min ?? selectedCard.ratePerMin ?? 0).toFixed(4)} / min
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">Retention Period:</span>
+                                        <span className="font-bold text-gray-900">
+                                            {selectedCard.retention_period ?? selectedCard.retentionPeriod ?? 7} Days
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">Currency:</span>
+                                        <span className="font-bold text-gray-900">{selectedCard.currency || 'USD'}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="pt-3 flex justify-end gap-3 border-t border-gray-100">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={submitting}
+                            className="inline-flex justify-center items-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-all active:scale-[0.98] focus:outline-none"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting || loading || rateCards.length === 0 || !selectedCardId}
+                            className="inline-flex justify-center items-center rounded-xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {submitting ? (
+                                <><Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" /> Enabling...</>
+                            ) : (
+                                'Confirm & Enable'
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const FeaturesTab = ({ tenant, onUpdate }) => {
     const [features, setFeatures] = useState(tenant.tenantFeatures || {
         ivrEnabled: true,
@@ -836,8 +1369,12 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
         schedulerLimit: 10,
         didForwardEnabled: true,
         didForwardLimit: 10,
+        voicemailEnabled: false,
+        voicemailBoxLimit: 0,
+        voicemailStorageLimitMb: 0,
     });
     const [updatingFeature, setUpdatingFeature] = useState(null);
+    const [showRecordingModal, setShowRecordingModal] = useState(false);
 
     // Keep state in sync if tenant prop updates
     useEffect(() => {
@@ -847,18 +1384,57 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
     }, [tenant.tenantFeatures]);
 
     const handleToggle = async (key) => {
+        if (key === 'recordingAllowed') {
+            const currentlyAllowed = !!features.recordingAllowed;
+            if (!currentlyAllowed) {
+                setShowRecordingModal(true);
+            } else {
+                setUpdatingFeature('recordingAllowed');
+                try {
+                    await api.patch(`/tenants/${tenant.id}/features`, { recordingAllowed: false });
+                    setFeatures(prev => ({ ...prev, recordingAllowed: false }));
+                    onUpdate();
+                } catch (err) {
+                    console.error('Failed to disable call recording:', err);
+                    alert('Failed to disable call recording: ' + (err.response?.data?.message || err.message));
+                } finally {
+                    setUpdatingFeature(null);
+                }
+            }
+            return;
+        }
+
         setUpdatingFeature(key);
         const updatedFeatures = {
             ...features,
             [key]: !features[key]
         };
         try {
-            await api.patch(`/tenants/${tenant.id}/features`, updatedFeatures);
+            await api.patch(`/tenants/${tenant.id}/features`, { [key]: !features[key] });
             setFeatures(updatedFeatures);
             onUpdate(); // refresh parent details
         } catch (err) {
             console.error('Failed to update tenant features:', err);
             alert('Failed to update tenant features');
+        } finally {
+            setUpdatingFeature(null);
+        }
+    };
+
+    const handleEnableRecording = async (recRateCardId) => {
+        setUpdatingFeature('recordingAllowed');
+        try {
+            await api.patch(`/tenants/${tenant.id}/features`, {
+                recordingAllowed: true,
+                recRateCardId: Number(recRateCardId)
+            });
+            setFeatures(prev => ({ ...prev, recordingAllowed: true }));
+            setShowRecordingModal(false);
+            onUpdate();
+        } catch (err) {
+            console.error('Failed to enable call recording:', err);
+            alert('Failed to enable call recording: ' + (err.response?.data?.message || err.message));
+            throw err;
         } finally {
             setUpdatingFeature(null);
         }
@@ -924,6 +1500,14 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
             description: 'Directly forward incoming phone numbers to external lines or specific destinations.',
             icon: Phone,
             color: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-100 dark:border-cyan-500/20',
+            color: 'text-blue-600 bg-blue-50 border-blue-100',
+        },
+        {
+            key: 'voicemailEnabled',
+            title: 'Voicemail',
+            description: 'On for new tenants: one active company mailbox and one off-by-default mailbox per extension.',
+            icon: Mic,
+            color: 'text-blue-600 bg-blue-50 border-blue-100',
         }
     ];
 
@@ -1002,6 +1586,18 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                                             <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider font-mono">slots</span>
                                         </div>
                                     )}
+                                    {isEnabled && item.key === 'voicemailEnabled' && (
+                                        <div className="mt-3 flex flex-wrap items-end gap-4">
+                                            <label className="flex flex-col gap-1 text-xs font-bold text-gray-700">
+                                                Storage limit (MB, 0 = unlimited)
+                                                <input type="number" min="0" className="w-28 px-2 py-1 border rounded"
+                                                    value={features.voicemailStorageLimitMb ?? 0}
+                                                    onChange={e => setFeatures(prev => ({ ...prev, voicemailStorageLimitMb: e.target.value }))}
+                                                    onBlur={e => handleLimitChange('voicemailStorageLimitMb', e.target.value || 0)} />
+                                            </label>
+                                            <p className="text-xs text-gray-500">Each mailbox keeps its latest 20 messages. When a new message arrives, the oldest is removed.</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -1028,6 +1624,14 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                     );
                 })}
             </div>
+
+            {showRecordingModal && (
+                <RecordingRateCardModal
+                    onClose={() => setShowRecordingModal(false)}
+                    onConfirm={handleEnableRecording}
+                    customerId={tenant.customerCode || tenant.id}
+                />
+            )}
         </div>
     );
 };
@@ -1509,11 +2113,10 @@ const CustomizeTab = ({ tenant, onUpdate }) => {
                         </label>
                         {!isEditing ? (
                             <div className="mt-1">
-                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${
-                                    formData.customerType === 'company'
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${formData.customerType === 'company'
                                         ? 'bg-blue-50 text-blue-700 ring-blue-600/20'
                                         : 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
-                                }`}>
+                                    }`}>
                                     {formData.customerType === 'company' ? <Building2 size={13} /> : <User size={13} />}
                                     {formData.customerType === 'company' ? 'Company' : 'Individual'}
                                 </span>
@@ -1523,22 +2126,20 @@ const CustomizeTab = ({ tenant, onUpdate }) => {
                                 <button
                                     type="button"
                                     onClick={() => handleChange('customerType', 'company')}
-                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                                        formData.customerType === 'company'
+                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${formData.customerType === 'company'
                                             ? 'bg-white text-indigo-700 shadow-sm'
                                             : 'text-gray-500 hover:text-gray-900'
-                                    }`}
+                                        }`}
                                 >
                                     Company
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => handleChange('customerType', 'individual')}
-                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                                        formData.customerType === 'individual'
+                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${formData.customerType === 'individual'
                                             ? 'bg-white text-indigo-700 shadow-sm'
                                             : 'text-gray-500 hover:text-gray-900'
-                                    }`}
+                                        }`}
                                 >
                                     Individual
                                 </button>

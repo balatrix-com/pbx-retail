@@ -8,6 +8,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { ExtensionsService } from '../telecom/extensions/extensions.service';
 import { MailService } from '../mail/mail.service';
 import { TenantArchiveService } from './tenant-archive.service';
+import { VoicemailService } from '../voicemail/voicemail.service';
 
 @Injectable()
 export class TenantsService {
@@ -22,6 +23,7 @@ export class TenantsService {
         private extensionsService: ExtensionsService,
         private mailService: MailService,
         private archives: TenantArchiveService,
+        private voicemail: VoicemailService,
     ) { }
 
     async listTenants(query: {
@@ -56,7 +58,14 @@ export class TenantsService {
                     _count: {
                         select: { users: { where: { status: { not: 'DELETED' } } } }
                     },
-                    wallet: true
+                    wallet: true,
+                    subscriptions: {
+                        where: {
+                            status: 'ACTIVE',
+                            endDate: { gt: new Date() }
+                        },
+                        select: { id: true }
+                    }
                 }
             }),
             this.prisma.tenant.count({ where }),
@@ -66,7 +75,23 @@ export class TenantsService {
         const archiveJobs = await this.prisma.$queryRawUnsafe<any[]>('SELECT * FROM tenant_archive_jobs WHERE tenant_id = ANY($1::text[])', data.map(t => t.id));
         // Merge real-time balances into the PBX tenant data
         const enrichedData = data.map((tenant: any) => {
-            tenant = { ...tenant, archiveJob: archiveJobs.find(j => j.tenant_id === tenant.id) || null };
+            const archiveJob = archiveJobs.find(j => j.tenant_id === tenant.id) || null;
+            const hasActivePlan = Array.isArray(tenant.subscriptions) && tenant.subscriptions.length > 0;
+            let serviceStatus = 'ACTIVE';
+            if (tenant.status === 'ARCHIVED' || archiveJob) {
+                serviceStatus = 'ARCHIVED';
+            } else if (tenant.serviceBlocked || tenant.status === 'SUSPENDED') {
+                serviceStatus = 'BLOCKED';
+            } else if (!hasActivePlan) {
+                serviceStatus = 'DEACTIVATED';
+            }
+
+            tenant = {
+                ...tenant,
+                archiveJob,
+                serviceStatus,
+                hasActivePlan
+            };
             const billingWallet = realTimeBalances.find((b: any) => b.customer_id === tenant.id);
             if (billingWallet) {
                 return {
@@ -316,6 +341,8 @@ export class TenantsService {
         return {
             ...tenant,
             archiveJob: await this.archives.status(id),
+            serviceStatus: (tenant.status === 'ARCHIVED') ? 'ARCHIVED' : (tenant.serviceBlocked || tenant.status === 'SUSPENDED') ? 'BLOCKED' : (!subscription || !['active', 'grace'].includes(subscription.status)) ? 'DEACTIVATED' : 'ACTIVE',
+            hasActivePlan: Boolean(subscription && ['active', 'grace'].includes(subscription.status)),
             wallet: realWallet,
             tenantFeatures: features,
             subscription,
@@ -424,11 +451,100 @@ export class TenantsService {
         didForwardLimit?: number;
         monitorEnabled?: boolean;
         recordingAllowed?: boolean;
+        /** Required when enabling recordingAllowed (turning it from false → true).
+         *  Must match a valid rec_rate_card.id. */
+        recRateCardId?: number;
+        voicemailEnabled?: boolean;
+        voicemailBoxLimit?: number;
+        voicemailStorageLimitMb?: number;
     }) {
         const tenant = await this.prisma.tenant.findUnique({
             where: { id }
         });
         if (!tenant) throw new NotFoundException('Tenant not found');
+
+        // ── Recording guard: rate card is mandatory before enabling recording ──
+        if (dto.recordingAllowed === true) {
+            if (!dto.recRateCardId) {
+                throw new BadRequestException(
+                    'A recording rate card (recRateCardId) must be selected before enabling call recording.',
+                );
+            }
+
+            // Validate that the rate card exists in sub-billing (authoritative) or local DB
+            let cardFound: any = null;
+            try {
+                const billingCards = await this.adminService.getAllRecRateCards();
+                const cardsList = Array.isArray(billingCards) ? billingCards : billingCards?.data || [];
+                cardFound = cardsList.find((rc: any) => Number(rc.id) === Number(dto.recRateCardId));
+            } catch (e: any) {
+                this.logger.warn(`Could not fetch rate cards from sub-billing: ${e.message}`);
+            }
+
+            if (!cardFound) {
+                const localCard = await this.prisma.recRateCard.findUnique({
+                    where: { id: dto.recRateCardId },
+                }).catch(() => null);
+                if (localCard) {
+                    cardFound = localCard;
+                }
+            }
+
+            if (!cardFound) {
+                throw new BadRequestException(
+                    `Recording rate card id ${dto.recRateCardId} does not exist.`,
+                );
+            }
+
+            // Best-effort local sync
+            try {
+                if (this.prisma.recRateCard) {
+                    await this.prisma.recRateCard.upsert({
+                        where: { id: Number(cardFound.id) },
+                        update: {
+                            name: cardFound.name,
+                            currency: cardFound.currency || 'USD',
+                            ratePerMin: cardFound.rate_per_min || cardFound.ratePerMin || 0,
+                            retentionPeriod: Number(cardFound.retention_period || cardFound.retentionPeriod || 15) as 7 | 15 | 30,
+                        },
+                        create: {
+                            id: Number(cardFound.id),
+                            name: cardFound.name,
+                            currency: cardFound.currency || 'USD',
+                            ratePerMin: cardFound.rate_per_min || cardFound.ratePerMin || 0,
+                            retentionPeriod: Number(cardFound.retention_period || cardFound.retentionPeriod || 15) as 7 | 15 | 30,
+                        },
+                    });
+                }
+            } catch (syncErr: any) {
+                this.logger.warn(`Could not sync rec_rate_card locally: ${syncErr.message}`);
+            }
+
+            // Upsert the customer → rec rate card mapping via admin service
+            const customerId = tenant.subBillingCustomerId || tenant.customerCode;
+            if (!customerId) {
+                throw new BadRequestException('Tenant is not linked to a billing customer; cannot assign rate card.');
+            }
+            try {
+                await this.adminService.updateCustomerRecRateCardMapping(customerId, {
+                    rec_rc_id: dto.recRateCardId,
+                });
+                this.logger.log(
+                    `Recording rate card ${dto.recRateCardId} assigned to customer ${customerId} before enabling recording.`,
+                );
+            } catch (rcErr: any) {
+                this.logger.error(
+                    `Failed to assign recording rate card ${dto.recRateCardId} to ${customerId}: ${rcErr.message}`,
+                );
+                throw new BadRequestException(
+                    `Could not assign recording rate card: ${rcErr.message}`,
+                );
+            }
+        }
+
+        if (dto.voicemailEnabled !== undefined && typeof dto.voicemailEnabled !== 'boolean') throw new BadRequestException('Invalid voicemail switch');
+        if (dto.voicemailBoxLimit !== undefined && (!Number.isInteger(dto.voicemailBoxLimit) || dto.voicemailBoxLimit < 0 || dto.voicemailBoxLimit > 10000)) throw new BadRequestException('Invalid mailbox limit');
+        if (dto.voicemailStorageLimitMb !== undefined && (!Number.isSafeInteger(dto.voicemailStorageLimitMb) || dto.voicemailStorageLimitMb < 0)) throw new BadRequestException('Invalid voicemail storage limit');
 
         const isDisablingRecording = dto.recordingAllowed === false;
 
@@ -446,6 +562,9 @@ export class TenantsService {
                 didForwardLimit: dto.didForwardLimit ?? 10,
                 monitorEnabled: dto.monitorEnabled ?? true,
                 recordingAllowed: dto.recordingAllowed ?? false,
+                voicemailEnabled: dto.voicemailEnabled ?? true,
+                voicemailBoxLimit: dto.voicemailBoxLimit ?? 0,
+                voicemailStorageLimitMb: dto.voicemailStorageLimitMb ?? 0,
                 recordingEnabled: false,
             },
             update: {
@@ -459,6 +578,9 @@ export class TenantsService {
                 didForwardLimit: dto.didForwardLimit,
                 monitorEnabled: dto.monitorEnabled,
                 recordingAllowed: dto.recordingAllowed,
+                voicemailEnabled: dto.voicemailEnabled,
+                voicemailBoxLimit: dto.voicemailBoxLimit,
+                voicemailStorageLimitMb: dto.voicemailStorageLimitMb,
                 ...(isDisablingRecording ? { recordingEnabled: false } : {}),
             }
         });
@@ -470,6 +592,9 @@ export class TenantsService {
             });
             await this.freeSwitchSync.syncAllDialplans(id);
         }
+
+        if (dto.voicemailEnabled === true) await this.voicemail.ensureDefaultBoxes(id);
+        if (dto.voicemailEnabled !== undefined) await this.freeSwitchSync.syncAllDialplans(id);
 
         return updatedFeatures;
     }
@@ -561,6 +686,9 @@ export class TenantsService {
                 }
             });
 
+            // Company voicemail is available by default; extension mailboxes are provisioned disabled.
+            await prisma.tenantFeature.create({ data: { tenantId: tenant.id, voicemailEnabled: true } });
+
             // 2. Create Wallet
             await prisma.wallet.create({
                 data: {
@@ -626,6 +754,9 @@ export class TenantsService {
         await this.extensionsService.syncMissingExtensionsFromSubBilling(result.tenant.id).catch(err => {
             this.logger.warn(`Post-tenant creation extension sync warning: ${err.message}`);
         });
+        await this.voicemail.ensureDefaultBoxes(result.tenant.id).catch(err => {
+            this.logger.warn(`Post-tenant creation voicemail provisioning warning: ${err.message}`);
+        });
 
         // 8. Send credentials email (fire-and-forget, non-blocking)
         try {
@@ -639,7 +770,7 @@ export class TenantsService {
                 .join('') || 'None';
             const extHtml = `<div style="text-align:left;display:inline-block;margin:10px auto;">${extList}</div>`;
 
-            await this.mailService.sendOnboardingCompletionEmail(
+            const emailSent = await this.mailService.sendOnboardingCompletionEmail(
                 data.adminEmail,
                 `${data.firstName} ${data.lastName}`,
                 result.tenant.customerCode || '',
@@ -650,7 +781,8 @@ export class TenantsService {
                 'N/A',
                 data.adminPassword,
             );
-            this.logger.log(`Credentials email sent to ${data.adminEmail} for tenant ${result.tenant.id}`);
+            if (emailSent) this.logger.log(`Credentials email sent to ${data.adminEmail} for tenant ${result.tenant.id}`);
+            else this.logger.warn(`Credentials email was not delivered to ${data.adminEmail} for tenant ${result.tenant.id}`);
         } catch (emailErr: any) {
             this.logger.error(`Failed to send credentials email to ${data.adminEmail}: ${emailErr.message}`);
         }

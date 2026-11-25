@@ -30,6 +30,11 @@ import api from '../../services/api';
 import { useWalletQuery, useSubscriptionQuery } from '../../hooks/useBillingQueries';
 import CreativeStatCard from '../../components/common/CreativeStatCard';
 import { useBillingIntelligence } from '../../hooks/useBillingIntelligence';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Download, Search, Filter, DollarSign, PhoneOff, ArrowDownRight, ArrowUpRight, History, Calendar, Play, Pause, Loader2, Users, Info } from 'lucide-react';
+import { format, subDays, startOfDay, endOfDay, startOfMonth } from 'date-fns';
+import { telecomService } from '../../services/telecom.service';
+import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import Pagination from '../../components/common/Pagination';
 import clsx from 'clsx';
@@ -167,9 +172,6 @@ const CdrsPage = () => {
     const [tenantList, setTenantList] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState('ALL');
 
-    const { data: wallet } = useWalletQuery();
-    const { data: subscription } = useSubscriptionQuery();
-    const intelligence = useBillingIntelligence(wallet, subscription);
 
     useEffect(() => {
         if (isSuperAdmin) {
@@ -421,6 +423,19 @@ const CdrsPage = () => {
                             <Download size={14} className="text-teal-700" />
                             <span>Export CSV</span>
                         </button>
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2 bg-white rounded-xl shadow-sm ring-1 ring-gray-200 p-1">
+                        {['today', '7days', '30days', 'month'].map((p) => (
+                            <button
+                                key={p}
+                                onClick={() => handlePresetChange(p)}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${preset === p
+                                    ? 'bg-primary-600 text-white shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+                            >
+                                {p.charAt(0).toUpperCase() + p.slice(1).replace('days', ' Days')}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>

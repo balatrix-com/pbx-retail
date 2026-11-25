@@ -2,7 +2,7 @@ import api from './api';
 
 export const subscriptionService = {
     // ------------------------------------------------------------------------
-    // 1. EXISTING BACKEND API: GET /api/plans (Status: 200 OK)
+    // Plans Catalog
     // ------------------------------------------------------------------------
     getPlans: async () => {
         try {
@@ -30,36 +30,93 @@ export const subscriptionService = {
         return res.data;
     },
 
-    // ------------------------------------------------------------------------
-    // 2. EXISTING BACKEND API: GET /api/wallet/subscription (Status: 200 OK)
-    // ------------------------------------------------------------------------
-    getSubscription: async (tenantId) => {
+    getRateCards: async () => {
         try {
-            const res = await api.get('/wallet/subscription', {
-                params: {
-                    tenantId
-                }
-            });
-
-            return res.data;
-        } catch (e) {
-            console.warn('GET /wallet/subscription endpoint error:', e);
-            return null;
+            const res = await api.get('/admin/rec-rate-cards');
+            const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
+            return list;
+        } catch (err) {
+            console.error('Failed to fetch rate cards:', err);
+            return [];
         }
     },
 
     // ------------------------------------------------------------------------
-    // 3. ADD-ONS CATALOG (Connected to Backend API)
+    // Authoritative PBX Subscriptions API (/api/subscriptions)
+    // ------------------------------------------------------------------------
+    getSubscriptions: async (tenantId) => {
+        const res = await api.get('/subscriptions', {
+            params: tenantId ? { tenantId } : {}
+        });
+        return res.data;
+    },
+
+    getAllSubscriptions: async () => {
+        const res = await api.get('/subscriptions', {
+            params: { tenantId: 'all' }
+        });
+        return res.data;
+    },
+
+    // Backward compatibility alias for useSubscriptionQuery
+    getSubscription: async (tenantId) => {
+        if (tenantId === 'all') {
+            return subscriptionService.getAllSubscriptions();
+        }
+        return subscriptionService.getSubscriptions(tenantId);
+    },
+
+    getQuote: async (payload) => {
+        const res = await api.post('/subscriptions/quote', payload);
+        return res.data;
+    },
+
+    activateSubscription: async (payload) => {
+        const res = await api.post('/subscriptions/activate', payload);
+        return res.data;
+    },
+
+    renewSubscription: async (id, payload) => {
+        const res = await api.post(`/subscriptions/${id}/renew`, payload);
+        return res.data;
+    },
+
+    toggleAutoRenew: async (id, auto_renew, tenantId) => {
+        const res = await api.patch(`/subscriptions/${id}/auto-renew`, {
+            auto_renew,
+            ...(tenantId ? { tenantId } : {})
+        });
+        return res.data;
+    },
+
+    reassignAsset: async (payload) => {
+        const res = await api.post('/subscriptions/assets/reassign', payload);
+        return res.data;
+    },
+
+    transitionSubscription: async (id, transition, tenantId) => {
+        const res = await api.post(`/subscriptions/${id}/${transition}`, {
+            ...(tenantId ? { tenantId } : {})
+        });
+        return res.data;
+    },
+
+    getSubscriptionHistory: async (id, tenantId) => {
+        const res = await api.get(`/subscriptions/${id}/history`, {
+            params: tenantId ? { tenantId } : {}
+        });
+        return res.data;
+    },
+
+    // ------------------------------------------------------------------------
+    // Add-ons Catalog & Operations
     // ------------------------------------------------------------------------
     getCatalog: async () => {
         const res = await api.get('/addons/catalog');
         return res.data;
     },
 
-    // ------------------------------------------------------------------------
-    // 4. ADD-ON QUOTE CALCULATION (Connected to Backend API)
-    // ------------------------------------------------------------------------
-    getQuote: async (tenantId, addonId, quantity = 1) => {
+    getAddonQuote: async (tenantId, addonId, quantity = 1) => {
         const res = await api.post('/addons/quote', {
             tenantId,
             addonId,
@@ -68,9 +125,6 @@ export const subscriptionService = {
         return res.data;
     },
 
-    // ------------------------------------------------------------------------
-    // 5. ADD-ON PURCHASE (Connected to Backend API)
-    // ------------------------------------------------------------------------
     purchaseAddon: async (tenantId, addonId, quantity = 1) => {
         const res = await api.post('/addons/purchase', {
             tenantId,
@@ -80,14 +134,13 @@ export const subscriptionService = {
         return res.data;
     },
 
-    // ------------------------------------------------------------------------
-    // 6. PLAN SWITCH (Real backend API: POST /api/wallet/subscription)
-    // ------------------------------------------------------------------------
-    switchPlan: async (customerId, newPlanId, immediate = true) => {
+    // Compatibility plan switch
+    switchPlan: async (tenantId, newPlanId, immediate = true) => {
+        // The onboarding compatibility endpoint supplies a stable activation key.
         const res = await api.post('/wallet/subscription', {
-            targetTenantId: customerId,
+            targetTenantId: tenantId,
             planId: newPlanId,
-            immediate
+            immediate,
         });
         return res.data;
     }

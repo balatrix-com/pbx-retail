@@ -14,7 +14,6 @@ import { ConfigService } from '@nestjs/config';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
 
 import { StripeService } from '../payments/stripe.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { LookupRedisService } from '../redis/lookup-redis.module';
 import { ProvisionTenantDto } from './dto/provision-tenant.dto';
 import { Role, UserStatus, SubscriptionStatus, TFNStatus } from '@prisma/client';
@@ -34,7 +33,6 @@ export class OnboardingService {
         private configService: ConfigService,
         private freeSwitchSync: FreeSwitchSyncService,
         private stripeService: StripeService,
-        private notificationsService: NotificationsService,
         private lookupRedis: LookupRedisService,
         private httpService: HttpService,
         private mailService: MailService,

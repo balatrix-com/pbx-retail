@@ -323,6 +323,12 @@ export class OperationalSchedulesService {
             if (!ivr) {
                 throw new BadRequestException('IVR not found');
             }
+        } else if (routeType === 'voicemail') {
+            const [box, feature] = await Promise.all([
+                this.prisma.voicemailBox.findFirst({ where: { id: targetId, tenantId, enabled: true } }),
+                this.prisma.tenantFeature.findUnique({ where: { tenantId } }),
+            ]);
+            if (!box || !feature?.voicemailEnabled) throw new BadRequestException('Voicemail box is unavailable');
         } else {
             throw new BadRequestException(`Unknown route type: ${routeType}`);
         }

@@ -15,6 +15,7 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
 import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
+import { VoicemailService } from '../../voicemail/voicemail.service';
 
 @Injectable()
 export class ExtensionsService {
@@ -27,6 +28,7 @@ export class ExtensionsService {
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
         private readonly subscriptions: SubscriptionsService,
+        private readonly voicemail: VoicemailService,
     ) { }
 
     private async resolveTenantId(tenantId: string): Promise<string> {
@@ -108,6 +110,7 @@ export class ExtensionsService {
                     });
 
                     existingMap.set(extNum, newExt);
+                    await this.voicemail.ensureDefaultBoxes(targetTenantId);
                     this.logger.log(`[Auto-Sync] Created extension ${extNum} in PBX DB for tenant ${targetTenantId}`);
 
                     // Sync to FreeSWITCH & Kamailio
@@ -130,6 +133,7 @@ export class ExtensionsService {
         }
 
         // Sync with Redis Lookup DB
+        await this.voicemail.ensureDefaultBoxes(targetTenantId);
         await this.lookupRedis.updateExtensionLookup(targetTenantId).catch(() => {});
     }
 
@@ -282,6 +286,7 @@ export class ExtensionsService {
         catch(error){await this.prisma.extension.delete({where:{id:extension.id}});throw error;}
 
         // Sync to FreeSWITCH/Kamailio — non-fatal if unreachable
+        await this.voicemail.ensureDefaultBoxes(tenantId);
         try {
             await this.freeSwitchSync.syncExtension(extension.id);
         } catch (syncErr) {
@@ -408,12 +413,15 @@ export class ExtensionsService {
             throw new BadRequestException(`Cannot delete extension. It is currently the routing target for DID ${didUsage.number}.`);
         }
 
+        const mailboxId = await this.voicemail.assertExtensionMailboxCanRetire(tenantId, id);
+
         // Remove SIP/routing successfully before freeing the paid subscription slot.
         await this.freeSwitchSync.deleteExtension(extension);
         await this.subscriptions.unassignExtension(tenantId,extension);
 
         // Delete
         await this.prisma.extension.delete({ where: { id } });
+        await this.voicemail.retireExtensionMailbox(tenantId, mailboxId);
 
         // Sync with Redis Lookup DB
         await this.lookupRedis.deleteExtensionLookup(extension.extensionNumber);

@@ -11,8 +11,8 @@ export class CreateDIDDto {
 
     @IsString()
     @IsOptional()
-    @IsIn(['extension', 'ring_group', 'ivr', 'forward', 'did_forward'])
-    routeType?: 'extension' | 'ring_group' | 'ivr' | 'forward' | 'did_forward';
+    @IsIn(['extension', 'ring_group', 'ivr', 'forward', 'did_forward', 'voicemail'])
+    routeType?: 'extension' | 'ring_group' | 'ivr' | 'forward' | 'did_forward' | 'voicemail';
 
     @IsString()
     @IsOptional()

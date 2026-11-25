@@ -35,6 +35,7 @@ const TenantWizard = ({ onClose, onSuccess }) => {
     const [statusMessage, setStatusMessage] = useState('');
     const [error, setError] = useState(null);
     const [createdTenantId, setCreatedTenantId] = useState(null);
+    const [walletFunded, setWalletFunded] = useState(false);
     const [tenantName, setTenantName] = useState('');
     const [customerCode, setCustomerCode] = useState(null);
     const [showWarning, setShowWarning] = useState(false);
@@ -264,14 +265,16 @@ const TenantWizard = ({ onClose, onSuccess }) => {
 
             // 2. Fund Wallet (if walletAmount is provided and > 0)
             const fundingAmount = Number(walletAmount);
-            if (fundingAmount > 0) {
+            if (fundingAmount > 0 && !walletFunded) {
                 setStatusMessage('Funding wallet...');
                 await api.post('/wallet/internal-adjust', {
                     targetTenantId: tenantId,
                     amount: fundingAmount,
                     type: 'CREDIT',
-                    description: walletDescription || 'Initial Funding'
+                    description: walletDescription || 'Initial Funding',
+                    operationKey: `onboarding-funding:${tenantId}`
                 });
+                setWalletFunded(true);
             }
 
             // 3. Configure Subscription (if not skipped and plan selected)

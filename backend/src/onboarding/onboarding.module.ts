@@ -9,7 +9,6 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
 import { WalletModule } from '../wallet/wallet.module';
 import { PaymentsModule } from '../payments/payments.module';
-import { NotificationsModule } from '../notifications/notifications.module';
 import { LookupRedisModule } from '../redis/lookup-redis.module';
 import { HttpModule } from '@nestjs/axios';
 import { MailModule } from '../mail/mail.module';
@@ -24,7 +23,6 @@ import { MailModule } from '../mail/mail.module';
         FreeswitchModule,
         WalletModule,
         PaymentsModule,
-        NotificationsModule,
         LookupRedisModule,
         MailModule
     ],

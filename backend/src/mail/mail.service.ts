@@ -440,7 +440,7 @@ export class MailService {
                     html: html,
                 });
                 this.logger.log(`Onboarding completion email sent successfully via SMTP to ${email}`);
-                return;
+                return true;
             } catch (smtpError) {
                 this.logger.error(`SMTP delivery failed, falling back to ZeptoMail: ${smtpError.message}`);
             }
@@ -449,7 +449,7 @@ export class MailService {
         // ZeptoMail Fallback
         if (!this.apiKey) {
             this.logger.warn('ZeptoMail API key not configured. Skipping onboarding completion email send.');
-            return;
+            return false;
         }
 
         const payload = {
@@ -493,11 +493,14 @@ export class MailService {
             if (!response.ok) {
                 const errorData = await response.text();
                 this.logger.error(`Failed to send onboarding completion email to ${email} via ZeptoMail: ${response.status} - ${errorData}`);
+                return false;
             } else {
                 this.logger.log(`Onboarding completion email sent successfully via ZeptoMail to ${email}`);
+                return true;
             }
         } catch (error) {
             this.logger.error(`Error sending onboarding completion email to ${email} via ZeptoMail`, error);
+            return false;
         }
     }
 }

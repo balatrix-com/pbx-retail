@@ -19,7 +19,10 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:tfns": "ts-node prisma/seed-tfns.ts",
-    "seed:ratecards": "ts-node prisma/rate_card.ts"
+    "seed:ratecards": "ts-node prisma/rate_card.ts",
+    "migrate": "node scripts/run-migrations.js",
+    "migrate:status": "node scripts/run-migrations.js --status",
+    "migrate:check": "node scripts/run-migrations.js --check"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

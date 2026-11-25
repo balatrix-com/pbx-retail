@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WalletService } from './wallet.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from '../billing/billing.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { FreeSwitchSyncService } from '../freeswitch/freeswitch-sync.service';
@@ -99,7 +98,6 @@ describe('WalletService (switchSubscriptionPlan & Kamailio Sync)', () => {
                 WalletService,
                 { provide: PrismaService, useValue: prisma },
                 { provide: BillingService, useValue: {} },
-                { provide: NotificationsService, useValue: {} },
                 { provide: HttpService, useValue: httpService },
                 { provide: ConfigService, useValue: configService },
                 { provide: FreeSwitchSyncService, useValue: freeSwitchSync },
@@ -142,5 +140,16 @@ describe('WalletService (switchSubscriptionPlan & Kamailio Sync)', () => {
             await expect(service.switchSubscriptionPlan('U1010', 'tier_1_starter')).rejects.toThrow('Insufficient funds');
             expect(prisma.subscription.create).not.toHaveBeenCalled();
         });
+    });
+
+    it('uses one transaction ID for repeated initial funding and rejects a mismatched key', async () => {
+        await service.adjustBalance('U1010', 100, 'CREDIT' as any, 'Initial Funding', 'admin', undefined, 'onboarding-funding:U1010');
+        await service.adjustBalance('U1010', 100, 'CREDIT' as any, 'Initial Funding', 'admin', undefined, 'onboarding-funding:U1010');
+        expect(httpService.post.mock.calls.map(([, body]) => body.tx_id)).toEqual([
+            'onboarding-funding:U1010', 'onboarding-funding:U1010',
+        ]);
+        await expect(service.adjustBalance('U1010', 100, 'CREDIT' as any, 'Initial Funding', 'admin', undefined, 'onboarding-funding:OTHER'))
+            .rejects.toThrow('Invalid initial funding operation key');
+        expect(httpService.post).toHaveBeenCalledTimes(2);
     });
 });

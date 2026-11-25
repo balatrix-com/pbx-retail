@@ -13,9 +13,10 @@ import { CustomerIdentityController } from './customer-identity.controller';
 import { TenantArchiveService } from './tenant-archive.service';
 import { HttpModule } from '@nestjs/axios';
 import { InternalServiceGuard } from '../auth/guards/internal-service.guard';
+import { VoicemailModule } from '../voicemail/voicemail.module';
 
 @Module({
-    imports: [FreeswitchModule, AdminModule, LookupRedisModule, WalletModule, MailModule, ExtensionsModule, HttpModule],
+    imports: [FreeswitchModule, AdminModule, LookupRedisModule, WalletModule, MailModule, ExtensionsModule, HttpModule, VoicemailModule],
     controllers: [TenantsController, CustomerIdentityController],
     providers: [TenantsService, PrismaService, TenantArchiveService, InternalServiceGuard],
     exports: [TenantsService],

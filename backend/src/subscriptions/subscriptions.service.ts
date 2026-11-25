@@ -39,6 +39,109 @@ export class SubscriptionsService {
     const t = await this.tenant(tenantId);
     return this.request(`customer/${encodeURIComponent(t.subBillingCustomerId || t.customerCode!)}`);
   }
+  async listAll(): Promise<any> {
+    const tenants = await this.prisma.tenant.findMany({
+      where: { status: { not: 'ARCHIVED' } },
+      include: {
+        wallet: true,
+        users: {
+          where: { role: 'ADMIN' },
+          select: { email: true },
+          take: 1,
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    let allSubs: any[] = [];
+    try {
+      allSubs = await this.request('all');
+      if (!Array.isArray(allSubs)) {
+        allSubs = [];
+      }
+    } catch {
+      allSubs = [];
+    }
+
+    const subsByCustomer = new Map<string, any[]>();
+    for (const sub of allSubs) {
+      const custId = String(sub.customer_id || '').toLowerCase();
+      if (!subsByCustomer.has(custId)) {
+        subsByCustomer.set(custId, []);
+      }
+      subsByCustomer.get(custId)!.push(sub);
+    }
+
+    let activeCount = 0;
+    const enriched = tenants.map((t: any) => {
+      const keys = [
+        t.subBillingCustomerId?.toLowerCase(),
+        t.customerCode?.toLowerCase(),
+      ].filter(Boolean) as string[];
+
+      let tenantSubs: any[] = [];
+      for (const k of keys) {
+        if (subsByCustomer.has(k)) {
+          tenantSubs = subsByCustomer.get(k)!;
+          break;
+        }
+      }
+
+      const activeSub = tenantSubs.find((s) => ['active', 'grace'].includes(s.status)) || tenantSubs[0] || null;
+      const isSubActive = activeSub && ['active', 'grace'].includes(activeSub.status);
+      if (isSubActive) activeCount++;
+
+      const adminEmail = t.users && t.users.length > 0 ? t.users[0].email : (t.adminEmail || '');
+
+      return {
+        tenantId: t.id,
+        tenantName: t.name,
+        customerCode: t.customerCode,
+        subBillingCustomerId: t.subBillingCustomerId,
+        adminEmail,
+        tenantStatus: t.status,
+        hasSubscription: Boolean(isSubActive),
+        subscription: activeSub
+          ? {
+              id: activeSub.id,
+              subscription_id: activeSub.subscription_id,
+              plan_id: activeSub.plan_id,
+              plan_name: activeSub.plan_name,
+              status: activeSub.status,
+              amount: Number(activeSub.renewal_price || activeSub.amount || 0),
+              renewal_price: Number(activeSub.renewal_price || activeSub.amount || 0),
+              currency: activeSub.currency_snapshot || activeSub.currency || 'USD',
+              auto_renew: Boolean(activeSub.auto_renew),
+              end_date: activeSub.current_period_end,
+              next_billing: activeSub.current_period_end,
+              limits: activeSub.entitlement_snapshot || {},
+              usage: activeSub.usage || { numbers: 0, extensions: 0, monitoring_extensions: 0 },
+              duration_count: activeSub.duration_count,
+              duration_unit: activeSub.duration_unit,
+            }
+          : null,
+        wallet: {
+          balance: Number(t.wallet?.balance || 0),
+          freeMins: 0,
+          currency: t.wallet?.currency || 'USD',
+        },
+      };
+    });
+
+    const totalTenants = tenants.length;
+    const noActivePlan = totalTenants - activeCount;
+    const deactivatedOrgs = tenants.filter((t) => t.status !== 'ACTIVE').length;
+
+    return {
+      summary: {
+        totalTenants,
+        activeSubscriptions: activeCount,
+        noActivePlan,
+        deactivatedOrgs,
+      },
+      data: enriched,
+    };
+  }
   async owned(tenantId: string, id: string) {
     const rows = await this.list(tenantId);
     const s = rows.find(s => s.id === id || s.subscription_id === id);
@@ -115,15 +218,10 @@ export class SubscriptionsService {
     const done = await this.prisma.$queryRawUnsafe<any[]>('SELECT event_id FROM subscription_event_receipts WHERE event_id=$1', input.event_id);
     if (done.length) return { success: true };
     await this.reconcile(t.id);
-    await this.prisma.$transaction(async tx => {
-      const inserted = await tx.$executeRawUnsafe('INSERT INTO subscription_event_receipts(event_id,tenant_id) VALUES($1,$2) ON CONFLICT DO NOTHING', input.event_id, t.id);
-      if (inserted && (['grace', 'freeze', 'reactivate', 'release'].includes(input.action) || String(input.action).startsWith('retention_reminder_'))) await tx.notification.create({ data: {
-        tenantId: t.id, type: 'SUBSCRIPTION', title: `Subscription ${input.action}`, message: `Subscription ${input.subscription_id}: ${input.action}. Check Subscriptions for assets and recovery options.` } });
-      if(inserted && (['grace','freeze','release'].includes(input.action) || String(input.action).startsWith('retention_reminder_'))) {
-        const admins=await tx.user.findMany({where:{role:'SUPER_ADMIN',status:'ACTIVE'},select:{id:true,tenantId:true}});
-        for(const admin of admins)await tx.notification.create({data:{tenantId:admin.tenantId || t.id,userId:admin.id,type:'SUBSCRIPTION',title:`${t.customerCode}: subscription ${input.action}`,message:`Subscription ${input.subscription_id}: ${input.action}. Review tenant subscriptions for recovery or retention.`}});
-      }
-    });
+    await this.prisma.$executeRawUnsafe(
+      'INSERT INTO subscription_event_receipts(event_id,tenant_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
+      input.event_id, t.id,
+    );
     return { success: true };
   }
   async reconcile(tenantId: string) {

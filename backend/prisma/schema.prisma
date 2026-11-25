@@ -30,7 +30,6 @@ model Tenant {
   extensions           Extension[]
   ivrs                 IVR[]
   monitoringAddOn      MonitoringAddOn?
-  notifications        Notification[]
   operationalSchedules OperationalSchedule[]
   paymentMethods       PaymentMethod[]
   ringGroups           RingGroup[]
@@ -48,6 +47,8 @@ model Tenant {
   outboundCarriers     OutboundCarrier[]
   ownedOutboundEndpoints OutboundEndpoint[]   @relation("TenantOutboundEndpoints")
   inboundWhitelist     InboundWhitelist[]
+  voicemailBoxes       VoicemailBox[]
+  voicemailMessages    VoicemailMessage[]
 
   @@map("tenants")
 }
@@ -101,6 +102,7 @@ model Extension {
   isActive                   Boolean           @default(true)
   tenant                     Tenant            @relation(fields: [tenantId], references: [id])
   ringGroupMembers           RingGroupMember[]
+  voicemailBox               VoicemailBox?
 
   @@unique([tenantId, extensionNumber])
   @@index([tenantId])
@@ -209,7 +211,6 @@ model User {
   forcePasswordChange Boolean          @default(false)
   resetToken          String?          @unique
   resetTokenExpiry    DateTime?
-  notifications       Notification[]
   managedSupportUsers SupportProfile[] @relation("AdminUser")
   supportProfile      SupportProfile?  @relation("SupportUser")
   actorAuditLogs      UserAuditLog[]   @relation("Actor")
@@ -353,6 +354,7 @@ model IVR {
   timeoutMs         Int      @default(5000)
   maxAttempts       Int      @default(3)
   menu              Json
+  fallbackVoicemailBoxId String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   sequenceId        Int      @default(0)
@@ -500,23 +502,6 @@ model InvoiceAdjustment {
   @@map("invoice_adjustments")
 }
 
-model Notification {
-  id        String   @id @default(uuid())
-  tenantId  String
-  userId    String?
-  type      String
-  title     String
-  message   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@index([userId])
-  @@map("notifications")
-}
-
 model tenant_config_versions {
   id             String    @id
   tenantId       String
@@ -627,12 +612,70 @@ model TenantFeature {
   monitorEnabled    Boolean  @default(true)
   recordingEnabled  Boolean  @default(false)
   recordingAllowed  Boolean  @default(false)
+  voicemailEnabled  Boolean  @default(true)
+  voicemailBoxLimit Int      @default(0)
+  voicemailStorageLimitMb Int @default(0)
   createdAt         DateTime @default(now())
 
   updatedAt         DateTime @updatedAt
   tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_features")
+}
+
+enum VoicemailMessageStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+model VoicemailBox {
+  id              String   @id @default(uuid())
+  tenantId        String
+  extensionId     String?  @unique
+  sequenceId      Int
+  name            String
+  enabled         Boolean  @default(true)
+  retiredAt       DateTime?
+  greetingPath    String?
+  greetingAudioFileId String?
+  greetingAudioName   String?
+  noAnswerSeconds Int      @default(20)
+  notifyByEmail   Boolean  @default(false)
+  notifyEmail     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  extension       Extension? @relation(fields: [extensionId], references: [id], onDelete: SetNull)
+  messages        VoicemailMessage[]
+
+  @@unique([tenantId, sequenceId])
+  @@index([tenantId, enabled])
+  @@map("voicemail_boxes")
+}
+
+model VoicemailMessage {
+  id           String @id @default(uuid())
+  tenantId     String
+  boxId        String
+  callUuid     String
+  callerId     String?
+  calledNumber String?
+  durationMs   Int?
+  audioKey     String?
+  audioBytes   BigInt @default(0)
+  status       VoicemailMessageStatus @default(PROCESSING)
+  readAt       DateTime?
+  notificationSentAt DateTime?
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+  tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  box          VoicemailBox @relation(fields: [boxId], references: [id], onDelete: Cascade)
+
+  @@unique([boxId, callUuid])
+  @@index([tenantId, boxId, createdAt])
+  @@index([tenantId, status, deletedAt])
+  @@map("voicemail_messages")
 }
 
 model Partner {
@@ -722,38 +765,6 @@ enum InboundNormalization {
   STRIP_PLUS
   STRIP_PLUS_ONE_US
   AUTO_10DIGIT
-}
-
-model RateCard {
-  ratecardId            Int                @id @default(autoincrement()) @map("ratecard_id")
-  name                  String
-  currency              String             @default("USD") @db.Char(3)
-  country               String?
-  inRatePerMin          Decimal            @default(0.000000) @map("in_rate_per_min") @db.Decimal(14, 6)
-  inRatePerSec          Decimal?           @map("in_rate_per_sec") @db.Decimal(14, 8)
-  inInitialIncrementSec Int                @default(60) @map("in_initial_increment_sec")
-  inIncrementSec        Int                @default(60) @map("in_increment_sec")
-  obRatePerMin          Decimal            @default(0.000000) @map("ob_rate_per_min") @db.Decimal(14, 6)
-  obRatePerSec          Decimal?           @map("ob_rate_per_sec") @db.Decimal(14, 8)
-  obInitialIncrementSec Int                @default(60) @map("ob_initial_increment_sec")
-  obIncrementSec        Int                @default(60) @map("ob_increment_sec")
-  createdAt             DateTime           @default(now()) @map("created_at")
-  updatedAt             DateTime           @updatedAt @map("updated_at")
-  customerMappings      CustomerRatecard[]
-
-  @@map("rate_cards")
-}
-
-model CustomerRatecard {
-  customerId    String    @id @map("customer_id")
-  ratecardId    Int       @map("ratecard_id")
-  effectiveFrom DateTime  @default(now()) @map("effective_from")
-  effectiveTo   DateTime? @map("effective_to")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @default(now()) @map("updated_at")
-  rateCard      RateCard  @relation(fields: [ratecardId], references: [ratecardId], onDelete: Cascade)
-
-  @@map("customer_ratecard")
 }
 
 model RecRateCard {

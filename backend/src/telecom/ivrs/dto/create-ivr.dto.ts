@@ -13,6 +13,10 @@ export class CreateIVRDto {
     @IsOptional()
     menu?: Record<string, MenuAction>; // Digit -> Action mapping
 
+    @IsString()
+    @IsOptional()
+    fallbackVoicemailBoxId?: string;
+
     @IsInt()
     @Min(1000)
     @Max(10000)
@@ -27,7 +31,7 @@ export class CreateIVRDto {
 }
 
 export interface MenuAction {
-    type: 'extension' | 'ring_group' | 'ivr' | 'repeat' | 'hangup' | 'external' | 'submenu' | 'back';
+    type: 'extension' | 'ring_group' | 'ivr' | 'voicemail' | 'repeat' | 'hangup' | 'external' | 'submenu' | 'back';
     target?: string; // Extension ID, Ring Group ID, IVR ID, or phone number
     props?: Record<string, any>; // Additional properties like greeting override
     children?: Record<string, MenuAction>; // Nested menu for submenus

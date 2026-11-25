@@ -114,17 +114,15 @@ export class WalletController {
         @Body('targetTenantId') targetTenantId: string,
         @Body('amount') amount: number,
         @Body('type') type: TransactionType,
-        @Body('description') description: string
+        @Body('description') description: string,
+        @Body('operationKey') operationKey?: string
     ) {
         if (user.role !== Role.SUPER_ADMIN) {
             throw new ForbiddenException('Only Platform Owner can perform internal adjustments');
         }
 
-        // If user is ADMIN of their own tenant, they can maybe add funds? 
-        // Requirement says "internal-adjust (admin only)". Let's stick to standard RBAC.
-
         const tenantId = targetTenantId || user.tenantId!; // Default to self if not provided
-        return this.walletService.adjustBalance(tenantId, amount, type, description, `MANUAL-ADJ-BY-${user.email}`);
+        return this.walletService.adjustBalance(tenantId, amount, type, description, `MANUAL-ADJ-BY-${user.email}`, undefined, operationKey);
     }
 
     @Post('credit-limit')
