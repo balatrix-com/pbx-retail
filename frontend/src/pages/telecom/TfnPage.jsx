@@ -82,45 +82,28 @@ const TfnPage = () => {
     };
 
     return (
-        <div className="min-h-full space-y-6">
+        <div className="w-full pb-12 space-y-6">
 
-            {/* =========================================
-                PAGE HEADER
-            ========================================= */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-7">
-
-                <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                        Phone Numbers (TFN)
-                    </h1>
-
-                    <p className="text-slate-600 dark:text-blue-300/80 mt-1.5 font-medium">
-                        Manage your toll-free numbers and inbound routing.
-                    </p>
+            {/* PAGE HEADER */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 shadow-xs">
+                        <Phone className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                            Phone Numbers (TFN)
+                        </h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                            Manage your toll-free numbers and inbound routing.
+                        </p>
+                    </div>
                 </div>
 
                 {/* Wallet Balance */}
                 <div className="flex justify-start sm:justify-end">
-                    <span
-                        className="
-                            text-sm
-                            text-gray-700
-                            dark:text-slate-300
-                            font-mono
-                            bg-white
-                            dark:bg-[#0d0e13]
-                            border
-                            border-gray-200
-                            dark:border-white/[0.08]
-                            px-3.5
-                            py-2
-                            rounded-lg
-                            shadow-sm
-                            dark:shadow-lg
-                        "
-                    >
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200/80 dark:border-white/10 bg-white dark:bg-[#0c0d12] text-sm text-gray-700 dark:text-slate-300 font-mono shadow-xs">
                         Available Balance:
-
                         <span className="font-bold text-indigo-600 dark:text-indigo-400 ml-2">
                             ${Number(walletBalance).toFixed(2)}
                         </span>

@@ -152,7 +152,7 @@ const AnalyticsPage = () => {
     // ---------------------------------------------------------------------------
     if (loading) {
         return (
-            <div className="max-w-7xl mx-auto pb-12 space-y-6 animate-pulse">
+            <div className="w-full pb-12 space-y-6 animate-pulse">
                 <div className="h-8 bg-gray-200 rounded-xl w-1/3" />
                 <div className="h-24 bg-gray-200 rounded-2xl w-full" />
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -171,7 +171,7 @@ const AnalyticsPage = () => {
     // Render
     // ---------------------------------------------------------------------------
     return (
-        <div className="max-w-7xl mx-auto pb-12 space-y-6">
+        <div className="w-full pb-12 space-y-6">
 
             {/* ── Header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

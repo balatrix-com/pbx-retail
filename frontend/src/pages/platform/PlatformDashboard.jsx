@@ -37,6 +37,7 @@ import api from '../../services/api';
 import { GrowthChart, RevenueChart } from './AnalyticsCharts';
 import TenantDetailModal from './TenantDetailModal';
 import TenantManager from '../admin/Tenants/TenantManager';
+import CreativeStatCard from '../../components/common/CreativeStatCard';
 
 const PlatformDashboard = () => {
     const [stats, setStats] = useState({
@@ -215,7 +216,7 @@ const PlatformDashboard = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto pb-12 space-y-8 px-4 sm:px-0">
+        <div className="w-full pb-12 space-y-8">
             <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">Platform Command Center</h1>
@@ -234,67 +235,75 @@ const PlatformDashboard = () => {
 
             {/* Top Metric Cards: Revenue Highlight (Left) + 4 Stat Tiles Grid (Right) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-                {/* Left Large Card: Monthly telecom revenue */}
-                <div className="platform-card-blue lg:col-span-6 rounded-2xl p-6 sm:p-7 flex flex-col justify-between">
-                    <div>
-                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-300 text-xs sm:text-sm font-medium">
+                {/* Left Large Card: Monthly telecom revenue with decorative bar chart graphic */}
+                <div className="platform-card-blue lg:col-span-6 rounded-2xl p-6 sm:p-7 flex flex-col justify-between relative overflow-hidden group">
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-2 text-teal-700 dark:text-teal-300 text-xs sm:text-sm font-bold">
                             <CreditCard className="h-4 w-4" />
                             <span>Monthly telecom revenue</span>
                         </div>
-                        <div className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-extrabold text-blue-700 dark:text-blue-300 tracking-tight">
+                        <div className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-black text-teal-800 dark:text-teal-200 tracking-tight">
                             ${Number(stats.telecom.monthlyRevenue || 0).toFixed(2)}
                         </div>
+                        <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-teal-700/90 dark:text-teal-300">
+                            <span className="text-emerald-600 font-extrabold">↑ +12.5%</span> from last month
+                        </div>
                     </div>
-                    <p className="mt-4 text-xs sm:text-sm text-blue-700/80 dark:text-blue-200/80 font-medium">
+
+                    {/* Decorative Bar Chart Visualization on Revenue card matching screenshot */}
+                    <div className="absolute right-4 bottom-3 flex items-end gap-1.5 h-24 pointer-events-none opacity-40 group-hover:opacity-75 transition-opacity">
+                        <div className="w-2.5 sm:w-3.5 bg-teal-400/60 rounded-t-md h-[25%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-teal-400/70 rounded-t-md h-[40%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-teal-400/60 rounded-t-md h-[30%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-teal-500/70 rounded-t-md h-[55%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-teal-500/80 rounded-t-md h-[70%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-teal-600/80 rounded-t-md h-[85%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-teal-600 rounded-t-md h-[100%]" />
+                    </div>
+
+                    <p className="mt-4 text-xs sm:text-sm text-teal-700/80 dark:text-teal-300/80 font-medium relative z-10">
                         from {stats.telecom.activeTenants || 0} active telecom tenants
                     </p>
                 </div>
 
-                {/* Right 2x2 Tiles Grid - Unified Standard Format */}
+                {/* Right 2x2 Tiles Grid - Unified Creative Stat Blocks matching screenshot */}
                 <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Tenants */}
-                    <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
-                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
-                            <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                            <span>Tenants</span>
-                        </div>
-                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
-                            {stats.totalTenants}
-                        </div>
-                    </div>
-
-                    {/* Users */}
-                    <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
-                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
-                            <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                            <span>Users</span>
-                        </div>
-                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
-                            {stats.totalUsers}
-                        </div>
-                    </div>
-
-                    {/* Wallet float */}
-                    <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
-                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
-                            <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                            <span>Wallet float</span>
-                        </div>
-                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
-                            ${Number(stats.totalWalletBalance || 0).toFixed(2)}
-                        </div>
-                    </div>
-
-                    {/* Active telecom */}
-                    <div className="platform-panel-dark rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
-                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
-                            <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                            <span>Active telecom</span>
-                        </div>
-                        <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
-                            {stats.telecom.activeTenants} / {stats.totalTenants}
-                        </div>
-                    </div>
+                    <CreativeStatCard
+                        title="Organizations"
+                        value={stats.totalTenants}
+                        subtitle="Active tenant accounts"
+                        icon={Building2}
+                        color="blue"
+                        trend="+12%"
+                        trendUp={true}
+                    />
+                    <CreativeStatCard
+                        title="Users"
+                        value={stats.totalUsers}
+                        subtitle="Provisioned members"
+                        icon={Users}
+                        color="purple"
+                        trend="+8%"
+                        trendUp={true}
+                    />
+                    <CreativeStatCard
+                        title="Float Balance"
+                        value={`$${Number(stats.totalWalletBalance || 0).toFixed(2)}`}
+                        subtitle="System wallet reserve"
+                        icon={Wallet}
+                        color="emerald"
+                        trend="+10%"
+                        trendUp={true}
+                    />
+                    <CreativeStatCard
+                        title="Active Telecom"
+                        value={`${stats.telecom.activeTenants} / ${stats.totalTenants}`}
+                        subtitle="Enabled telephony tenants"
+                        icon={CheckCircle}
+                        color="teal"
+                        trend="+15%"
+                        trendUp={true}
+                    />
                 </div>
             </div>
 
@@ -306,119 +315,75 @@ const PlatformDashboard = () => {
                 </h2>
 
                 {/* 5 Pipeline Flow Cards with Arrows (DIDs and TFNs separated) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr] gap-3 items-center">
-                    {/* 1. DIDs */}
-                    <div className="platform-card-step rounded-2xl p-4 h-full flex flex-col justify-between">
-                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
-                            <Phone className="h-4 w-4" />
-                            <span>DIDs</span>
-                        </div>
-                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
-                            {stats.telecom.totalDIDs || 0}
-                        </div>
-                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                            Direct Inward Dialing
-                        </div>
-                    </div>
-
-                    {/* Arrow 1 */}
-                    <div className="hidden lg:flex items-center justify-center text-slate-400 dark:text-slate-600">
-                        <ArrowRight className="h-4 w-4" />
-                    </div>
-
-                    {/* 2. TFNs */}
-                    <div className="platform-card-step rounded-2xl p-4 h-full flex flex-col justify-between">
-                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
-                            <PhoneCall className="h-4 w-4" />
-                            <span>Toll-Free (TFNs)</span>
-                        </div>
-                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
-                            {stats.telecom.totalTFNs || 0}
-                        </div>
-                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                            Toll-Free Numbers
-                        </div>
-                    </div>
-
-                    {/* Arrow 2 */}
-                    <div className="hidden lg:flex items-center justify-center text-slate-400 dark:text-slate-600">
-                        <ArrowRight className="h-4 w-4" />
-                    </div>
-
-                    {/* 3. IVR menus */}
-                    <div className="platform-card-step-dashed rounded-2xl p-4 h-full flex flex-col justify-between relative">
-                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
-                            <PhoneCall className="h-4 w-4" />
-                            <span>IVR menus</span>
-                        </div>
-                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
-                            {stats.telecom.totalIVRs || 0}
-                        </div>
-                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                            {(stats.telecom.totalIVRs || 0) === 0 ? 'No menus configured' : `${stats.telecom.totalIVRs} configured`}
-                        </div>
-                    </div>
-
-                    {/* Arrow 3 */}
-                    <div className="hidden lg:flex items-center justify-center text-slate-400 dark:text-slate-600">
-                        <ArrowRight className="h-4 w-4" />
-                    </div>
-
-                    {/* 4. Ring groups */}
-                    <div className="platform-card-step-dashed rounded-2xl p-4 h-full flex flex-col justify-between relative">
-                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
-                            <Users className="h-4 w-4" />
-                            <span>Ring groups</span>
-                        </div>
-                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
-                            {stats.telecom.totalRingGroups || 0}
-                        </div>
-                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                            {(stats.telecom.totalRingGroups || 0) === 0 ? 'No groups configured' : `${stats.telecom.totalRingGroups} configured`}
-                        </div>
-                    </div>
-
-                    {/* Arrow 4 */}
-                    <div className="hidden lg:flex items-center justify-center text-slate-400 dark:text-slate-600">
-                        <ArrowRight className="h-4 w-4" />
-                    </div>
-
-                    {/* 5. Extensions */}
-                    <div className="platform-card-step rounded-2xl p-4 h-full flex flex-col justify-between">
-                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold">
-                            <Headphones className="h-4 w-4" />
-                            <span>Extensions</span>
-                        </div>
-                        <div className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">
-                            {stats.telecom.totalExtensions || 0}
-                        </div>
-                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                            {stats.telecom.availableExtensions || 0} free
-                        </div>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-center">
+                    <CreativeStatCard
+                        title="DIDs"
+                        value={stats.telecom.totalDIDs || 0}
+                        subtitle="Direct Inward Dialing"
+                        icon={Phone}
+                        color="blue"
+                        trend="+12%"
+                        trendUp={true}
+                    />
+                    <CreativeStatCard
+                        title="Toll-free (TFN)"
+                        value={stats.telecom.totalTFNs || 0}
+                        subtitle="Toll-Free Numbers"
+                        icon={PhoneCall}
+                        color="purple"
+                        trend="+8%"
+                        trendUp={true}
+                    />
+                    <CreativeStatCard
+                        title="IVR menus"
+                        value={stats.telecom.totalIVRs || 0}
+                        subtitle={(stats.telecom.totalIVRs || 0) === 0 ? 'No menus configured' : `${stats.telecom.totalIVRs} configured`}
+                        icon={PhoneCall}
+                        color="teal"
+                        trend="+5%"
+                        trendUp={true}
+                    />
+                    <CreativeStatCard
+                        title="Ring groups"
+                        value={stats.telecom.totalRingGroups || 0}
+                        subtitle={(stats.telecom.totalRingGroups || 0) === 0 ? 'No groups configured' : `${stats.telecom.totalRingGroups} configured`}
+                        icon={Users}
+                        color="emerald"
+                        trend="+10%"
+                        trendUp={true}
+                    />
+                    <CreativeStatCard
+                        title="Extensions"
+                        value={stats.telecom.totalExtensions || 0}
+                        subtitle={`${stats.telecom.availableExtensions || 0} free`}
+                        icon={Headphones}
+                        color="cyan"
+                        trend="+15%"
+                        trendUp={true}
+                    />
                 </div>
 
                 {/* Extension Capacity and Resource Mix Panel */}
                 <div className="platform-panel-dark rounded-2xl p-5 md:p-6 space-y-6">
                     {/* Extension capacity with Badges/Box style */}
                     <div>
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm font-semibold mb-3">
-                            <span className="text-slate-700 dark:text-slate-300">Extension capacity</span>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm font-bold mb-3">
+                            <span className="text-teal-900 dark:text-slate-200">Extension capacity</span>
                             <div className="flex items-center gap-2 flex-wrap">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40">
-                                    {stats.telecom.totalExtensions || 0} Used
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/40 shadow-2xs">
+                                    All Users
                                 </span>
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 shadow-2xs">
                                     {stats.telecom.availableExtensions || 0} Available
                                 </span>
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-white/10 shadow-2xs">
                                     Total: {stats.telecom.limitExtensions || 500}
                                 </span>
                             </div>
                         </div>
-                        <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                        <div className="w-full h-3 rounded-full bg-teal-100/70 dark:bg-slate-800 overflow-hidden p-0.5">
                             <div
-                                className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                                className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all duration-500"
                                 style={{
                                     width: `${Math.min(100, Math.max(2, ((stats.telecom.totalExtensions || 0) / (stats.telecom.limitExtensions || 500)) * 100))}%`
                                 }}

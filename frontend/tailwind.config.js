@@ -37,7 +37,9 @@ export default {
       },
       fontFamily: {
         sans: ['var(--font-sans)'],
-        mono: ['var(--font-mono)']
+        display: ['var(--font-display)'],
+        mono: ['var(--font-mono)'],
+        labels: ['var(--font-labels)']
       }
     },
   },

@@ -1,27 +1,46 @@
 import React from 'react';
 
 export default function PlanValidityFields({ formData, onChange }) {
-    const inputClass = 'w-full min-h-11 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500';
+    const inputClass = 'w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#121520] text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-teal-500 focus:outline-none transition-all shadow-2xs';
     return (
-        <fieldset className="space-y-2">
-            <legend className="text-sm font-bold text-gray-900 dark:text-white">Plan validity period *</legend>
+        <fieldset className="space-y-3 pt-1">
+            <legend className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Plan Validity Period *
+            </legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="block text-sm text-gray-700 dark:text-slate-300">
-                    Duration
-                    <input className={inputClass} type="number" min="1" max="3660" step="1"
-                        name="duration_count" value={formData.duration_count} onChange={onChange} required />
-                </label>
-                <label className="block text-sm text-gray-700 dark:text-slate-300">
-                    Unit
-                    <select className={inputClass} name="duration_unit" value={formData.duration_unit} onChange={onChange}>
+                <div>
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        Duration
+                    </label>
+                    <input 
+                        className={inputClass} 
+                        type="number" 
+                        min="1" 
+                        max="3660" 
+                        step="1"
+                        name="duration_count" 
+                        value={formData.duration_count} 
+                        onChange={onChange} 
+                        required 
+                    />
+                </div>
+                <div>
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        Unit
+                    </label>
+                    <select 
+                        className={inputClass} 
+                        name="duration_unit" 
+                        value={formData.duration_unit} 
+                        onChange={onChange}
+                    >
                         <option value="days">Days</option>
                         <option value="months">Calendar months</option>
                     </select>
-                </label>
+                </div>
             </div>
-            <p className="text-xs text-gray-600 dark:text-slate-400">
-                Examples: 15 days, 1 month, or 6 months. Validity starts when the subscription is activated.
-                The recurring price covers the selected period.
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                Validity timer initializes upon customer activation. Recurring price covers the selected duration period.
             </p>
         </fieldset>
     );

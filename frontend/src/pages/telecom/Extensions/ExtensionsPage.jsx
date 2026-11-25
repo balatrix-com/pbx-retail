@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit2, Trash2, Key, Users } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Key, Users, Radio, PhoneCall, RefreshCw, ShieldCheck } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import MonitoringExtensionModal from '../../../components/admin/MonitoringExtensionModal';
+import Pagination from '../../../components/common/Pagination';
+import CreativeStatCard from '../../../components/common/CreativeStatCard';
+import { clsx } from 'clsx';
 
 function ExtensionsPage() {
     const navigate = useNavigate();
@@ -14,6 +17,10 @@ function ExtensionsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(10);
+    const [mPage, setMPage] = useState(1);
+    const [mLimit, setMLimit] = useState(10);
 
     // Monitoring Edit State
     const [showMonitoringModal, setShowMonitoringModal] = useState(false);
@@ -131,6 +138,9 @@ function ExtensionsPage() {
         ext.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const paginatedExtensions = filteredExtensions.slice((page - 1) * limit, page * limit);
+    const paginatedMonitoringUsers = monitoringUsers.slice((mPage - 1) * mLimit, mPage * mLimit);
+
     if (loading) {
         return (
             <div className="flex justify-center py-12">
@@ -140,21 +150,83 @@ function ExtensionsPage() {
     }
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto pb-12">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-2">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">Extensions</h1>
-                    <p className="text-gray-500 mt-1 font-medium text-sm md:text-base">Manage phone system extensions and routing.</p>
+        <div className="w-full pb-16 space-y-7 animate-in fade-in duration-300 max-w-7xl mx-auto">
+            {/* Header Banner */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 p-8 text-white shadow-xl shadow-teal-900/15">
+                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                    <div className="space-y-1.5 max-w-2xl">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold tracking-wide border border-white/20">
+                            <Radio size={14} className="text-teal-200 animate-pulse" />
+                            <span>PBX Endpoints & Seat Allocation</span>
+                        </div>
+                        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                            Extensions
+                        </h1>
+                        <p className="text-teal-100 text-xs sm:text-sm font-medium">
+                            Manage phone system extensions, call forwarding, agent assignment, and monitoring seats.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button
+                            onClick={fetchData}
+                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-2xl bg-white/15 hover:bg-white/25 text-white backdrop-blur-md border border-white/20 transition-all active:scale-95 cursor-pointer"
+                        >
+                            <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
+                            <span>Refresh</span>
+                        </button>
+                        {canManageExtensions && (
+                            <button
+                                onClick={() => navigate('/telecom/extensions/new')}
+                                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white hover:bg-teal-50 px-5 py-2.5 text-xs font-bold text-teal-800 shadow-lg shadow-black/10 transition-all active:scale-95 cursor-pointer"
+                            >
+                                <Plus className="h-4 w-4 text-teal-700" />
+                                <span>Create Extension</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
-                {canManageExtensions && (
-                    <button
-                        onClick={() => navigate('/telecom/extensions/new')}
-                        className="inline-flex items-center justify-center rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-all active:scale-[0.98] w-full sm:w-auto"
-                    >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Extension
-                    </button>
-                )}
+            </div>
+
+            {/* Quick KPI Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <CreativeStatCard
+                    title="Total Extensions"
+                    value={extensions.length}
+                    subtitle="Configured lines"
+                    icon={Radio}
+                    color="blue"
+                    trend="+12%"
+                    trendUp={true}
+                />
+                <CreativeStatCard
+                    title="Call Forwarding"
+                    value={extensions.filter(e => e.forwardAllEnabled || e.forwardNoAnswerEnabled).length}
+                    subtitle="Active rules"
+                    icon={PhoneCall}
+                    color="purple"
+                    trend="+8%"
+                    trendUp={true}
+                />
+                <CreativeStatCard
+                    title="Ring Group Exts"
+                    value={extensions.filter(e => e.ringGroupMembers?.length > 0).length}
+                    subtitle="Linked to groups"
+                    icon={Users}
+                    color="teal"
+                    trend="+10%"
+                    trendUp={true}
+                />
+                <CreativeStatCard
+                    title="Monitoring Seats"
+                    value={`${monitoringSeats.used} / ${monitoringSeats.limit}`}
+                    subtitle="Assigned / Limit"
+                    icon={ShieldCheck}
+                    color="emerald"
+                    trend={monitoringSeats.remaining > 0 ? `${monitoringSeats.remaining} left` : 'Full'}
+                    trendUp={monitoringSeats.remaining > 0}
+                />
             </div>
 
             {canManageMonitoring && (
@@ -192,57 +264,63 @@ function ExtensionsPage() {
                 </div>
             )}
 
-            <div className="relative mx-4 sm:mx-0">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Search className="h-5 w-5 text-gray-400" />
+            {/* Unified search bar */}
+            <div className="bg-white dark:bg-[#0c0d12] p-3 rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-xs">
+                <div className="relative max-w-md">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
+                    <input
+                        type="text"
+                        placeholder="Search extension # or name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-gray-50/80 dark:bg-white/[0.03] border border-gray-200/80 dark:border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all font-medium"
+                    />
                 </div>
-                <input
-                    type="text"
-                    placeholder="Search extensions..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="block w-full sm:max-w-md rounded-xl border-0 py-2.5 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 font-medium bg-white transition-all"
-                />
             </div>
 
-            <div className="bg-white shadow-sm ring-1 ring-gray-100 sm:rounded-2xl overflow-hidden mt-6">
+            <div className="bg-white dark:bg-[#0c0d12] rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-xs overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50/50">
+                    <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">
+                        <thead className="bg-gray-50/75 dark:bg-white/[0.02]">
                             <tr>
-                                <th className="px-4 md:px-6 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">Extension #</th>
-                                <th className="px-4 md:px-6 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">Name</th>
-                                <th className="hidden lg:table-cell px-6 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">SIP Username</th>
-                                <th className="hidden md:table-cell px-6 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">Forwarding</th>
-                                <th className="hidden sm:table-cell px-6 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">Groups</th>
-                                <th className="px-4 md:px-6 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 whitespace-nowrap">Actions</th>
+                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Extension #</th>
+                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                                <th className="hidden lg:table-cell px-6 py-4 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">SIP Username</th>
+                                <th className="hidden md:table-cell px-6 py-4 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Forwarding</th>
+                                <th className="hidden sm:table-cell px-6 py-4 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Groups</th>
+                                <th className="px-6 py-4 text-right text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 bg-white">
+                        <tbody className="divide-y divide-gray-100 dark:divide-white/5 bg-transparent">
                             {filteredExtensions.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-sm font-medium text-gray-500 italic bg-gray-50/30">
-                                        {searchTerm ? 'No matching extensions found' : 'No extensions yet.'}
+                                    <td colSpan="6" className="px-6 py-16 text-center">
+                                        <div className="flex flex-col items-center">
+                                            <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl mb-3 border border-gray-100 dark:border-white/5">
+                                                <Radio size={32} className="text-gray-400 dark:text-gray-500" />
+                                            </div>
+                                            <p className="text-gray-600 dark:text-gray-300 font-bold">{searchTerm ? 'No matching extensions found' : 'No extensions yet.'}</p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
-                                filteredExtensions.map((ext) => (
-                                    <tr key={ext.id} className="hover:bg-gray-50/80 transition-colors group">
-                                        <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                                            <div className="inline-flex items-center px-2 py-0.5 rounded-md text-xs md:text-sm font-bold text-primary-700 bg-primary-50 ring-1 ring-inset ring-primary-100/50 shadow-sm font-mono">
+                                paginatedExtensions.map((ext) => (
+                                    <tr key={ext.id} className="hover:bg-gray-50/60 dark:hover:bg-white/[0.02] transition-colors group">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold text-primary-700 bg-primary-50 dark:bg-primary-950/40 dark:text-primary-400 ring-1 ring-inset ring-primary-100/50 dark:ring-primary-800/40 font-mono">
                                                 {ext.extensionNumber}
                                             </div>
                                         </td>
-                                        <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 truncate max-w-[100px] md:max-w-none">{ext.name}</td>
-                                        <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 font-medium select-all">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white truncate max-w-[140px] md:max-w-none">{ext.name}</td>
+                                        <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-400 font-medium select-all">
                                             {ext.sipUsername}
                                         </td>
                                         <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm">
                                             <div className="flex flex-col gap-1 items-start">
                                                 {ext.forwardAllEnabled ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/50">All</span>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20">All</span>
                                                 ) : ext.forwardNoAnswerEnabled ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200/50">No Answer</span>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20">No Answer</span>
                                                 ) : (
                                                     <span className="text-[10px] font-bold text-gray-400 uppercase">Off</span>
                                                 )}
@@ -250,17 +328,17 @@ function ExtensionsPage() {
                                         </td>
                                         <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm">
                                             {ext.ringGroupMembers && ext.ringGroupMembers.length > 0 ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200/50">
-                                                    {ext.ringGroupMembers.length}
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-600/20">
+                                                    {ext.ringGroupMembers.length} groups
                                                 </span>
                                             ) : (
                                                 <span className="text-[10px] font-bold text-gray-400 uppercase">None</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                                            <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end space-x-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
                                                 <button
-                                                    className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors focus:outline-none"
+                                                    className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 rounded-xl transition-all"
                                                     onClick={() => navigate(`/telecom/extensions/${ext.id}/edit`)}
                                                     title="Edit Extension"
                                                 >
@@ -268,7 +346,7 @@ function ExtensionsPage() {
                                                 </button>
                                                 {canManageExtensions && (
                                                     <button
-                                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors focus:outline-none"
+                                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-all"
                                                         onClick={() => handleDelete(ext.id, ext.extensionNumber)}
                                                         title="Delete Extension"
                                                     >
@@ -283,58 +361,68 @@ function ExtensionsPage() {
                         </tbody>
                     </table>
                 </div>
+                <Pagination
+                    page={page}
+                    limit={limit}
+                    total={filteredExtensions.length}
+                    onPageChange={setPage}
+                    onLimitChange={(l) => { setLimit(l); setPage(1); }}
+                    itemName="extensions"
+                />
             </div>
 
             {/* Monitoring Extensions Section */}
             {monitoringUsers.length > 0 && (
-                <>
-                    <div className="mt-12 mb-4 flex items-center space-x-2">
-                        <Users className="h-5 w-5 text-gray-400" />
+                <div className="space-y-4 pt-4">
+                    <div className="flex items-center space-x-3">
+                        <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                            <Users className="h-5 w-5" />
+                        </div>
                         <div>
-                            <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Monitoring Extensions</h2>
-                            <p className="text-sm text-gray-500 mt-1 font-medium">Extensions assigned to users for real-time call monitoring.</p>
+                            <h2 className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">Monitoring Extensions</h2>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Extensions assigned to users for real-time call monitoring.</p>
                         </div>
                     </div>
 
-                    <div className="bg-white shadow-sm ring-1 ring-gray-100 sm:rounded-2xl overflow-hidden">
+                    <div className="bg-white dark:bg-[#0c0d12] rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-xs overflow-hidden">
                         <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50/50">
+                            <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">
+                                <thead className="bg-gray-50/75 dark:bg-white/[0.02]">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">Extension #</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">User Name</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">User Email</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">SIP Password</th>
-                                        <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 whitespace-nowrap">Actions</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Extension #</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">User Name</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">User Email</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">SIP Password</th>
+                                        <th className="px-6 py-4 text-right text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100 bg-white">
-                                    {monitoringUsers.map((user) => (
-                                        <tr key={user.id} className="hover:bg-gray-50/80 transition-colors group">
+                                <tbody className="divide-y divide-gray-100 dark:divide-white/5 bg-transparent">
+                                    {paginatedMonitoringUsers.map((user) => (
+                                        <tr key={user.id} className="hover:bg-gray-50/60 dark:hover:bg-white/[0.02] transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-bold text-indigo-700 bg-indigo-50 ring-1 ring-inset ring-indigo-100/50 shadow-sm font-mono">
+                                                <div className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-400 ring-1 ring-inset ring-indigo-100/50 dark:ring-indigo-800/40 font-mono">
                                                     {user.monitoringExtension}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{user.name || 'Unnamed'}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">{user.email}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">{user.name || 'Unnamed'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-gray-400">{user.email}</td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="inline-flex items-center text-xs font-mono font-medium text-gray-500 bg-gray-50/50 px-2 py-1 rounded border border-gray-100">
+                                                <div className="inline-flex items-center text-xs font-mono font-medium text-gray-500 bg-gray-50/80 dark:bg-white/5 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-white/5">
                                                     <Key className="h-3 w-3 mr-1 text-gray-400" />
                                                     Configured
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                                                <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex items-center justify-end space-x-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
                                                     <button
-                                                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors focus:outline-none"
+                                                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 rounded-xl transition-all"
                                                         onClick={() => handleEditMonitoring(user)}
                                                     >
                                                         <Edit2 className="h-4 w-4" />
                                                     </button>
                                                     {canManageMonitoring && (
                                                         <button
-                                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors focus:outline-none"
+                                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-all"
                                                             onClick={() => handleDisableMonitoring(user)}
                                                         >
                                                             <Trash2 className="h-4 w-4" />
@@ -347,8 +435,16 @@ function ExtensionsPage() {
                                 </tbody>
                             </table>
                         </div>
+                        <Pagination
+                            page={mPage}
+                            limit={mLimit}
+                            total={monitoringUsers.length}
+                            onPageChange={setMPage}
+                            onLimitChange={(l) => { setMLimit(l); setMPage(1); }}
+                            itemName="monitoring extensions"
+                        />
                     </div>
-                </>
+                </div>
             )}
 
             {showMonitoringModal && (

@@ -7,9 +7,15 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Check if user is blocked and force logout
+    // Check if user is blocked and force logout (bypassed if in impersonation session)
     const checkEnforcement = (userData) => {
-        if (userData?.enforcement?.isBlocked) {
+        const isImpersonating = !!(
+            sessionStorage.getItem('accessToken') ||
+            userData?.isImpersonating ||
+            userData?.impersonation
+        );
+
+        if (userData?.enforcement?.isBlocked && !isImpersonating) {
             const reason = userData.enforcement.blockReason;
             console.warn(`User blocked: ${reason}`);
 
@@ -205,6 +211,7 @@ export const AuthProvider = ({ children }) => {
 
     const value = useMemo(() => ({
         user,
+        setUser,
         loading,
         login,
         signup,

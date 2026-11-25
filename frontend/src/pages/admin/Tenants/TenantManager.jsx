@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Wallet, Phone, Users, Info, Building2, Plus, Trash2, Loader, CreditCard, RefreshCw, User, LogIn, Sliders, ShieldAlert, Clock, Mic, Zap, Loader2, Radio, HardDrive, Activity, Package, Palette, Edit3, Save, Check, CheckCircle2, Globe, MapPin, Mail, Lock, Eye, EyeOff, Search, Pencil } from 'lucide-react';
+import { X, Wallet, Phone, Users, Info, Building2, Plus, Trash2, Loader, CreditCard, RefreshCw, User, LogIn, Sliders, ShieldAlert, Clock, Mic, Zap, Loader2, Radio, HardDrive, Activity, Package, Palette, Edit3, Save, Check, CheckCircle2, Globe, MapPin, Mail, Lock, Eye, EyeOff, Search, Pencil, Shield, CheckCircle } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { formatCustomerId } from '../../../utils/billing.utils';
 import { subscriptionService } from '../../../services/subscription.service';
 import AddonPurchaseModal from '../../../components/subscription/AddonPurchaseModal';
+import CreativeStatCard from '../../../components/common/CreativeStatCard';
 
 const TABS = [
     { id: 'overview', label: 'Overview', icon: Info },
@@ -109,32 +110,65 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
     );
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
-            <div className="relative bg-white rounded-2xl shadow-xl w-[1040px] max-w-[95vw] h-[640px] max-h-[90vh] overflow-hidden flex flex-col ring-1 ring-gray-200">
-                {/* Header */}
-                <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-4">
-                        <div className="bg-primary-50 p-2.5 rounded-xl ring-1 ring-inset ring-primary-100 shadow-sm">
-                            <Building2 className="text-primary-600 h-6 w-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5">
+            <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity" onClick={onClose} />
+            
+            <div className="relative bg-[#f8fafc] dark:bg-[#07090e] rounded-3xl shadow-2xl w-[1080px] max-w-[95vw] h-[720px] max-h-[90vh] overflow-hidden flex flex-col border border-slate-200/80 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/5 transition-all">
+                
+                {/* Header Banner - Matching Main Page Header Standard */}
+                <div className="relative overflow-hidden bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 dark:from-[#081816] dark:via-[#0c2621] dark:to-[#081816] px-6 py-4.5 text-white border-b border-teal-500/30 dark:border-teal-500/20 shrink-0">
+                    <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 rounded-full bg-white/10 dark:bg-teal-500/10 blur-3xl pointer-events-none" />
+                    
+                    <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5">
+                            <div className="h-11 w-11 rounded-2xl bg-white/15 dark:bg-teal-500/20 backdrop-blur-md border border-white/20 dark:border-teal-400/30 flex items-center justify-center shadow-lg text-white shrink-0">
+                                <Building2 className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white font-display">
+                                        {tenant.name}
+                                    </h2>
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold font-mono tracking-wider bg-white/20 text-white border border-white/25 shadow-xs">
+                                        {formatCustomerId(tenant.customerCode) || tenant.id}
+                                    </span>
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold font-mono uppercase tracking-wider border shadow-xs ${
+                                        tenant.serviceBlocked 
+                                            ? 'bg-rose-500/20 text-rose-200 border-rose-400/30' 
+                                            : 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30'
+                                    }`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${tenant.serviceBlocked ? 'bg-rose-400' : 'bg-emerald-400 animate-pulse'}`} />
+                                        {tenant.serviceBlocked ? 'Blocked' : 'Active Tenant'}
+                                    </span>
+                                </div>
+                                <p className="text-teal-100/90 dark:text-teal-200/80 text-xs font-medium font-sans mt-0.5">
+                                    Tenant Control Panel • Internal account management, limits & telephony services
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">{tenant.name}</h2>
-                            <p className="text-sm font-mono text-gray-500 font-medium">ID: {tenant.id}</p>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                            <button
+                                onClick={handleRefresh}
+                                className="inline-flex items-center justify-center p-2 rounded-xl bg-white/15 hover:bg-white/25 text-white backdrop-blur-md border border-white/20 transition-all active:scale-95 cursor-pointer shadow-xs"
+                                title="Refresh Tenant Data"
+                            >
+                                <RefreshCw size={15} />
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="rounded-xl p-2 text-white/80 hover:text-white hover:bg-white/20 transition-all focus:outline-none cursor-pointer"
+                                title="Close"
+                            >
+                                <X size={20} />
+                            </button>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="rounded-xl p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
-                    >
-                        <X size={20} />
-                    </button>
                 </div>
 
-                {/* Main Content */}
-                <div className="flex flex-1 min-h-0 overflow-hidden">
-                    {/* Sidebar Tabs */}
-                    <div className="w-56 bg-gray-50/50 border-r border-gray-100 flex flex-col p-4 space-y-1.5 shrink-0 overflow-y-auto">
+                {/* Top Horizontal Pill Navigation Bar */}
+                <div className="bg-white/95 dark:bg-[#0b0d14]/95 border-b border-slate-200/80 dark:border-white/10 px-6 py-2.5 shrink-0 backdrop-blur-md z-10 flex items-center justify-between gap-3 overflow-x-auto no-scrollbar">
+                    <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 dark:bg-white/[0.04] rounded-2xl border border-slate-200/60 dark:border-white/5">
                         {TABS.map(tab => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.id;
@@ -142,28 +176,33 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-extrabold transition-all ${isActive
-                                        ? 'bg-indigo-600 text-white shadow-md font-bold'
-                                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-transparent'
+                                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer select-none ${isActive
+                                        ? 'bg-teal-600 text-white shadow-md shadow-teal-600/25'
+                                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10'
                                         }`}
                                 >
-                                    <Icon size={18} className={isActive ? 'text-white' : 'text-slate-500'} />
-                                    {tab.label}
+                                    <Icon size={15} className={isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400'} />
+                                    <span>{tab.label}</span>
                                 </button>
                             );
                         })}
                     </div>
 
-                    {/* Tab Content */}
-                    <div className="flex-1 min-h-0 overflow-y-auto p-8 bg-white">
-                        {activeTab === 'overview' && (<OverviewTab tenant={tenant} subscription={subscription} />)}
-                        {activeTab === 'wallet' && <WalletTab tenant={tenant} onUpdate={handleRefresh} />}
-                        {activeTab === 'extensions' && <ExtensionsTab tenant={tenant} onUpdate={handleRefresh} />}
-                        {activeTab === 'users' && <UsersTab tenant={tenant} />}
-                        {activeTab === 'features' && <FeaturesTab tenant={tenant} onUpdate={handleRefresh} />}
-                        {activeTab === 'subscriptions' && <a className="text-primary-600 underline" href={`/super-admin/subscriptions?tenantId=${encodeURIComponent(tenant.id)}`}>Manage this tenant's subscriptions and allocated assets</a>}
-                        {activeTab === 'customize' && <CustomizeTab tenant={tenant} onUpdate={handleRefresh} />}
+                    <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 font-medium shrink-0">
+                        <span className="w-2 h-2 rounded-full bg-teal-500 animate-ping" />
+                        <span>Live Console</span>
                     </div>
+                </div>
+
+                {/* Tab Content Canvas */}
+                <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 bg-[#f8fafc] dark:bg-[#06080d]">
+                    {activeTab === 'overview' && (<OverviewTab tenant={tenant} subscription={subscription} />)}
+                    {activeTab === 'wallet' && <WalletTab tenant={tenant} onUpdate={handleRefresh} />}
+                    {activeTab === 'extensions' && <ExtensionsTab tenant={tenant} onUpdate={handleRefresh} />}
+                    {activeTab === 'users' && <UsersTab tenant={tenant} />}
+                    {activeTab === 'features' && <FeaturesTab tenant={tenant} onUpdate={handleRefresh} />}
+                    {activeTab === 'subscriptions' && <SubscriptionsTab tenant={tenant} onUpdate={handleRefresh} />}
+                    {activeTab === 'customize' && <CustomizeTab tenant={tenant} onUpdate={handleRefresh} />}
                 </div>
             </div>
         </div>
@@ -175,69 +214,57 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
 const OverviewTab = ({ tenant, subscription }) => (
     <div className="space-y-6 w-full">
         <div>
-            <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Organization Overview</h3>
-            <p className="text-sm font-medium text-gray-500 mt-1">Core platform details and system status for this tenant.</p>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight font-display">Organization Overview</h3>
+            <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-1 font-sans">Core platform details and system status for this tenant.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
-                <div className="relative z-10">
-                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
-                        Company Code
-                    </div>
-                    <p className="text-2xl font-mono font-extrabold text-gray-900">{formatCustomerId(tenant.customerCode)}</p>
-                </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
-                <div className="relative z-10">
-                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-purple-500"></div>
-                        Created At
-                    </div>
-                    <p className="text-2xl font-extrabold text-gray-900 tracking-tight">
-                        {new Date(tenant.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </p>
-                </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
-                <div className="relative z-10">
-                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <div className={`h-1.5 w-1.5 rounded-full ${tenant.serviceBlocked ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                        System Status
-                    </div>
-                    <div className="mt-1">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ring-1 ring-inset uppercase tracking-wider ${tenant.serviceBlocked ? 'bg-red-50 text-red-700 ring-red-600/20' : 'bg-green-50 text-green-700 ring-green-600/20'
-                            }`}>
-                            {tenant.serviceBlocked ? 'Blocked' : 'Active'}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
-                <div className="relative z-10">
-                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-indigo-500"></div>
-                        Total Users
-                    </div>
-                    <p className="text-2xl font-extrabold text-gray-900 font-mono tracking-tight">{tenant.stats?.users || 0}</p>
-                </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-gray-200/50 relative overflow-hidden group hover:shadow-md transition-all">
-                <div className="relative z-10">
-                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
-                        Current Subscription
-                    </div>
-                    <p className="text-2xl font-mono font-extrabold text-gray-900">
-                        {subscription?.plan?.name || subscription?.planName || subscription?.plan_name || 'No Active Plan'}
-                    </p>
-                </div>
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <CreativeStatCard
+                title="Company Code"
+                value={formatCustomerId(tenant.customerCode) || '—'}
+                subtitle="Unique platform identifier"
+                icon={Building2}
+                color="blue"
+                trend="Verified"
+                trendUp={true}
+            />
+            <CreativeStatCard
+                title="Created At"
+                value={new Date(tenant.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                subtitle="Account provision date"
+                icon={Clock}
+                color="purple"
+                trend="Active"
+                trendUp={true}
+            />
+            <CreativeStatCard
+                title="System Status"
+                value={tenant.serviceBlocked ? 'Blocked' : 'Active'}
+                subtitle={tenant.serviceBlocked ? 'Services restricted' : 'All services operational'}
+                icon={Shield}
+                color={tenant.serviceBlocked ? 'rose' : 'emerald'}
+                badgeText={tenant.serviceBlocked ? 'Disabled' : 'Operational'}
+                trend={tenant.serviceBlocked ? 'Restricted' : 'Healthy'}
+                trendUp={!tenant.serviceBlocked}
+            />
+            <CreativeStatCard
+                title="Total Users"
+                value={tenant.stats?.users || 0}
+                subtitle="Provisioned member seats"
+                icon={Users}
+                color="teal"
+                trend="+8%"
+                trendUp={true}
+            />
+            <CreativeStatCard
+                title="Current Subscription"
+                value={subscription?.plan?.name || subscription?.planName || subscription?.plan_name || 'No Active Plan'}
+                subtitle="Active billing package"
+                icon={CreditCard}
+                color="cyan"
+                trend="Subscribed"
+                trendUp={true}
+            />
         </div>
     </div>
 );
@@ -293,133 +320,155 @@ const WalletTab = ({ tenant, onUpdate }) => {
         }
     };
 
+    const balanceVal = Number(tenant.wallet?.balance || 0);
+    const creditLimitVal = Number(tenant.wallet?.creditLimit || 0);
+
     return (
-        <div className="space-y-8 w-full">
-            <div className="flex sm:justify-between sm:items-center flex-col sm:flex-row gap-4">
+        <div className="space-y-6 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Wallet Management</h3>
-                    <p className="text-sm font-medium text-gray-500 mt-1">Adjust tenant funds and view balance.</p>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight font-display">Wallet & Credit Control</h3>
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-sans">
+                        Internal balance adjustment and operational credit limits.
+                    </p>
                 </div>
-                <div className="flex gap-4">
-                    <div className="bg-white px-5 py-3 rounded-2xl shadow-sm ring-1 ring-gray-200">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1 text-right">Current Balance</p>
-                        <p className={`text-3xl font-mono font-extrabold tracking-tight ${Number(tenant.wallet?.balance || 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            ${Number(tenant.wallet?.balance || 0).toFixed(2)}
-                        </p>
+                
+                {/* Balance & Limit Quick Stat Badges */}
+                <div className="flex items-center gap-3">
+                    <div className="bg-white dark:bg-white/[0.04] px-4 py-2.5 rounded-2xl border border-slate-200/80 dark:border-white/10 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-mono">Current Float</span>
+                        <span className={`text-xl font-mono font-black tracking-tight ${balanceVal < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            ${balanceVal.toFixed(2)}
+                        </span>
                     </div>
-                    <div className="bg-white px-5 py-3 rounded-2xl shadow-sm ring-1 ring-gray-200">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1 text-right">Credit Limit</p>
-                        <p className="text-3xl font-mono font-extrabold tracking-tight text-gray-900">
-                            ${Number(tenant.wallet?.creditLimit || 0).toFixed(2)}
-                        </p>
+                    <div className="bg-white dark:bg-white/[0.04] px-4 py-2.5 rounded-2xl border border-slate-200/80 dark:border-white/10 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-mono">Credit Limit</span>
+                        <span className="text-xl font-mono font-black tracking-tight text-slate-900 dark:text-white">
+                            ${creditLimitVal.toFixed(2)}
+                        </span>
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Administrative Adjustment Card */}
-                <div className="bg-gray-50/50 p-6 sm:p-8 rounded-2xl ring-1 ring-inset ring-gray-100 shadow-sm relative overflow-hidden">
-                    <div className="relative z-10">
-                        <h4 className="text-base font-extrabold text-gray-900 mb-6 flex items-center gap-2 tracking-tight">
-                            <CreditCard className="h-5 w-5 text-primary-500" /> Administrative Adjustment
-                        </h4>
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Transaction Type</label>
-                                    <select
-                                        className="block w-full rounded-xl border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm font-medium bg-white transition-all"
-                                        value={type}
-                                        onChange={e => setType(e.target.value)}
-                                    >
-                                        <option value="CREDIT">Add Credit (Deposit)</option>
-                                        <option value="DEBIT">Remove Credit (Charge)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Amount</label>
-                                    <div className="relative rounded-md shadow-sm">
-                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                            <span className="text-gray-500 sm:text-sm font-medium">$</span>
-                                        </div>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            required
-                                            className="block w-full rounded-xl border-0 py-2.5 pl-7 pr-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm font-medium bg-white transition-all font-mono"
-                                            value={amount}
-                                            onChange={e => setAmount(e.target.value)}
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                </div>
+                <div className="bg-white dark:bg-[#0c0e17] p-6 rounded-3xl border border-slate-200/80 dark:border-white/10 shadow-sm relative overflow-hidden">
+                    <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100 dark:border-white/5">
+                        <div className="p-2.5 rounded-2xl bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-500/20">
+                            <Wallet className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-900 dark:text-white font-display">Administrative Adjustment</h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-sans">Credit or debit funds with an internal audit memo</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 font-mono">Transaction Type</label>
+                                <select
+                                    className="block w-full rounded-xl border border-slate-200 dark:border-white/10 py-2.5 px-3 text-slate-900 dark:text-white shadow-xs focus:ring-2 focus:ring-teal-500 text-xs sm:text-sm font-bold bg-slate-50 dark:bg-white/[0.03] transition-all cursor-pointer"
+                                    value={type}
+                                    onChange={e => setType(e.target.value)}
+                                >
+                                    <option value="CREDIT">Deposit (Credit Account)</option>
+                                    <option value="DEBIT">Charge (Debit Account)</option>
+                                </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1.5">Description (Internal Note)</label>
-                                <input
-                                    type="text"
-                                    required
-                                    className="block w-full rounded-xl border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm font-medium bg-white transition-all"
-                                    value={description}
-                                    onChange={e => setDescription(e.target.value)}
-                                    placeholder="E.g., Platform fee adjustment"
-                                />
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 font-mono">Amount (USD)</label>
+                                <div className="relative rounded-xl shadow-xs">
+                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                        <span className="text-slate-400 font-bold text-xs">$</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        required
+                                        className="block w-full rounded-xl border border-slate-200 dark:border-white/10 py-2.5 pl-7 pr-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 text-xs sm:text-sm font-mono font-bold bg-slate-50 dark:bg-white/[0.03] transition-all"
+                                        value={amount}
+                                        onChange={e => setAmount(e.target.value)}
+                                        placeholder="0.00"
+                                    />
+                                </div>
                             </div>
-                            <div className="flex justify-end pt-2">
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="inline-flex justify-center items-center rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {loading ? (
-                                        <><Loader className="animate-spin -ml-1 mr-2 h-4 w-4" /> Processing...</>
-                                    ) : (
-                                        'Process Transaction'
-                                    )}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 font-mono">Internal Memo / Note</label>
+                            <input
+                                type="text"
+                                required
+                                className="block w-full rounded-xl border border-slate-200 dark:border-white/10 py-2.5 px-3.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 text-xs sm:text-sm font-medium bg-slate-50 dark:bg-white/[0.03] transition-all"
+                                value={description}
+                                onChange={e => setDescription(e.target.value)}
+                                placeholder="E.g., Platform fee adjustment, refund or setup credit"
+                            />
+                        </div>
+
+                        <div className="flex justify-end pt-3">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="inline-flex justify-center items-center rounded-xl bg-teal-600 hover:bg-teal-500 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-teal-600/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                            >
+                                {loading ? (
+                                    <><Loader className="animate-spin -ml-1 mr-2 h-3.5 w-3.5" /> Processing...</>
+                                ) : (
+                                    'Process Adjustment'
+                                )}
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
                 {/* Edit Credit Limit Card */}
-                <div className="bg-gray-50/50 p-6 sm:p-8 rounded-2xl ring-1 ring-inset ring-gray-100 shadow-sm relative overflow-hidden">
-                    <div className="relative z-10">
-                        <h4 className="text-base font-extrabold text-gray-900 mb-6 flex items-center gap-2 tracking-tight">
-                            <CreditCard className="h-5 w-5 text-primary-500" /> Credit Limit Control
-                        </h4>
-                        <form onSubmit={handleCreditLimitSubmit} className="space-y-6">
+                <div className="bg-white dark:bg-[#0c0e17] p-6 rounded-3xl border border-slate-200/80 dark:border-white/10 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100 dark:border-white/5">
+                            <div className="p-2.5 rounded-2xl bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-100 dark:border-cyan-500/20">
+                                <Shield className="h-5 w-5" />
+                            </div>
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1.5">Tenant Credit Limit</label>
-                                <div className="relative rounded-md shadow-sm">
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white font-display">Credit Limit Policy</h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-sans">Set allowable overdraft ceiling for telephony services</p>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleCreditLimitSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 font-mono">Maximum Credit Limit</label>
+                                <div className="relative rounded-xl shadow-xs">
                                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                        <span className="text-gray-500 sm:text-sm font-medium">$</span>
+                                        <span className="text-slate-400 font-bold text-xs">$</span>
                                     </div>
                                     <input
                                         type="number"
                                         step="0.01"
                                         min="0"
                                         required
-                                        className="block w-full rounded-xl border-0 py-2.5 pl-7 pr-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm font-medium bg-white transition-all font-mono"
+                                        className="block w-full rounded-xl border border-slate-200 dark:border-white/10 py-2.5 pl-7 pr-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 text-xs sm:text-sm font-mono font-bold bg-slate-50 dark:bg-white/[0.03] transition-all"
                                         value={creditLimitInput}
                                         onChange={e => setCreditLimitInput(e.target.value)}
                                         placeholder="0.00"
                                     />
                                 </div>
-                                <p className="text-xs text-gray-500 mt-2">
-                                    Determines how much negative balance this tenant is permitted before outbound services are restricted.
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                                    Allows outbound SIP calls up to this negative balance. Once surpassed, the tenant's outbound services are suspended automatically.
                                 </p>
                             </div>
-                            <div className="flex justify-end pt-8">
+
+                            <div className="flex justify-end pt-3">
                                 <button
                                     type="submit"
                                     disabled={creditLimitLoading}
-                                    className="inline-flex justify-center items-center rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="inline-flex justify-center items-center rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                                 >
                                     {creditLimitLoading ? (
-                                        <><Loader className="animate-spin -ml-1 mr-2 h-4 w-4" /> Updating...</>
+                                        <><Loader className="animate-spin -ml-1 mr-2 h-3.5 w-3.5" /> Updating...</>
                                     ) : (
-                                        'Update Credit Limit'
+                                        'Update Limit'
                                     )}
                                 </button>
                             </div>
@@ -507,123 +556,148 @@ const ExtensionsTab = ({ tenant, onUpdate }) => {
     };
 
     return (
-        <div className="space-y-8 w-full">
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+        <div className="space-y-6 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-white/10">
                 <div>
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Extensions</h3>
-                    <p className="text-sm font-medium text-gray-500 mt-1">Manage standard extension lines.</p>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight font-display">SIP Extensions</h3>
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-sans">
+                        Provisioned hardware and softphone extension lines for this tenant.
+                    </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                     <button
                         onClick={() => setShowAdd(true)}
-                        className="inline-flex justify-center items-center rounded-xl bg-primary-600 px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500 gap-1.5"
+                        className="inline-flex justify-center items-center rounded-xl bg-teal-600 hover:bg-teal-500 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-teal-600/20 transition-all active:scale-95 cursor-pointer gap-2"
                     >
-                        <Plus size={16} /> Add Extension
+                        <Plus size={15} /> Add Extension
                     </button>
                     <button
                         onClick={fetchExtensions}
-                        className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
+                        className="p-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10 transition-all cursor-pointer shadow-xs"
+                        title="Reload Extensions"
                     >
-                        <RefreshCw size={18} />
+                        <RefreshCw size={15} />
                     </button>
                 </div>
             </div>
 
             {loading ? (
-                <div className="flex justify-center py-12">
-                    <Loader className="animate-spin text-primary-600 h-8 w-8" />
+                <div className="flex justify-center py-16">
+                    <Loader className="animate-spin text-teal-600 h-8 w-8" />
                 </div>
             ) : (
-                <>
-                    {/* Standard Extensions list */}
-                    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                                <Users size={14} className="text-gray-400" /> Standard Extensions
+                <div className="bg-white dark:bg-[#0c0e17] rounded-3xl border border-slate-200/80 dark:border-white/10 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Phone size={16} className="text-teal-600 dark:text-teal-400" />
+                            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-mono">
+                                Allocated Extension Lines ({extensions.length})
                             </h4>
                         </div>
-                        <div className="p-5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {extensions.length === 0 ? <div className="col-span-full text-center py-6 text-sm font-medium text-gray-500">No standard extensions found.</div> :
-                                    extensions.map(ext => (
-                                        <div key={ext.id} className="flex justify-between items-center bg-white p-3.5 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
-                                            <div>
-                                                <span className="font-mono font-extrabold text-sm text-gray-900 mr-2">{ext.extensionNumber}</span>
-                                                <span className="text-sm font-medium text-gray-600">{ext.name}</span>
+                    </div>
+                    <div className="p-6">
+                        {extensions.length === 0 ? (
+                            <div className="text-center py-12">
+                                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/[0.04] text-slate-400 flex items-center justify-center mx-auto mb-3">
+                                    <Phone size={20} />
+                                </div>
+                                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No extensions registered</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Click "Add Extension" above to create this tenant's first SIP extension line.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {extensions.map(ext => (
+                                    <div 
+                                        key={ext.id} 
+                                        className="flex items-center justify-between p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.02] hover:bg-white dark:hover:bg-white/[0.05] hover:border-teal-500/40 dark:hover:border-teal-500/30 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-200/60 dark:border-teal-500/20 flex items-center justify-center font-mono font-black text-sm shrink-0">
+                                                {ext.extensionNumber}
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 bg-gray-50 px-2 py-0.5 rounded ring-1 ring-inset ring-gray-500/10">
-                                                    {ext.ringGroupMembers?.length > 0 ? 'Ring Grp' : 'Std'}
-                                                </div>
-                                                <button
-                                                    onClick={() => handleDeleteExtension(ext)}
-                                                    className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 focus:outline-none"
-                                                    title="Delete Extension"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                            <div className="min-w-0">
+                                                <h5 className="text-sm font-bold text-slate-900 dark:text-white truncate font-display">{ext.name}</h5>
+                                                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider">SIP Line</span>
                                             </div>
                                         </div>
-                                    ))
-                                }
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                                                ext.ringGroupMembers?.length > 0 
+                                                    ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/20' 
+                                                    : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/20'
+                                            }`}>
+                                                {ext.ringGroupMembers?.length > 0 ? 'Ring Grp' : 'Active'}
+                                            </span>
+                                            <button
+                                                onClick={() => handleDeleteExtension(ext)}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                title="Delete Extension"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        </div>
+                        )}
                     </div>
-
-                </>
+                </div>
             )}
 
             {showAdd && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={() => setShowAdd(false)}></div>
-                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col ring-1 ring-gray-200 p-6">
-                        <div className="flex justify-between items-center mb-5">
-                            <h4 className="text-lg font-extrabold text-gray-900 tracking-tight">Add Extension</h4>
-                            <button onClick={() => setShowAdd(false)} className="rounded-xl p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none">
-                                <X size={20} />
+                    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity" onClick={() => setShowAdd(false)} />
+                    <div className="relative bg-white dark:bg-[#0c0e17] rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-slate-200/80 dark:border-white/10 ring-1 ring-black/5 p-6 z-10">
+                        <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-100 dark:border-white/5">
+                            <div>
+                                <h4 className="text-lg font-black text-slate-900 dark:text-white tracking-tight font-display">Provision Extension</h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-sans">Create a new extension on this tenant's PBX</p>
+                            </div>
+                            <button onClick={() => setShowAdd(false)} className="rounded-xl p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                                <X size={18} />
                             </button>
                         </div>
                         <form onSubmit={handleAddExtension} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1.5">Predicted Number</label>
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 font-mono">Assigned Number</label>
                                 <input
-                                    className="block w-full rounded-xl border-0 py-2.5 px-3 text-gray-500 shadow-sm ring-1 ring-inset ring-gray-200 bg-gray-50 sm:text-sm font-medium font-mono cursor-not-allowed"
+                                    className="block w-full rounded-xl border border-slate-200 dark:border-white/10 py-2.5 px-3.5 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/[0.03] text-sm font-mono font-bold cursor-not-allowed"
                                     disabled
                                     value={predictedExt}
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1.5">Name</label>
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 font-mono">Display / Friendly Name</label>
                                 <input
-                                    className="block w-full rounded-xl border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm font-medium bg-white transition-all"
-                                    placeholder="E.g., Support Team"
+                                    className="block w-full rounded-xl border border-slate-200 dark:border-white/10 py-2.5 px-3.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 text-sm font-medium bg-slate-50 dark:bg-white/[0.03] transition-all"
+                                    placeholder="E.g., Support Desk, Front Desk"
                                     value={newExt.name}
                                     onChange={e => setNewExt({ ...newExt, name: e.target.value })}
                                     required
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1.5">SIP Password</label>
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 font-mono">SIP Secret / Password</label>
                                 <input
-                                    className="block w-full rounded-xl border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm font-medium bg-white transition-all font-mono"
-                                    placeholder="Secure password"
+                                    className="block w-full rounded-xl border border-slate-200 dark:border-white/10 py-2.5 px-3.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 text-sm font-mono font-bold bg-slate-50 dark:bg-white/[0.03] transition-all"
+                                    placeholder="Secure alphanumeric password"
                                     type="text"
                                     value={newExt.password}
                                     onChange={e => setNewExt({ ...newExt, password: e.target.value })}
                                     required
                                 />
                             </div>
-                            <div className="flex justify-end gap-3 pt-2">
+                            <div className="flex justify-end gap-2.5 pt-3">
                                 <button
                                     type="button"
                                     onClick={() => setShowAdd(false)}
-                                    className="inline-flex justify-center items-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-all active:scale-[0.98] focus:outline-none"
+                                    className="inline-flex justify-center items-center rounded-xl px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-all cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="inline-flex justify-center items-center rounded-xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="inline-flex justify-center items-center rounded-xl bg-teal-600 hover:bg-teal-500 px-5 py-2 text-xs font-bold text-white shadow-md shadow-teal-600/20 transition-all active:scale-95 cursor-pointer"
                                 >
                                     Create Extension
                                 </button>
@@ -632,7 +706,6 @@ const ExtensionsTab = ({ tenant, onUpdate }) => {
                     </div>
                 </div>
             )}
-
         </div>
     );
 };
@@ -676,59 +749,68 @@ const UsersTab = ({ tenant }) => {
     };
 
     return (
-        <div className="space-y-8 w-full">
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+        <div className="space-y-6 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-white/10">
                 <div>
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Users</h3>
-                    <p className="text-sm font-medium text-gray-500 mt-1">Manage users and impersonation sessions.</p>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight font-display">Tenant Users</h3>
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-sans">
+                        Directory of administrator and agent user accounts associated with this tenant.
+                    </p>
                 </div>
                 <button
                     onClick={fetchUsers}
-                    className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
+                    className="p-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10 transition-all cursor-pointer shadow-xs self-start sm:self-auto"
+                    title="Reload Users"
                 >
-                    <RefreshCw size={18} />
+                    <RefreshCw size={15} />
                 </button>
             </div>
 
             {loading ? (
-                <div className="flex justify-center py-12">
-                    <Loader className="animate-spin text-primary-600 h-8 w-8" />
+                <div className="flex justify-center py-16">
+                    <Loader className="animate-spin text-teal-600 h-8 w-8" />
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 overflow-hidden text-left">
+                <div className="bg-white dark:bg-[#0c0e17] rounded-3xl border border-slate-200/80 dark:border-white/10 shadow-sm overflow-hidden text-left">
                     {users.length === 0 ? (
-                        <div className="text-center py-12">
-                            <User className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-                            <p className="text-sm font-medium text-gray-500">No users found for this tenant.</p>
+                        <div className="text-center py-16">
+                            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/[0.04] text-slate-400 flex items-center justify-center mx-auto mb-3">
+                                <User size={20} />
+                            </div>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No users found</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">There are currently no provisioned users under this tenant.</p>
                         </div>
                     ) : (
-                        <div className="divide-y divide-gray-100">
+                        <div className="divide-y divide-slate-100 dark:divide-white/5">
                             {users.map(user => (
-                                <div key={user.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors group">
-                                    <div className="flex items-start gap-4">
-                                        <div className="bg-gray-100 h-10 w-10 rounded-full flex items-center justify-center shrink-0 ring-1 ring-inset ring-gray-200">
-                                            <span className="text-sm font-extrabold text-gray-600">
-                                                {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
-                                            </span>
+                                <div key={user.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-white/[0.02] transition-colors group">
+                                    <div className="flex items-center gap-3.5 min-w-0">
+                                        <div className="w-10 h-10 rounded-2xl bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-200/60 dark:border-teal-500/20 flex items-center justify-center font-display font-black text-sm shrink-0">
+                                            {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
                                         </div>
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-0.5">
-                                                <span className="font-extrabold text-sm text-gray-900">{user.name || 'Unnamed User'}</span>
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ring-1 ring-inset ${user.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 ring-purple-600/20' :
-                                                    user.role === 'SUPPORT' ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
-                                                        'bg-gray-50 text-gray-600 ring-gray-500/10'
-                                                    }`}>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                                <span className="font-bold text-sm text-slate-900 dark:text-white font-display truncate">
+                                                    {user.name || 'Unnamed User'}
+                                                </span>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider font-mono border ${
+                                                    user.role === 'ADMIN' 
+                                                        ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/20' :
+                                                    user.role === 'SUPPORT' 
+                                                        ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/20' :
+                                                        'bg-slate-100 dark:bg-white/[0.04] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10'
+                                                }`}>
                                                     {user.role}
                                                 </span>
                                             </div>
-                                            <p className="text-xs font-medium text-gray-500">{user.email}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 font-sans truncate">{user.email}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4 shrink-0 mt-2 sm:mt-0">
+                                    <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
                                         <button
                                             onClick={() => handleImpersonate(user.id)}
                                             disabled={impersonatingId === user.id}
-                                            className="inline-flex justify-center items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-primary-600 shadow-sm ring-1 ring-inset ring-primary-200 hover:bg-primary-50 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="inline-flex justify-center items-center gap-1.5 rounded-xl border border-teal-500/30 dark:border-teal-500/20 bg-teal-50 dark:bg-teal-500/10 px-3.5 py-1.5 text-xs font-bold text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-500/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                                         >
                                             {impersonatingId === user.id ? <Loader className="animate-spin h-3.5 w-3.5" /> : <LogIn className="h-3.5 w-3.5" />}
                                             Impersonate
@@ -809,7 +891,7 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
             title: 'Call Recording Permission',
             description: 'Allow tenant administrators to toggle automatic call recording for extensions.',
             icon: Mic,
-            color: 'text-blue-600 bg-blue-50 border-blue-100',
+            color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20',
         },
         {
             key: 'ivrEnabled',
@@ -817,7 +899,7 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
             title: 'Interactive Voice Response (IVR)',
             description: 'Enable multi-level auto-attendant phone menus and call routing prompts.',
             icon: Phone,
-            color: 'text-blue-600 bg-blue-50 border-blue-100',
+            color: 'text-teal-600 bg-teal-50 dark:bg-teal-500/10 border-teal-100 dark:border-teal-500/20',
         },
         {
             key: 'ringGroupEnabled',
@@ -825,7 +907,7 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
             title: 'Ring Groups',
             description: 'Group extensions together to ring sequentially or simultaneously for incoming calls.',
             icon: Users,
-            color: 'text-blue-600 bg-blue-50 border-blue-100',
+            color: 'text-purple-600 bg-purple-50 dark:bg-purple-500/10 border-purple-100 dark:border-purple-500/20',
         },
         {
             key: 'schedulerEnabled',
@@ -833,7 +915,7 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
             title: 'Operational Schedules (Scheduler)',
             description: 'Route calls automatically based on operational business hours, holidays, and times.',
             icon: Clock,
-            color: 'text-blue-600 bg-blue-50 border-blue-100',
+            color: 'text-amber-600 bg-amber-50 dark:bg-amber-500/10 border-amber-100 dark:border-amber-500/20',
         },
         {
             key: 'didForwardEnabled',
@@ -841,16 +923,16 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
             title: 'DID Forwarding',
             description: 'Directly forward incoming phone numbers to external lines or specific destinations.',
             icon: Phone,
-            color: 'text-blue-600 bg-blue-50 border-blue-100',
+            color: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-100 dark:border-cyan-500/20',
         }
     ];
 
     return (
-        <div className="space-y-8 w-full">
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+        <div className="space-y-6 w-full">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-200/80 dark:border-white/10">
                 <div className="text-left">
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Feature Controller</h3>
-                    <p className="text-sm font-medium text-gray-500 mt-1">Control active features and set creation limits for this tenant.</p>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight font-display">Feature Controller</h3>
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-sans">Control active modules and configure resource allocation limits for this tenant.</p>
                 </div>
             </div>
 
@@ -864,22 +946,32 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                     return (
                         <div
                             key={item.key}
-                            className={`p-5 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-sm ${isEnabled
-                                ? 'bg-white border-gray-200'
-                                : 'bg-gray-50/50 border-gray-100 opacity-75'
-                                }`}
+                            className={`p-5 rounded-3xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-5 ${
+                                isEnabled
+                                    ? 'bg-white dark:bg-[#0c0e17] border-slate-200/80 dark:border-white/10 shadow-xs'
+                                    : 'bg-slate-50/70 dark:bg-white/[0.02] border-slate-200/50 dark:border-white/5 opacity-80'
+                            }`}
                         >
-                            <div className="flex items-start gap-4 flex-1">
-                                <div className={`p-3 rounded-xl border shrink-0 ${item.color}`}>
-                                    <Icon className="h-6 w-6" />
+                            <div className="flex items-start gap-4 flex-1 min-w-0">
+                                <div className={`p-3 rounded-2xl border shrink-0 ${item.color}`}>
+                                    <Icon className="h-5 w-5" />
                                 </div>
-                                <div className="text-left flex-1">
-                                    <h4 className="font-extrabold text-gray-900 text-sm tracking-tight">{item.title}</h4>
-                                    <p className="text-xs font-medium text-gray-500 mt-1 leading-relaxed max-w-xl">{item.description}</p>
+                                <div className="text-left flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="font-bold text-slate-900 dark:text-white text-sm tracking-tight font-display">{item.title}</h4>
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider font-mono border ${
+                                            isEnabled
+                                                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20'
+                                                : 'bg-slate-100 dark:bg-white/[0.04] text-slate-400 dark:text-slate-500 border-slate-200 dark:border-white/10'
+                                        }`}>
+                                            {isEnabled ? 'Enabled' : 'Disabled'}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 leading-relaxed max-w-xl font-sans">{item.description}</p>
 
                                     {isEnabled && item.limitKey && (
-                                        <div className="mt-3 flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex">
-                                            <span className="text-xs font-bold text-gray-700">Creation Limit:</span>
+                                        <div className="mt-3.5 flex items-center gap-2.5 bg-slate-50 dark:bg-white/[0.03] px-3 py-1.5 rounded-xl border border-slate-200/60 dark:border-white/10 inline-flex">
+                                            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 font-mono">Allocation Ceiling:</span>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -905,26 +997,30 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                                                     }
                                                 }}
                                                 disabled={isUpdating}
-                                                className="w-16 px-2 py-1 text-xs font-extrabold text-gray-800 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-center shadow-sm"
+                                                className="w-16 px-2 py-0.5 text-xs font-mono font-black text-slate-900 dark:text-white bg-white dark:bg-[#121420] border border-slate-200 dark:border-white/15 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-center shadow-xs"
                                             />
-                                            <span className="text-[10px] text-gray-400 font-bold">resources</span>
+                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider font-mono">slots</span>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="flex items-center shrink-0 justify-end">
+                            {/* Modern Toggle Switch */}
+                            <div className="flex items-center shrink-0 justify-end self-end md:self-center">
                                 <button
                                     onClick={() => !isUpdating && handleToggle(item.key)}
                                     disabled={isUpdating}
-                                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 ${isEnabled ? 'bg-primary-600' : 'bg-gray-200'
-                                        }`}
+                                    type="button"
+                                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 disabled:opacity-50 ${
+                                        isEnabled ? 'bg-teal-600 shadow-md shadow-teal-600/30' : 'bg-slate-200 dark:bg-white/15'
+                                    }`}
                                 >
                                     <span
-                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out flex items-center justify-center ${isEnabled ? 'translate-x-5' : 'translate-x-0'
-                                            }`}
+                                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out flex items-center justify-center ${
+                                            isEnabled ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
                                     >
-                                        {isUpdating && <Loader className="animate-spin h-3 w-3 text-primary-600" />}
+                                        {isUpdating && <Loader className="animate-spin h-3 w-3 text-teal-600" />}
                                     </span>
                                 </button>
                             </div>
@@ -932,13 +1028,15 @@ const FeaturesTab = ({ tenant, onUpdate }) => {
                     );
                 })}
             </div>
-
         </div>
     );
 };
 
-const AddonsTab = ({ tenant, onUpdate }) => {
+const SubscriptionsTab = ({ tenant, onUpdate }) => {
     const { addToast } = useToast();
+    const [subscriptions, setSubscriptions] = useState([]);
+    const [plans, setPlans] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [catalog, setCatalog] = useState([]);
     const [catalogLoading, setCatalogLoading] = useState(true);
     const [quantityMap, setQuantityMap] = useState({});
@@ -947,8 +1045,31 @@ const AddonsTab = ({ tenant, onUpdate }) => {
     const [addonModalOpen, setAddonModalOpen] = useState(false);
 
     useEffect(() => {
-        loadCatalog();
+        if (tenant?.id) {
+            loadSubscriptionData();
+            loadCatalog();
+        }
     }, [tenant?.id]);
+
+    const loadSubscriptionData = async () => {
+        setLoading(true);
+        try {
+            const [subRes, plansRes] = await Promise.allSettled([
+                api.get('/subscriptions', { params: { tenantId: tenant.id } }),
+                subscriptionService.getPlans()
+            ]);
+            if (subRes.status === 'fulfilled') {
+                setSubscriptions(subRes.value.data || []);
+            }
+            if (plansRes.status === 'fulfilled') {
+                setPlans(plansRes.value || []);
+            }
+        } catch (err) {
+            console.error('Failed to load subscriptions', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const loadCatalog = async () => {
         setCatalogLoading(true);
@@ -957,7 +1078,6 @@ const AddonsTab = ({ tenant, onUpdate }) => {
             setCatalog(addonsData || []);
         } catch (err) {
             console.error('Failed to load add-on catalog:', err);
-            if (addToast) addToast('error', 'Failed to load add-ons');
         } finally {
             setCatalogLoading(false);
         }
@@ -972,7 +1092,7 @@ const AddonsTab = ({ tenant, onUpdate }) => {
 
     const getAddonIcon = (addonType = '') => {
         const type = String(addonType).toLowerCase();
-        const iconClasses = "h-5 w-5 text-indigo-600";
+        const iconClasses = "h-5 w-5 text-teal-600 dark:text-teal-400";
         switch (type) {
             case 'ext':
             case 'extension':
@@ -1009,98 +1129,195 @@ const AddonsTab = ({ tenant, onUpdate }) => {
     };
 
     const handleRefreshAll = () => {
+        loadSubscriptionData();
         loadCatalog();
         if (onUpdate) onUpdate();
     };
 
+    const activeSubs = subscriptions.filter(s => ['active', 'grace'].includes(s.status));
+
     return (
-        <div className="space-y-8 w-full">
-            {/* Catalog Section Header */}
-            <div>
-                <div className="flex items-center gap-2 mb-1">
-                    <Zap className="h-5 w-5 text-indigo-500" />
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">
-                        Mid-Cycle Add-ons Catalog
-                    </h3>
+        <div className="space-y-6 w-full">
+            {/* Header with Title and External Link */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-white/10">
+                <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight font-display">Subscription & Entitlements</h3>
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-sans">
+                        Active plans, resource allocations, and mid-cycle capacity add-ons.
+                    </p>
                 </div>
-                <p className="text-sm font-medium text-gray-500">
-                    Select capacity add-ons to upgrade your tenant resources with instant prorated billing
-                </p>
+                <div className="flex items-center gap-2">
+                    <a
+                        href={`/super-admin/subscriptions?tenantId=${encodeURIComponent(tenant.id)}`}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md shadow-teal-600/20 transition-all cursor-pointer"
+                    >
+                        <CreditCard size={14} /> Full Billing Console
+                    </a>
+                    <button
+                        onClick={handleRefreshAll}
+                        className="p-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer shadow-xs"
+                        title="Reload Subscriptions"
+                    >
+                        <RefreshCw size={15} />
+                    </button>
+                </div>
             </div>
 
-            {/* Catalog Grid */}
-            {catalogLoading ? (
-                <div className="flex justify-center py-16">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+            {/* Subscriptions Overview Cards */}
+            {loading ? (
+                <div className="flex justify-center py-12">
+                    <Loader className="animate-spin text-teal-600 h-8 w-8" />
+                </div>
+            ) : subscriptions.length === 0 ? (
+                <div className="p-8 text-center bg-white dark:bg-[#0c0e17] rounded-3xl border border-slate-200/80 dark:border-white/10">
+                    <CreditCard className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600 mb-3" />
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No active subscription</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                        This tenant currently has no active subscription packages assigned. Assign or renew a package via the billing console.
+                    </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {catalog.map((addon) => (
-                        <div
-                            key={addon.addon_id}
-                            className="bg-white rounded-2xl p-6 border border-gray-200/80 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
-                        >
-                            <div>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100">
-                                        {getAddonIcon(addon.resource_type || addon.addon_type)}
-                                    </div>
-                                    <span className="text-lg font-extrabold font-mono text-gray-900">
-                                        ${Number(addon.unit_price || addon.price || 0).toFixed(2)}
-                                        <span className="text-xs text-gray-400 font-sans font-normal"> / mo</span>
-                                    </span>
-                                </div>
-
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="text-base font-bold text-gray-900 tracking-tight">
-                                        {addon.name}
-                                    </h4>
-                                    {addon.units_count > 1 && (
-                                        <span className="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                            {addon.units_count} Units / Pack
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {subscriptions.map(s => {
+                        const isLive = ['active', 'grace'].includes(s.status);
+                        return (
+                            <div key={s.id} className="p-5 rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#0c0e17] shadow-xs flex flex-col justify-between">
+                                <div>
+                                    <div className="flex justify-between items-start gap-2 mb-3">
+                                        <div>
+                                            <h4 className="font-bold text-base text-slate-900 dark:text-white font-display">{s.plan_name}</h4>
+                                            <span className="inline-block mt-0.5 text-[10px] font-mono uppercase font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-500/20">
+                                                {s.subscription_type || 'Base Plan'}
+                                            </span>
+                                        </div>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider font-mono border ${
+                                            s.status === 'active' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20' :
+                                            s.status === 'grace' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20' :
+                                            'bg-slate-100 dark:bg-white/[0.04] text-slate-500 border-slate-200 dark:border-white/10'
+                                        }`}>
+                                            {s.status}
                                         </span>
-                                    )}
-                                </div>
-                                <p className="text-xs font-medium text-gray-500 mt-1.5 leading-relaxed min-h-[36px]">
-                                    {addon.description || `Resource type: ${addon.resource_type || 'addon'}`}
-                                </p>
-                            </div>
+                                    </div>
 
-                            <div className="mt-6 pt-4 border-t border-gray-100 flex items-center gap-3">
-                                {/* Quantity Selector */}
-                                <div className="w-24">
-                                    <label className="sr-only">Quantity</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="50"
-                                        value={getQuantity(addon.addon_id)}
-                                        onChange={(e) => handleQuantityChange(addon.addon_id, e.target.value)}
-                                        className="w-full text-center font-mono font-bold text-sm rounded-xl border border-gray-200 bg-gray-50 py-2 text-gray-900 focus:ring-2 focus:ring-primary-500"
-                                    />
-                                </div>
+                                    {/* Dates & Renewal info */}
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mb-4 space-y-1">
+                                        <p>Period: {s.start_date ? new Date(s.start_date).toLocaleDateString() : '—'} → {s.end_date ? new Date(s.end_date).toLocaleDateString() : '—'}</p>
+                                        <p className="font-bold text-slate-800 dark:text-slate-200">
+                                            Renewal: ${Number(s.renewal_price || 0).toFixed(2)} {String(s.currency_snapshot || 'USD').toUpperCase()} / {s.duration_count} {s.duration_unit}
+                                        </p>
+                                    </div>
 
-                                {/* Trigger Quote & Purchase Button */}
-                                <button
-                                    type="button"
-                                    onClick={() => handleGetQuote(addon)}
-                                    disabled={quotingAddonId === addon.addon_id}
-                                    className="flex-1 inline-flex justify-center items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                                >
-                                    {quotingAddonId === addon.addon_id ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Plus className="h-4 w-4" />
-                                    )}
-                                    Purchase Add-on
-                                </button>
+                                    {/* Quotas breakdown */}
+                                    <div className="bg-slate-50 dark:bg-white/[0.02] p-3 rounded-2xl border border-slate-200/60 dark:border-white/5 grid grid-cols-3 gap-2 text-center">
+                                        <div>
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Numbers</span>
+                                            <span className="text-xs font-black text-slate-900 dark:text-white font-mono">
+                                                {s.usage?.numbers || 0} / {s.entitlement_snapshot?.numbers || 0}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Extensions</span>
+                                            <span className="text-xs font-black text-slate-900 dark:text-white font-mono">
+                                                {s.usage?.extensions || 0} / {s.entitlement_snapshot?.extensions || 0}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Monitoring</span>
+                                            <span className="text-xs font-black text-slate-900 dark:text-white font-mono">
+                                                {s.usage?.monitoring_extensions || 0} / {s.entitlement_snapshot?.monitoring_extensions || 0}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
-            {/* Prorated Add-on Quote & Purchase Modal */}
+            {/* Mid-Cycle Add-ons Catalog Section */}
+            <div className="pt-4 border-t border-slate-200/80 dark:border-white/10">
+                <div className="flex items-center gap-2 mb-1">
+                    <Zap className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                    <h4 className="text-base font-bold text-slate-900 dark:text-white tracking-tight font-display">
+                        Mid-Cycle Capacity Add-ons
+                    </h4>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 font-sans">
+                    Select capacity add-ons to upgrade tenant resources with instant prorated billing.
+                </p>
+
+                {catalogLoading ? (
+                    <div className="flex justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
+                    </div>
+                ) : catalog.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">No add-ons currently available in the catalog.</p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {catalog.map((addon) => (
+                            <div
+                                key={addon.addon_id}
+                                className="bg-white dark:bg-[#0c0e17] rounded-3xl p-5 border border-slate-200/80 dark:border-white/10 shadow-xs flex flex-col justify-between"
+                            >
+                                <div>
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="p-2.5 rounded-2xl bg-teal-50 dark:bg-teal-500/10 border border-teal-100 dark:border-teal-500/20">
+                                            {getAddonIcon(addon.resource_type || addon.addon_type)}
+                                        </div>
+                                        <span className="text-base font-black font-mono text-slate-900 dark:text-white">
+                                            ${Number(addon.unit_price || addon.price || 0).toFixed(2)}
+                                            <span className="text-[11px] text-slate-400 font-sans font-normal"> / mo</span>
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <h5 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight font-display">
+                                            {addon.name}
+                                        </h5>
+                                        {addon.units_count > 1 && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/20 font-mono">
+                                                {addon.units_count} Units
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 leading-relaxed min-h-[32px] font-sans">
+                                        {addon.description || `Resource: ${addon.resource_type || 'addon'}`}
+                                    </p>
+                                </div>
+
+                                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center gap-2.5">
+                                    <div className="w-20">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="50"
+                                            value={getQuantity(addon.addon_id)}
+                                            onChange={(e) => handleQuantityChange(addon.addon_id, e.target.value)}
+                                            className="w-full text-center font-mono font-bold text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => handleGetQuote(addon)}
+                                        disabled={quotingAddonId === addon.addon_id}
+                                        className="flex-1 inline-flex justify-center items-center gap-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 px-3 py-2 text-xs font-bold text-white shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                                    >
+                                        {quotingAddonId === addon.addon_id ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Plus className="h-3.5 w-3.5" />
+                                        )}
+                                        Purchase
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             <AddonPurchaseModal
                 isOpen={addonModalOpen}
                 onClose={() => setAddonModalOpen(false)}

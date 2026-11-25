@@ -31,7 +31,7 @@ const SuperAdminDashboard = () => {
     const totalBalance = balances.reduce((sum, b) => sum + (b.balance || 0), 0);
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
+        <div className="p-8 w-full space-y-8">
             <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Platform Overview</h1>

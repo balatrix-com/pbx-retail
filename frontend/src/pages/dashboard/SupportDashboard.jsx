@@ -68,7 +68,7 @@ const SupportDashboard = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto pb-12 space-y-8">
+        <div className="w-full pb-12 space-y-8">
             {/* Header section with gradient and branding */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-900 via-primary-800 to-indigo-900 p-8 shadow-lg ring-1 ring-black/5">
                 <div className="absolute -right-32 -top-32 opacity-10">
