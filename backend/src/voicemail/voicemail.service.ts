@@ -6,7 +6,10 @@ import { AudioUploadService } from '../freeswitch/audio-upload.service';
 import { createReadStream, promises as fs } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { spawn } from 'child_process';
+import { execFile, spawn } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 type BoxInput = {
   name?: string;
@@ -21,6 +24,7 @@ type BoxInput = {
 export class VoicemailService implements OnModuleInit {
   private readonly storageRoot = process.env.VOICEMAIL_STORAGE_ROOT || '/var/lib/pbx-voicemail';
   private readonly greetingRoot = process.env.VOICEMAIL_GREETING_ROOT || '/opt/ivr_audio';
+  private freeSwitchGid?: Promise<number>;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -40,22 +44,22 @@ export class VoicemailService implements OnModuleInit {
   private async setPermissions(targetPath: string, mode: number) {
     const stat = await fs.lstat(targetPath);
     if (stat.isSymbolicLink()) throw new BadRequestException('Symbolic links are not allowed');
-    const gidStr = process.env.VOICEMAIL_SHARED_GID;
-    if (gidStr) {
-      const gid = Number(gidStr);
-      if (!Number.isInteger(gid) || gid < 0) {
-        throw new ServiceUnavailableException('Invalid VOICEMAIL_SHARED_GID');
-      }
-      try {
-        await fs.chown(targetPath, -1, gid);
-      } catch (err) {
-        throw new ServiceUnavailableException('Failed to set voicemail shared group permissions');
-      }
+    try {
+      await fs.chown(targetPath, -1, await this.getFreeSwitchGid());
       await fs.chmod(targetPath, mode);
-    } else {
-      const fallbackMode = (mode & 0o777) === 0o640 ? 0o666 : 0o777;
-      await fs.chmod(targetPath, fallbackMode).catch(() => { });
+    } catch {
+      throw new ServiceUnavailableException('Failed to set voicemail permissions for the freeswitch group');
     }
+  }
+
+  private getFreeSwitchGid(): Promise<number> {
+    this.freeSwitchGid ??= execFileAsync('id', ['-g', 'freeswitch'], { timeout: 5000 })
+      .then(({ stdout }) => {
+        const gid = Number(stdout.trim());
+        if (!Number.isInteger(gid) || gid < 0) throw new Error('Invalid freeswitch group ID');
+        return gid;
+      });
+    return this.freeSwitchGid;
   }
 
   async capabilities(tenantId: string) {
@@ -135,9 +139,7 @@ export class VoicemailService implements OnModuleInit {
     const boxId = randomUUID();
     const tenantIncomingDir = join(this.storageRoot, 'incoming', tenantId);
     const incomingDirectory = join(tenantIncomingDir, boxId);
-    await fs.mkdir(incomingDirectory, { recursive: true, mode: 0o2770 });
-    await this.setPermissions(tenantIncomingDir, 0o2770).catch(() => { });
-    await this.setPermissions(incomingDirectory, 0o2770).catch(() => { });
+    await this.prepareIncomingDirectory(tenantId, boxId);
     let box;
     try {
       box = await this.prisma.$transaction(async tx => {
@@ -240,6 +242,16 @@ export class VoicemailService implements OnModuleInit {
 
   private greetingPath(tenantId: string, boxId: string) {
     return join(this.greetingRoot, tenantId, 'voicemail', boxId, 'greeting.wav');
+  }
+
+  private async prepareIncomingDirectory(tenantId: string, boxId: string) {
+    const incomingRoot = join(this.storageRoot, 'incoming');
+    const tenantIncomingDir = join(incomingRoot, tenantId);
+    const boxDir = join(tenantIncomingDir, boxId);
+    for (const directory of [this.storageRoot, incomingRoot, tenantIncomingDir, boxDir]) {
+      await fs.mkdir(directory, { recursive: true, mode: 0o2770 });
+      await this.setPermissions(directory, 0o2770);
+    }
   }
 
   private async prepareGreetingDirectory(tenantId: string, boxId: string) {
