@@ -59,8 +59,8 @@ export const BrandingProvider = ({ children }) => {
         logoMain: '/svg logo/logo-main.svg',
         logoSidebar: '/svg logo/logo-main.svg',
         favicon: '/svg logo/favicon.svg',
-        primaryColor: '#3d52a0',
-        accentColor: '#ed8f55',
+        primaryColor: '#0d9488',
+        accentColor: '#14b8a6',
         supportEmail: 'support@telecom-platform.com',
         supportPhone: '+1-800-555-0199',
     });

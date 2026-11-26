@@ -155,217 +155,286 @@ const SuperAdminUsers = () => {
     const supportUsers = users.filter(u => u.role === 'SUPPORT');
 
     return (
-        <div className="max-w-[1600px] mx-auto h-[calc(100vh-120px)] flex flex-col gap-6 px-4 sm:px-6 lg:px-8">
-            <header className="flex-shrink-0">
-                <h1 className="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
-                    <div className="bg-primary-600 p-2 rounded-2xl shadow-lg shadow-primary-600/20">
-                        <ShieldCheck className="text-white h-7 w-7" />
+        <div className="w-full pb-16 space-y-7 animate-in fade-in duration-300 max-w-7xl mx-auto">
+            {/* Header Banner */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 p-8 text-white shadow-xl shadow-teal-900/15">
+                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                    <div className="space-y-1.5 max-w-2xl">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold tracking-wide border border-white/20">
+                            <ShieldCheck size={14} className="text-teal-200" />
+                            <span>Identity Directory & Access Control</span>
+                        </div>
+                        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                            User Management & Directory
+                        </h1>
+                        <p className="text-teal-100 text-xs sm:text-sm font-medium">
+                            Global authority over all client organizations, tenant administrators, support operators, and staff credentials.
+                        </p>
                     </div>
-                    Super Admin Control
-                </h1>
-                <p className="mt-2 text-gray-500 font-medium text-sm">Global authority over all tenants, system administrators, and staff.</p>
-            </header>
 
-            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-8">
-                {/* Left Panel: Tenant Explorer */}
-                <div className="lg:col-span-1 flex flex-col min-h-0 bg-white rounded-[2.5rem] shadow-sm ring-1 ring-gray-200 overflow-hidden">
-                    <div className="p-6 space-y-4 border-b border-gray-50">
-                        <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest px-1">Tenants</h2>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={fetchTenants}
+                            disabled={loading}
+                            className="inline-flex items-center gap-2 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 px-4 py-2.5 text-xs font-bold text-white transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-50"
+                        >
+                            <RefreshCw size={14} className={`text-teal-200 ${loading ? 'animate-spin' : ''}`} />
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left Panel: Tenant Explorer Sidebar (4 cols) */}
+                <div className="lg:col-span-4 flex flex-col rounded-3xl bg-white dark:bg-[#0c0e17] border border-slate-200/80 dark:border-white/10 shadow-sm overflow-hidden backdrop-blur-sm">
+                    {/* Sidebar Header & Search */}
+                    <div className="p-4 sm:p-5 space-y-3 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Building2 size={16} className="text-teal-600 dark:text-teal-400" />
+                                <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider font-mono">
+                                    Tenant Directory
+                                </h2>
+                            </div>
+                            <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full border border-slate-200/60 dark:border-white/5">
+                                {tenantPagination.total || tenants.length} accounts
+                            </span>
+                        </div>
                         <div className="relative">
-                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
                             <input 
                                 type="text" 
-                                placeholder="Search..."
+                                placeholder="Search organization by name or ID..."
                                 value={tenantSearch}
                                 onChange={(e) => { setTenantSearch(e.target.value); setTenantPagination(p => ({ ...p, page: 1 })); }}
-                                className="w-full pl-9 pr-4 py-2 bg-gray-50 border-0 rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary-500 transition-all"
+                                className="w-full pl-9 pr-3.5 py-2 bg-white dark:bg-[#121420] border border-slate-200 dark:border-white/10 rounded-xl text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all shadow-2xs"
                             />
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
+                    {/* Tenant List */}
+                    <div className="max-h-[560px] overflow-y-auto p-3 space-y-1.5 custom-scrollbar">
                         {/* Platform Users Option */}
                         <button
                             onClick={() => fetchUsersForTenant('null')}
                             className={clsx(
-                                "w-full flex items-center justify-between p-3 rounded-xl transition-all group",
+                                "w-full flex items-center justify-between p-3 rounded-2xl transition-all group cursor-pointer text-left border",
                                 selectedTenant === 'null' 
-                                    ? "bg-primary-600 text-white shadow-lg shadow-primary-600/20" 
-                                    : "hover:bg-gray-50 text-gray-700"
+                                    ? "bg-gradient-to-r from-teal-600 to-teal-500 text-white border-teal-500 shadow-md shadow-teal-600/20" 
+                                    : "bg-slate-50/60 dark:bg-white/[0.02] border-slate-200/60 dark:border-white/5 hover:border-teal-500/40 hover:bg-white dark:hover:bg-white/[0.05] text-slate-700 dark:text-slate-300"
                             )}
                         >
-                            <div className="text-left">
-                                <p className="text-xs font-black uppercase tracking-tight">Platform</p>
-                                <p className={clsx("text-[10px] font-bold", selectedTenant === 'null' ? "text-primary-100" : "text-gray-400")}>Global Admins</p>
+                            <div className="flex items-center gap-3 min-w-0 pr-2">
+                                <div className={clsx(
+                                    "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-xs font-black shadow-xs",
+                                    selectedTenant === 'null' ? "bg-white/20 text-white" : "bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-100 dark:border-teal-500/20"
+                                )}>
+                                    <Shield size={16} />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-xs font-bold uppercase tracking-tight truncate font-display">Platform Core</p>
+                                    <p className={clsx("text-[10px] font-medium truncate font-sans", selectedTenant === 'null' ? "text-teal-100" : "text-slate-400")}>
+                                        Global Super Admins
+                                    </p>
+                                </div>
                             </div>
-                            <ArrowRight size={14} className={clsx("transition-transform", selectedTenant === 'null' ? "translate-x-0" : "-translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0")} />
+                            <ArrowRight size={14} className={clsx("transition-transform shrink-0", selectedTenant === 'null' ? "translate-x-0" : "-translate-x-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-0")} />
                         </button>
 
+                        <div className="pt-2 pb-1 px-2">
+                            <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-slate-400 dark:text-slate-500">
+                                Client Organizations
+                            </span>
+                        </div>
+
                         {loading ? (
-                            Array.from({ length: 8 }).map((_, i) => (
-                                <div key={i} className="h-12 bg-gray-50 animate-pulse rounded-xl mb-1"></div>
+                            Array.from({ length: 6 }).map((_, i) => (
+                                <div key={i} className="h-12 bg-slate-100/70 dark:bg-white/5 animate-pulse rounded-2xl mb-1.5" />
                             ))
                         ) : tenants.length === 0 ? (
-                            <p className="py-8 text-center text-[10px] font-bold text-gray-400 uppercase italic">No tenants</p>
+                            <p className="py-10 text-center text-xs font-medium text-slate-400 italic">No tenants matching search</p>
                         ) : (
-                            tenants.map(t => (
-                                <button
-                                    key={t.id}
-                                    onClick={() => fetchUsersForTenant(t.id)}
-                                    className={clsx(
-                                        "w-full flex items-center justify-between p-3 rounded-xl transition-all group mb-1",
-                                        selectedTenant === t.id 
-                                            ? "bg-primary-600 text-white shadow-lg shadow-primary-600/20" 
-                                            : "hover:bg-gray-50 text-gray-700"
-                                    )}
-                                >
-                                    <div className="text-left overflow-hidden pr-2">
-                                        <p className="text-xs font-black truncate">{t.name}</p>
-                                        <p className={clsx("text-[10px] font-bold truncate uppercase", selectedTenant === t.id ? "text-primary-100" : "text-gray-400")}>{t.id}</p>
-                                    </div>
-                                    <ArrowRight size={14} className={clsx("transition-transform flex-shrink-0", selectedTenant === t.id ? "translate-x-0" : "-translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0")} />
-                                </button>
-                            ))
+                            tenants.map(t => {
+                                const isSelected = selectedTenant === t.id;
+                                return (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => fetchUsersForTenant(t.id)}
+                                        className={clsx(
+                                            "w-full flex items-center justify-between p-3 rounded-2xl transition-all group mb-1 cursor-pointer text-left border",
+                                            isSelected 
+                                                ? "bg-gradient-to-r from-teal-600 to-teal-500 text-white border-teal-500 shadow-md shadow-teal-600/20" 
+                                                : "bg-slate-50/50 dark:bg-white/[0.02] border-slate-200/60 dark:border-white/5 hover:border-teal-500/40 hover:bg-white dark:hover:bg-white/[0.05] text-slate-700 dark:text-slate-300"
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                                            <div className={clsx(
+                                                "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-mono font-bold text-xs shadow-xs",
+                                                isSelected ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-white/10"
+                                            )}>
+                                                {t.name ? t.name.substring(0, 2).toUpperCase() : 'TN'}
+                                            </div>
+                                            <div className="overflow-hidden min-w-0">
+                                                <p className="text-xs font-bold truncate font-display">{t.name}</p>
+                                                <p className={clsx("text-[10px] font-mono truncate uppercase tracking-wider", isSelected ? "text-teal-100" : "text-slate-400 dark:text-slate-500")}>
+                                                    {t.customerCode || t.id}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <ArrowRight size={14} className={clsx("transition-transform shrink-0", isSelected ? "translate-x-0" : "-translate-x-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-0")} />
+                                    </button>
+                                );
+                            })
                         )}
                     </div>
 
                     {/* Tenant Pagination */}
                     {tenantPagination.totalPages > 1 && (
-                        <div className="p-4 border-t border-gray-50 bg-gray-50/50 flex items-center justify-between">
+                        <div className="p-3 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01] flex items-center justify-between">
                             <button 
                                 disabled={tenantPagination.page === 1}
                                 onClick={() => setTenantPagination(p => ({ ...p, page: p.page - 1 }))}
-                                className="p-2 rounded-lg bg-white shadow-sm text-gray-400 disabled:opacity-20 hover:bg-gray-100 transition-all border border-gray-100"
+                                className="p-1.5 rounded-xl bg-white dark:bg-[#121420] shadow-2xs text-slate-400 disabled:opacity-20 hover:bg-slate-100 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/10 cursor-pointer"
                             >
-                                <ChevronRight size={16} className="rotate-180" />
+                                <ChevronRight size={14} className="rotate-180" />
                             </button>
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{tenantPagination.page} / {tenantPagination.totalPages}</span>
+                            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">{tenantPagination.page} / {tenantPagination.totalPages}</span>
                             <button 
                                 disabled={tenantPagination.page === tenantPagination.totalPages}
                                 onClick={() => setTenantPagination(p => ({ ...p, page: p.page + 1 }))}
-                                className="p-2 rounded-lg bg-white shadow-sm text-gray-400 disabled:opacity-20 hover:bg-gray-100 transition-all border border-gray-100"
+                                className="p-1.5 rounded-xl bg-white dark:bg-[#121420] shadow-2xs text-slate-400 disabled:opacity-20 hover:bg-slate-100 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/10 cursor-pointer"
                             >
-                                <ChevronRight size={16} />
+                                <ChevronRight size={14} />
                             </button>
                         </div>
                     )}
                 </div>
 
-                {/* Right Panel: Content */}
-                <div className="lg:col-span-3 min-h-0 flex flex-col">
-                    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar rounded-[2.5rem]">
-                        {!selectedTenant ? (
-                            <div className="h-full flex flex-col items-center justify-center bg-white rounded-[2.5rem] shadow-sm ring-1 ring-gray-100 text-center px-8">
-                                <div className="h-20 w-20 bg-primary-50 rounded-[2rem] flex items-center justify-center mb-6">
-                                    <Building2 size={40} className="text-primary-600" />
-                                </div>
-                                <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-2">No Selection</h3>
-                                <p className="text-gray-500 font-medium max-w-sm">Select a tenant from the explorer to manage its organizational structure and users.</p>
+                {/* Right Panel: Content (8 cols) */}
+                <div className="lg:col-span-8 space-y-6">
+                    {!selectedTenant ? (
+                        <div className="bg-white dark:bg-[#0c0e17] rounded-3xl border border-slate-200/80 dark:border-white/10 p-16 flex flex-col items-center justify-center text-center shadow-xs">
+                            <div className="w-16 h-16 bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-3xl border border-teal-100 dark:border-teal-500/20 flex items-center justify-center mb-4 shadow-sm">
+                                <Building2 size={32} />
                             </div>
-                        ) : usersLoading ? (
-                            <div className="h-full flex flex-col items-center justify-center bg-white rounded-[2.5rem] shadow-sm ring-1 ring-gray-100">
-                                <RefreshCw className="h-8 w-8 text-primary-600 animate-spin mb-4" />
-                                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Synchronizing Access...</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-8 pb-12">
-                                {/* Tenant Banner */}
-                                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm ring-1 ring-gray-200 relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                                        <Building2 size={120} />
-                                    </div>
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-                                        <div className="flex-1">
-                                            <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight font-display mb-1.5">Select a Tenant</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm font-sans">
+                                Select an organization from the directory on the left to inspect its credentials, audit sessions, adjust wallet float, or impersonate administrators.
+                            </p>
+                        </div>
+                    ) : usersLoading ? (
+                        <div className="bg-white dark:bg-[#0c0e17] rounded-3xl border border-slate-200/80 dark:border-white/10 p-16 flex flex-col items-center justify-center shadow-xs">
+                            <RefreshCw className="h-7 w-7 text-teal-600 animate-spin mb-3" />
+                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[11px] font-mono">Synchronizing Access...</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {/* Tenant Hero Banner */}
+                            <div className="bg-white dark:bg-[#0c0e17] p-6 rounded-3xl border border-slate-200/80 dark:border-white/10 shadow-xs relative overflow-hidden group">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2.5 flex-wrap">
+                                            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight font-display">
                                                 {selectedTenant === 'null' ? 'Platform Authority' : (tenants.find(t => t.id === selectedTenant)?.name || 'Tenant')}
                                             </h2>
-                                            <p className="text-sm text-gray-500 font-medium mt-1">
-                                                {selectedTenant === 'null' ? 'Managing global security and system-wide privileges.' : `Direct oversight of organization and associated staff accounts.`}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-3">
                                             {selectedTenant !== 'null' && (
-                                                <button
-                                                    onClick={() => setShowWalletModal(true)}
-                                                    className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-5 py-3 rounded-2xl font-black text-sm shadow-sm ring-1 ring-emerald-600/10 hover:bg-emerald-100 transition-all active:scale-95"
-                                                >
-                                                    <Wallet size={18} />
-                                                    Wallet Update
-                                                </button>
-                                            )}
-                                            {selectedTenant !== 'null' && (
-                                                <button
-                                                    onClick={() => handleDeleteTenant(selectedTenant)}
-                                                    className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-all active:scale-95"
-                                                    title="Destroy Tenant"
-                                                >
-                                                    <Trash2 size={20} />
-                                                </button>
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase tracking-wider bg-slate-100 dark:bg-white/[0.04] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10">
+                                                    {tenants.find(t => t.id === selectedTenant)?.customerCode || selectedTenant}
+                                                </span>
                                             )}
                                         </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1 font-sans">
+                                            {selectedTenant === 'null' ? 'Managing global security, super admin credentials, and system-wide privileges.' : `Direct oversight of organization, administrators, and associated staff accounts.`}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {selectedTenant !== 'null' && (
+                                            <button
+                                                onClick={() => setShowWalletModal(true)}
+                                                className="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20 px-3.5 py-2 rounded-xl font-bold text-xs shadow-xs hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all active:scale-95 cursor-pointer"
+                                            >
+                                                <Wallet size={15} />
+                                                Wallet Adjust
+                                            </button>
+                                        )}
+                                        {selectedTenant !== 'null' && (
+                                            <button
+                                                onClick={() => handleDeleteTenant(selectedTenant)}
+                                                className="p-2 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20 rounded-xl hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all active:scale-95 cursor-pointer"
+                                                title="Delete Tenant"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-
-                                {/* Grouped User Cards */}
-                                <div className="space-y-8">
-                                    {/* Admins Group */}
-                                    {admins.length > 0 && (
-                                        <section className="space-y-4">
-                                            <div className="flex items-center gap-3 px-2">
-                                                <Shield size={18} className="text-primary-600" />
-                                                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Administrators ({admins.length})</h3>
-                                            </div>
-                                            <div className="grid grid-cols-1 gap-4">
-                                                {admins.map(admin => (
-                                                    <AdminCard
-                                                        key={admin.id}
-                                                        admin={admin}
-                                                        supportUsers={supportUsers.filter(s => s.adminId === admin.id)}
-                                                        expanded={expandedAdmin === admin.id}
-                                                        onToggle={() => setExpandedAdmin(expandedAdmin === admin.id ? null : admin.id)}
-                                                        onSuspend={handleSuspendUser}
-                                                        onImpersonate={handleImpersonate}
-                                                        onViewActivity={() => setSelectedUserForActivity(admin)}
-                                                        onDelete={handleDeleteUser}
-                                                        onResetPassword={handleResetPassword}
-                                                    />
-                                                ))}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {/* Support/Sales Group */}
-                                    {supportUsers.filter(u => !u.adminId).length > 0 && (
-                                        <section className="space-y-4">
-                                            <div className="flex items-center gap-3 px-2 pt-4">
-                                                <Users size={18} className="text-gray-400" />
-                                                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Staff & Support ({supportUsers.filter(u => !u.adminId).length})</h3>
-                                            </div>
-                                            <div className="grid grid-cols-1 gap-4">
-                                                {supportUsers.filter(u => !u.adminId).map(staff => (
-                                                    <UserCard
-                                                        key={staff.id}
-                                                        user={staff}
-                                                        onSuspend={handleSuspendUser}
-                                                        onViewActivity={() => setSelectedUserForActivity(staff)}
-                                                        onDelete={handleDeleteUser}
-                                                        onResetPassword={handleResetPassword}
-                                                    />
-                                                ))}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {users.length === 0 && !usersLoading && (
-                                         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] shadow-sm ring-1 ring-gray-100 text-center">
-                                            <Users size={40} className="text-gray-300 mb-4" />
-                                            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No users found for this tenant</p>
-                                         </div>
-                                    )}
-                                </div>
                             </div>
-                        )}
-                    </div>
+
+                            {/* Grouped User Cards */}
+                            <div className="space-y-6">
+                                {/* Admins Group */}
+                                {admins.length > 0 && (
+                                    <section className="space-y-3">
+                                        <div className="flex items-center gap-2 px-1">
+                                            <Shield size={16} className="text-teal-600 dark:text-teal-400" />
+                                            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono">
+                                                Administrators ({admins.length})
+                                            </h3>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-3.5">
+                                            {admins.map(admin => (
+                                                <AdminCard
+                                                    key={admin.id}
+                                                    admin={admin}
+                                                    supportUsers={supportUsers.filter(s => s.adminId === admin.id)}
+                                                    expanded={expandedAdmin === admin.id}
+                                                    onToggle={() => setExpandedAdmin(expandedAdmin === admin.id ? null : admin.id)}
+                                                    onSuspend={handleSuspendUser}
+                                                    onImpersonate={handleImpersonate}
+                                                    onViewActivity={() => setSelectedUserForActivity(admin)}
+                                                    onDelete={handleDeleteUser}
+                                                    onResetPassword={handleResetPassword}
+                                                />
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* Support/Staff Group */}
+                                {supportUsers.filter(u => !u.adminId).length > 0 && (
+                                    <section className="space-y-3">
+                                        <div className="flex items-center gap-2 px-1 pt-2">
+                                            <Users size={16} className="text-slate-400" />
+                                            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono">
+                                                Staff & Support ({supportUsers.filter(u => !u.adminId).length})
+                                            </h3>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {supportUsers.filter(u => !u.adminId).map(staff => (
+                                                <UserCard
+                                                    key={staff.id}
+                                                    user={staff}
+                                                    onSuspend={handleSuspendUser}
+                                                    onViewActivity={() => setSelectedUserForActivity(staff)}
+                                                    onDelete={handleDeleteUser}
+                                                    onResetPassword={handleResetPassword}
+                                                />
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {users.length === 0 && !usersLoading && (
+                                    <div className="flex flex-col items-center justify-center py-16 bg-white dark:bg-[#0c0e17] rounded-3xl border border-slate-200/80 dark:border-white/10 text-center shadow-xs">
+                                        <Users size={36} className="text-slate-300 dark:text-slate-600 mb-3" />
+                                        <p className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs font-mono">No users provisioned for this tenant</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -378,59 +447,67 @@ const SuperAdminUsers = () => {
                 />
             )}
 
+            {/* Redesigned Wallet Update Modal */}
             {showWalletModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowWalletModal(false)}></div>
-                    <div className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-10">
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="bg-emerald-50 p-3 rounded-2xl">
-                                    <Wallet className="text-emerald-600 h-6 w-6" />
+                    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity" onClick={() => setShowWalletModal(false)} />
+                    <div className="relative bg-white dark:bg-[#0c0e17] rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200/80 dark:border-white/10 ring-1 ring-black/5 animate-in zoom-in-95 duration-200">
+                        <div className="p-7">
+                            <div className="flex items-center gap-3.5 mb-6 pb-4 border-b border-slate-100 dark:border-white/5">
+                                <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 p-3 rounded-2xl border border-emerald-100 dark:border-emerald-500/20 shadow-xs">
+                                    <Wallet className="h-6 w-6" />
                                 </div>
-                                <h3 className="text-2xl font-black text-gray-900 tracking-tight">Wallet Update</h3>
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight font-display">Wallet Adjustment</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-sans">Credit or debit tenant operational float</p>
+                                </div>
                             </div>
-                            <form onSubmit={handleWalletUpdate} className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Amount (USD)</label>
-                                    <input
-                                        type="number" step="0.01"
-                                        value={walletForm.amount}
-                                        onChange={e => setWalletForm({ ...walletForm, amount: e.target.value })}
-                                        required
-                                        className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-emerald-500 font-black text-xl"
-                                        placeholder="0.00"
-                                    />
+                            <form onSubmit={handleWalletUpdate} className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-1.5 font-mono">Amount (USD)</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-sm">$</span>
+                                        <input
+                                            type="number" step="0.01"
+                                            value={walletForm.amount}
+                                            onChange={e => setWalletForm({ ...walletForm, amount: e.target.value })}
+                                            required
+                                            className="w-full pl-8 pr-4 py-3 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-emerald-500 font-mono font-black text-lg text-slate-900 dark:text-white"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Transaction Type</label>
+                                <div>
+                                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-1.5 font-mono">Transaction Type</label>
                                     <select
-                                        className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-emerald-500 font-bold"
+                                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-emerald-500 font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer"
                                         value={walletForm.type}
                                         onChange={e => setWalletForm({ ...walletForm, type: e.target.value })}
                                     >
-                                        <option value="CREDIT">Credit (Add Balance)</option>
-                                        <option value="DEBIT">Debit (Deduct Balance)</option>
+                                        <option value="CREDIT">Credit (Deposit to Account)</option>
+                                        <option value="DEBIT">Debit (Charge Account)</option>
                                     </select>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Memo</label>
+                                <div>
+                                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-1.5 font-mono">Internal Audit Memo</label>
                                     <input
-                                        className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-emerald-500 font-bold"
+                                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-emerald-500 font-medium text-xs sm:text-sm text-slate-900 dark:text-white"
                                         value={walletForm.description}
                                         onChange={e => setWalletForm({ ...walletForm, description: e.target.value })}
+                                        placeholder="e.g. Manual float seed, promo credit"
                                     />
                                 </div>
-                                <div className="flex gap-3 pt-4">
+                                <div className="flex gap-2.5 pt-3">
                                     <button
                                         type="button"
                                         onClick={() => setShowWalletModal(false)}
-                                        className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-sm active:scale-95 transition-all"
+                                        className="flex-1 py-2.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs transition-all cursor-pointer"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-emerald-600/20 active:scale-95 transition-all"
+                                        className="flex-[2] py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-600/25 active:scale-95 transition-all cursor-pointer"
                                     >
                                         Update Balance
                                     </button>
@@ -448,101 +525,132 @@ const SuperAdminUsers = () => {
 const AdminCard = ({ admin, supportUsers, expanded, onToggle, onSuspend, onImpersonate, onViewActivity, onDelete, onResetPassword }) => {
     return (
         <div className={clsx(
-            "bg-white rounded-3xl shadow-sm ring-1 transition-all duration-300 overflow-hidden",
-            expanded ? "ring-primary-600 shadow-xl shadow-primary-600/5 card-active" : "ring-gray-200 hover:ring-primary-300 card-hover"
+            "rounded-3xl border transition-all duration-200 overflow-hidden shadow-xs",
+            expanded 
+                ? "bg-white dark:bg-[#0c0e17] border-teal-500/60 dark:border-teal-500/50 ring-2 ring-teal-500/15" 
+                : "bg-white dark:bg-[#0c0e17] border-slate-200/80 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
         )}>
+            {/* Admin Header Row */}
             <div 
                 className={clsx(
-                    "flex flex-col md:flex-row items-start md:items-center justify-between p-6 cursor-pointer gap-4",
-                    expanded ? "bg-primary-50/30" : "hover:bg-gray-50/50"
+                    "flex flex-col sm:flex-row sm:items-center justify-between p-5 cursor-pointer gap-4 transition-colors select-none",
+                    expanded ? "bg-teal-50/40 dark:bg-teal-950/20" : "hover:bg-slate-50/60 dark:hover:bg-white/[0.02]"
                 )}
                 onClick={onToggle}
             >
-                <div className="flex items-center gap-5 w-full">
-                    <div className="h-14 w-14 flex-shrink-0 bg-primary-100 rounded-2xl flex items-center justify-center font-black text-primary-700 text-lg shadow-sm ring-1 ring-primary-200">
-                        {admin.name ? admin.name.substring(0, 2).toUpperCase() : <ShieldCheck size={24} />}
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-200/80 dark:border-teal-500/20 flex items-center justify-center font-display font-black text-sm shrink-0 shadow-xs">
+                        {admin.name ? admin.name.substring(0, 2).toUpperCase() : <Shield size={18} />}
                     </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-lg font-black text-gray-900 truncate">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white font-display truncate">
                                 {admin.name || admin.email}
                             </span>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-primary-100 text-primary-700 text-[10px] font-black uppercase tracking-widest shadow-sm">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider font-mono bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/20">
                                 {admin.role}
                             </span>
+                            <StatusBadge status={admin.status} />
                         </div>
-                        <div className="flex items-center gap-4 mt-1">
-                            <span className="text-sm font-medium text-gray-400 flex items-center gap-1.5">
-                                <Mail size={14} /> {admin.email}
+                        <div className="flex items-center gap-3 flex-wrap text-xs text-slate-500 dark:text-slate-400 font-sans">
+                            <span className="flex items-center gap-1.5 truncate">
+                                <Mail size={13} className="text-slate-400 shrink-0" />
+                                {admin.email}
                             </span>
-                            <span className="text-sm font-bold text-primary-600 flex items-center gap-1.5">
-                                <Users size={14} /> {supportUsers.length} Staff
+                            <span className="inline-flex items-center gap-1 font-bold font-mono text-[11px] text-teal-600 dark:text-teal-400 bg-teal-50/60 dark:bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-100 dark:border-teal-500/20">
+                                <Users size={12} /> {supportUsers.length} Staff Accounts
                             </span>
                         </div>
                     </div>
-                    <ChevronRight size={24} className={clsx("text-gray-300 transition-transform hidden md:block", expanded && "rotate-90 text-primary-600")} />
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <span className="text-xs font-bold text-slate-400 dark:text-slate-500 hidden sm:inline font-mono">
+                        {expanded ? 'Hide Details' : 'Manage'}
+                    </span>
+                    <div className={clsx(
+                        "w-7 h-7 rounded-xl flex items-center justify-center transition-all bg-slate-100 dark:bg-white/[0.04] text-slate-400",
+                        expanded && "rotate-90 bg-teal-600 text-white dark:bg-teal-500"
+                    )}>
+                        <ChevronRight size={15} />
+                    </div>
                 </div>
             </div>
 
+            {/* Quick Action Pill Bar */}
             <div className={clsx(
-                "px-6 py-4 border-t border-gray-100 flex flex-wrap gap-2 transition-all",
-                expanded ? "bg-white" : "bg-gray-50/30"
+                "px-5 py-3 border-t border-slate-100 dark:border-white/5 flex flex-wrap items-center gap-2",
+                expanded ? "bg-white dark:bg-[#0c0e17]" : "bg-slate-50/50 dark:bg-white/[0.01]"
             )}>
                 <button
                     onClick={(e) => { e.stopPropagation(); onImpersonate(admin.id); }}
-                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-xs font-black text-white shadow-lg shadow-primary-600/10 hover:bg-primary-700 transition-all active:scale-95"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
                 >
-                    <Eye size={14} /> Impersonate
+                    <Eye size={13} /> Impersonate
                 </button>
                 <button
                     onClick={(e) => { e.stopPropagation(); onSuspend(admin.id, admin.status); }}
                     className={clsx(
-                        "flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-black ring-1 transition-all active:scale-95",
-                        admin.status === 'ACTIVE' ? "bg-white text-amber-600 ring-amber-200 hover:bg-amber-50" : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                        "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all active:scale-95 cursor-pointer",
+                        admin.status === 'ACTIVE' 
+                            ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20 hover:bg-amber-100" 
+                            : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20 hover:bg-emerald-100"
                     )}
                 >
-                    {admin.status === 'ACTIVE' ? <Ban size={14} /> : <CheckCircle size={14} />}
+                    {admin.status === 'ACTIVE' ? <Ban size={13} /> : <CheckCircle size={13} />}
                     {admin.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
                 </button>
                 <button
                     onClick={(e) => { e.stopPropagation(); onResetPassword(admin.id, admin.email); }}
-                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-black text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 transition-all active:scale-95"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-[#121420] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
                 >
-                    <Key size={14} /> Reset
+                    <Key size={13} /> Reset
                 </button>
                 <button
                     onClick={(e) => { e.stopPropagation(); onViewActivity(); }}
-                    className="p-2 bg-white text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl ring-1 ring-gray-200 transition-all active:scale-95"
-                    title="Audit Activity"
+                    className="p-1.5 bg-white dark:bg-[#121420] text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 border border-slate-200 dark:border-white/10 rounded-xl transition-all active:scale-95 cursor-pointer shadow-2xs"
+                    title="Audit Activity Logs"
                 >
-                    <RefreshCw size={16} />
+                    <RefreshCw size={14} />
                 </button>
-                <div className="flex-grow"></div>
+                <div className="flex-grow" />
                 <button
                     onClick={(e) => { e.stopPropagation(); onDelete(admin.id); }}
                     disabled={admin.role === 'SUPER_ADMIN'}
-                    className="p-2 bg-white text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl ring-1 ring-gray-200 transition-all active:scale-95 disabled:opacity-20"
-                    title="Destroy User"
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 border border-transparent hover:border-rose-200 rounded-xl transition-all active:scale-95 disabled:opacity-20 cursor-pointer"
+                    title="Delete User Permanently"
                 >
-                    <Trash2 size={16} />
+                    <Trash2 size={15} />
                 </button>
             </div>
 
-            {expanded && supportUsers.length > 0 && (
-                <div className="p-6 border-t border-primary-50 bg-white space-y-4">
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Managed Staff</h4>
-                    <div className="grid grid-cols-1 gap-3">
-                        {supportUsers.map(support => (
-                            <UserCard
-                                key={support.id}
-                                user={support}
-                                onSuspend={onSuspend}
-                                onViewActivity={onViewActivity}
-                                onDelete={onDelete}
-                                onResetPassword={onResetPassword}
-                            />
-                        ))}
+            {/* Managed Staff Accordion */}
+            {expanded && (
+                <div className="p-5 border-t border-slate-100 dark:border-white/5 bg-slate-50/70 dark:bg-[#07090f] space-y-3">
+                    <div className="flex items-center justify-between pb-1">
+                        <h4 className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono">
+                            Managed Staff Team Members ({supportUsers.length})
+                        </h4>
+                        <span className="text-[11px] text-slate-400">Directly reports to this administrator</span>
                     </div>
+                    {supportUsers.length === 0 ? (
+                        <div className="p-6 text-center rounded-2xl border border-dashed border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/[0.01]">
+                            <p className="text-xs text-slate-400 font-medium italic">No staff or operator accounts currently report to this administrator.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-2.5">
+                            {supportUsers.map(support => (
+                                <UserCard
+                                    key={support.id}
+                                    user={support}
+                                    onSuspend={onSuspend}
+                                    onViewActivity={onViewActivity}
+                                    onDelete={onDelete}
+                                    onResetPassword={onResetPassword}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -551,41 +659,58 @@ const AdminCard = ({ admin, supportUsers, expanded, onToggle, onSuspend, onImper
 
 const UserCard = ({ user, onSuspend, onViewActivity, onDelete, onResetPassword }) => {
     return (
-        <div className="bg-gray-50/50 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 ring-1 ring-gray-100 group transition-all hover:bg-white hover:ring-primary-200 hover:shadow-sm">
-            <div className="flex items-center gap-4 w-full">
-                <div className="h-10 w-10 flex-shrink-0 bg-white rounded-xl flex items-center justify-center font-black text-gray-500 text-xs shadow-sm ring-1 ring-gray-100 group-hover:bg-primary-600 group-hover:text-white transition-all">
+        <div className="bg-white dark:bg-[#0c0e17] rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-slate-200/70 dark:border-white/5 shadow-2xs group hover:border-teal-500/30 transition-all">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-white/10 flex items-center justify-center font-display font-black text-xs shrink-0 group-hover:bg-teal-600 group-hover:text-white transition-all shadow-xs">
                     {user.name ? user.name.substring(0, 2).toUpperCase() : user.email.substring(0, 2).toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-900 truncate">{user.name || user.email}</p>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-tight">{user.role}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <StatusBadge status={user.status} />
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate font-display">
+                            {user.name || user.email}
+                        </p>
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[9px] font-extrabold uppercase tracking-wider font-mono bg-slate-100 dark:bg-white/[0.04] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10">
+                            {user.role}
+                        </span>
+                        <StatusBadge status={user.status} />
+                    </div>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate font-sans">{user.email}</p>
                 </div>
             </div>
             
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 border-gray-100 pt-3 sm:pt-0">
+            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
                 <button
                     onClick={() => onSuspend(user.id, user.status)}
                     className={clsx(
-                        "p-2 rounded-xl transition-all",
-                        user.status === 'ACTIVE' ? "text-gray-400 hover:text-amber-600 hover:bg-amber-50" : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+                        "p-1.5 rounded-lg border transition-all cursor-pointer",
+                        user.status === 'ACTIVE' 
+                            ? "border-transparent text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10" 
+                            : "border-emerald-200 dark:border-emerald-500/20 text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10"
                     )}
+                    title={user.status === 'ACTIVE' ? 'Suspend Account' : 'Activate Account'}
                 >
-                    {user.status === 'ACTIVE' ? <Ban size={16} /> : <CheckCircle size={16} />}
+                    {user.status === 'ACTIVE' ? <Ban size={14} /> : <CheckCircle size={14} />}
                 </button>
                 <button
                     onClick={() => onResetPassword(user.id, user.email)}
-                    className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
+                    className="p-1.5 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-500/10 rounded-lg transition-all cursor-pointer"
+                    title="Reset Password"
                 >
-                    <Key size={16} />
+                    <Key size={14} />
+                </button>
+                <button
+                    onClick={() => onViewActivity()}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                    title="Audit Activity"
+                >
+                    <RefreshCw size={14} />
                 </button>
                 <button
                     onClick={() => onDelete(user.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer"
+                    title="Delete Account"
                 >
-                    <Trash2 size={16} />
+                    <Trash2 size={14} />
                 </button>
             </div>
         </div>
@@ -593,13 +718,17 @@ const UserCard = ({ user, onSuspend, onViewActivity, onDelete, onResetPassword }
 };
 
 const StatusBadge = ({ status }) => {
-    const styles = {
-        ACTIVE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/10',
-        INVITED: 'bg-blue-50 text-blue-700 ring-blue-600/10',
-        SUSPENDED: 'bg-red-50 text-red-700 ring-red-600/10'
-    };
+    const isAct = status === 'ACTIVE';
+    const isInv = status === 'INVITED';
     return (
-        <span className={clsx("inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ring-1", styles[status] || 'bg-gray-50 text-gray-600 ring-gray-200')}>
+        <span className={clsx(
+            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider font-mono border",
+            isAct 
+                ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20" 
+                : isInv 
+                    ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20" 
+                    : "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/20"
+        )}>
             {status}
         </span>
     );

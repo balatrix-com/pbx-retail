@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, Search, ShieldAlert } from 'lucide-react';
+import { Loader2, Plus, Search, ShieldAlert, Users, Layers, Zap, Clock, RefreshCw } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
+import Pagination from '../../../components/common/Pagination';
+import CreativeStatCard from '../../../components/common/CreativeStatCard';
+import { clsx } from 'clsx';
 
 function RingGroupsPage() {
     const navigate = useNavigate();
@@ -11,6 +14,8 @@ function RingGroupsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(10);
 
     const ringGroupLimit = user?.tenant?.tenantFeatures?.ringGroupLimit ?? 10;
     const isLimitReached = ringGroups.length >= ringGroupLimit;
@@ -23,7 +28,6 @@ function RingGroupsPage() {
         try {
             setLoading(true);
             const response = await api.get('/telecom/ring-groups');
-            console.log('Ring Groups response:', response.data);
             setRingGroups(Array.isArray(response.data) ? response.data : []);
             setError(null);
         } catch (err) {
@@ -52,6 +56,8 @@ function RingGroupsPage() {
         rg.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const paginatedRingGroups = filteredRingGroups.slice((page - 1) * limit, page * limit);
+
     const getStrategyBadge = (strategy) => {
         const badges = {
             simultaneous: { label: 'Simultaneous', class: 'bg-green-50 text-green-700 ring-1 ring-inset ring-green-200/50' },
@@ -70,114 +76,172 @@ function RingGroupsPage() {
     }
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto pb-12 px-4 sm:px-0">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">Ring Groups</h1>
-                    <p className="text-gray-500 mt-1.5 font-medium text-sm md:text-base">Group extensions together for simultaneous or tiered routing.</p>
+        <div className="w-full pb-16 space-y-7 animate-in fade-in duration-300 max-w-7xl mx-auto">
+            {/* Header Banner */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 p-8 text-white shadow-xl shadow-teal-900/15">
+                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                    <div className="space-y-1.5 max-w-2xl">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold tracking-wide border border-white/20">
+                            <Users size={14} className="text-teal-200 animate-pulse" />
+                            <span>Hunt Groups & Distribution</span>
+                        </div>
+                        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                            Ring Groups
+                        </h1>
+                        <p className="text-teal-100 text-xs sm:text-sm font-medium">
+                            Group extensions together for simultaneous, sequential, or tiered hunt routing strategies.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button
+                            onClick={fetchRingGroups}
+                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-2xl bg-white/15 hover:bg-white/25 text-white backdrop-blur-md border border-white/20 transition-all active:scale-95 cursor-pointer"
+                        >
+                            <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
+                            <span>Refresh</span>
+                        </button>
+                        <button
+                            disabled={isLimitReached}
+                            onClick={() => !isLimitReached && navigate('/telecom/ring-groups/new')}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white hover:bg-teal-50 px-5 py-2.5 text-xs font-bold text-teal-800 shadow-lg shadow-black/10 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                        >
+                            <Plus size={16} className="text-teal-700" />
+                            <span>Create Ring Group</span>
+                        </button>
+                    </div>
                 </div>
-                <button
-                    disabled={isLimitReached}
-                    onClick={() => !isLimitReached && navigate('/telecom/ring-groups/new')}
-                    className={`inline-flex justify-center items-center rounded-xl px-5 py-2.5 text-sm font-bold shadow-sm transition-all focus:outline-none w-full sm:w-auto ${
-                        isLimitReached
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-                            : 'bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98]'
-                    }`}
-                >
-                    <Plus className="h-5 w-5 mr-1" /> Create Ring Group
-                </button>
             </div>
 
-            {isLimitReached && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 font-medium shadow-sm flex items-center gap-2">
-                    <ShieldAlert className="h-5.5 w-5.5 text-amber-500 shrink-0" />
-                    <span>You have reached your limit of {ringGroupLimit} Ring Groups. Please contact your super administrator to upgrade your plan.</span>
-                </div>
-            )}
-
-            {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 font-medium">
-                    {error}
-                </div>
-            )}
-
-            <div className="relative w-full sm:max-w-md">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                    type="text"
-                    placeholder="Search ring groups..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="block w-full rounded-xl border-0 py-2.5 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 font-medium bg-white"
+            {/* Quick KPI Stat Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <CreativeStatCard
+                    title="Total Groups"
+                    value={ringGroups.length}
+                    subtitle="Active groups"
+                    icon={Users}
+                    color="blue"
+                    trend="+12%"
+                    trendUp={true}
+                />
+                <CreativeStatCard
+                    title="Simultaneous"
+                    value={ringGroups.filter(r => r.strategy === 'simultaneous').length}
+                    subtitle="Blast ring"
+                    icon={Zap}
+                    color="emerald"
+                    trend="+8%"
+                    trendUp={true}
+                />
+                <CreativeStatCard
+                    title="Sequential"
+                    value={ringGroups.filter(r => r.strategy === 'sequential' || r.strategy === 'cascade').length}
+                    subtitle="Tiered hunting"
+                    icon={Layers}
+                    color="purple"
+                    trend="+5%"
+                    trendUp={true}
+                />
+                <CreativeStatCard
+                    title="Plan Limit"
+                    value={ringGroupLimit}
+                    subtitle="Maximum allowed"
+                    icon={ShieldAlert}
+                    color="amber"
+                    trend={isLimitReached ? "Cap reached" : "Available"}
+                    trendUp={!isLimitReached}
                 />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredRingGroups.length === 0 ? (
-                    <div className="col-span-full py-12 text-center">
-                        <p className="text-gray-500 font-medium">
-                            {searchTerm ? 'No matching ring groups found.' : 'No ring groups yet. Create your first one!'}
-                        </p>
+            {/* Unified search bar */}
+            <div className="bg-white dark:bg-[#0c0d12] p-3 rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-xs">
+                <div className="relative max-w-md">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
+                    <input
+                        type="text"
+                        placeholder="Search ring groups..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-gray-50/80 dark:bg-white/[0.03] border border-gray-200/80 dark:border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all font-medium"
+                    />
+                </div>
+            </div>
+
+            {filteredRingGroups.length === 0 ? (
+                <div className="text-center py-16 bg-white dark:bg-[#0c0d12] rounded-2xl border border-dashed border-gray-200 dark:border-white/10 shadow-xs">
+                    <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl w-14 h-14 mx-auto mb-3 flex items-center justify-center">
+                        <Users className="h-7 w-7 text-gray-400 dark:text-gray-500" />
                     </div>
-                ) : (
-                    filteredRingGroups.map((rg) => {
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white">No ring groups found</h3>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium text-sm">
+                        {searchTerm ? 'Try adjusting your search terms' : 'Create your first ring group to get started'}
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {paginatedRingGroups.map((rg) => {
                         const strategyBadge = getStrategyBadge(rg.strategy);
                         return (
-                            <div key={rg.id} className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 flex flex-col overflow-hidden hover:shadow-md transition-shadow">
-                                <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex justify-between items-start">
-                                    <h3 className="text-lg font-extrabold text-gray-900 tracking-tight leading-tight">{rg.name}</h3>
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm ml-2 shrink-0 ${strategyBadge.class}`}>
-                                        {strategyBadge.label}
-                                    </span>
-                                </div>
-
-                                <div className="p-6 flex-1 flex flex-col space-y-4">
-                                    <div className="flex justify-between items-center border-b border-gray-50 pb-3">
-                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Members</span>
-                                        <span className="text-sm font-bold text-gray-900">{rg.members?.length || 0}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center border-b border-gray-50 pb-3">
-                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Ring Timeout</span>
-                                        <span className="text-sm font-bold text-gray-900">{rg.ringTimeout}s</span>
-                                    </div>
-                                    {rg.noAnswerAction && (
-                                        <div className="flex justify-between items-center border-b border-gray-50 pb-3">
-                                            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">No Answer</span>
-                                            <span className="text-sm font-bold text-gray-900 capitalize">{rg.noAnswerAction}</span>
-                                        </div>
-                                    )}
-
-                                    {rg.members && rg.members.length > 0 && (
-                                        <div className="pt-2">
-                                            <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Extensions</div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {rg.members.slice(0, 3).map((member) => (
-                                                    <span key={member.id} className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-bold text-primary-700 bg-primary-50 ring-1 ring-inset ring-primary-100/50 shadow-sm font-mono">
-                                                        {member.extension.extensionNumber}
-                                                    </span>
-                                                ))}
-                                                {rg.members.length > 3 && (
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold text-gray-500 bg-gray-50 ring-1 ring-inset ring-gray-200/50 shadow-sm">
-                                                        +{rg.members.length - 3} more
-                                                    </span>
-                                                )}
+                            <div key={rg.id} className="platform-panel-dark rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-xs overflow-hidden hover:border-teal-500/30 transition-all flex flex-col justify-between group">
+                                <div>
+                                    <div className="bg-gray-50/50 dark:bg-white/[0.02] px-5 py-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="h-8 w-8 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+                                                <Users size={16} />
                                             </div>
+                                            <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">{rg.name}</h3>
                                         </div>
-                                    )}
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${strategyBadge.class}`}>
+                                            {strategyBadge.label}
+                                        </span>
+                                    </div>
+
+                                    <div className="p-5 flex-1 space-y-3">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="font-semibold text-gray-500 dark:text-gray-400">Total Members:</span>
+                                            <span className="font-bold text-gray-900 dark:text-white">{rg.members?.length || 0} agents</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="font-semibold text-gray-500 dark:text-gray-400">Ring Timeout:</span>
+                                            <span className="font-bold text-gray-900 dark:text-white font-mono">{rg.ringTimeout}s</span>
+                                        </div>
+                                        {rg.noAnswerAction && (
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="font-semibold text-gray-500 dark:text-gray-400">No Answer Fallback:</span>
+                                                <span className="font-semibold text-gray-700 dark:text-gray-300 capitalize">{rg.noAnswerAction}</span>
+                                            </div>
+                                        )}
+
+                                        {rg.members && rg.members.length > 0 && (
+                                            <div className="pt-2 border-t border-gray-100 dark:border-white/5">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Extensions</span>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {rg.members.slice(0, 4).map((member) => (
+                                                        <span key={member.id} className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold text-primary-700 bg-primary-50 dark:bg-primary-950/40 dark:text-primary-400 ring-1 ring-inset ring-primary-100/50 dark:ring-primary-800/40 font-mono">
+                                                            {member.extension?.extensionNumber}
+                                                        </span>
+                                                    ))}
+                                                    {rg.members.length > 4 && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold text-gray-500 bg-gray-50 dark:bg-white/5">
+                                                            +{rg.members.length - 4} more
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
-                                <div className="px-6 py-4 bg-gray-50 flex border-t border-gray-100 gap-3">
+                                <div className="px-5 py-3 bg-gray-50/50 dark:bg-white/[0.02] border-t border-gray-100 dark:border-white/5 flex gap-2">
                                     <button
-                                        className="flex-1 rounded-xl bg-white px-3 py-2 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors"
+                                        className="flex-1 inline-flex justify-center items-center gap-1.5 rounded-xl bg-white dark:bg-[#181924] px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 shadow-xs border border-gray-200/80 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
                                         onClick={() => navigate(`/telecom/ring-groups/${rg.id}/edit`)}
                                     >
                                         Edit
                                     </button>
                                     <button
-                                        className="flex-1 rounded-xl bg-white px-3 py-2 text-sm font-bold text-red-600 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-red-50 hover:ring-red-200 hover:text-red-700 transition-colors"
+                                        className="flex-1 inline-flex justify-center items-center gap-1.5 rounded-xl bg-white dark:bg-[#181924] px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400 shadow-xs border border-gray-200/80 dark:border-white/10 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
                                         onClick={() => handleDelete(rg.id, rg.name)}
                                     >
                                         Delete
@@ -185,8 +249,20 @@ function RingGroupsPage() {
                                 </div>
                             </div>
                         );
-                    })
-                )}
+                    })}
+                </div>
+            )}
+
+            {/* Pagination */}
+            <div className="bg-white dark:bg-[#0c0d12] rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-xs overflow-hidden">
+                <Pagination
+                    page={page}
+                    limit={limit}
+                    total={filteredRingGroups.length}
+                    onPageChange={setPage}
+                    onLimitChange={(l) => { setLimit(l); setPage(1); }}
+                    itemName="ring groups"
+                />
             </div>
         </div>
     );

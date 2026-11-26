@@ -71,43 +71,46 @@ const CreatePlanPage = () => {
     };
 
     return (
-        <div className="p-4 sm:p-8 max-w-4xl mx-auto space-y-8">
-
+        <div className="w-full pb-12 space-y-6">
             {/* Header */}
             <div className="flex items-center gap-4">
                 <button
                     onClick={() => navigate('/subscriptions')}
-                    className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all"
+                    className="h-11 w-11 rounded-2xl bg-white dark:bg-[#12131a] border border-gray-200/80 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 flex items-center justify-center transition-all shadow-xs active:scale-95 cursor-pointer"
+                    title="Back to Subscriptions"
                 >
                     <ArrowLeft size={18} />
                 </button>
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white flex items-center gap-2.5">
-                        <Plus className="h-7 w-7 text-primary-600" />
-                        Create New Subscription Plan
-                    </h1>
-                    <p className="text-gray-500 dark:text-slate-400 mt-1 font-medium text-sm">
-                        Configure pricing, resource limits, and rate card mappings for a new billing plan
-                    </p>
+                <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 shadow-xs">
+                        <Plus className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                            Create New Subscription Plan
+                        </h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                            Configure pricing tiers, included quota limits, and renewal duration for customer catalogs.
+                        </p>
+                    </div>
                 </div>
             </div>
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
-
                 {/* Section 1: Basic Plan Information */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-gray-200/80 dark:border-slate-800 space-y-5">
-                    <div className="flex items-center gap-2 pb-3 border-b border-gray-100 dark:border-slate-800">
-                        <ShieldCheck className="h-5 w-5 text-primary-600" />
+                <div className="platform-panel-dark rounded-2xl p-6 border border-gray-200/80 dark:border-white/10 shadow-xs space-y-5">
+                    <div className="flex items-center gap-2 pb-3 border-b border-gray-100 dark:border-white/5">
+                        <ShieldCheck className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                         <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                            Basic Information
+                            Basic Plan Identification
                         </h2>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {/* Plan Name */}
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
                                 Plan Name *
                             </label>
                             <input
@@ -117,14 +120,14 @@ const CreatePlanPage = () => {
                                 onChange={handleChange}
                                 placeholder="e.g. Starter Pro Plan"
                                 required
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-[#12131a] text-xs sm:text-sm font-semibold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                         </div>
 
                         {/* Plan Identifier */}
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5">
-                                Plan ID / Code (Unique)
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
+                                Plan Code / Identifier (Unique)
                             </label>
                             <input
                                 type="text"
@@ -132,9 +135,9 @@ const CreatePlanPage = () => {
                                 value={formData.plan_id}
                                 onChange={handleChange}
                                 placeholder="e.g. starter_pro_v1"
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-[#12131a] text-xs sm:text-sm font-mono font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
-                            <span className="text-[11px] text-gray-400 dark:text-slate-500 mt-1 block">
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 block">
                                 Auto-generated from name if left empty
                             </span>
                         </div>
@@ -142,8 +145,8 @@ const CreatePlanPage = () => {
                 </div>
 
                 {/* Section 2: Pricing & Validity */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-gray-200/80 dark:border-slate-800 space-y-5">
-                    <div className="flex items-center gap-2 pb-3 border-b border-gray-100 dark:border-slate-800">
+                <div className="platform-panel-dark rounded-2xl p-6 border border-gray-200/80 dark:border-white/10 shadow-xs space-y-5">
+                    <div className="flex items-center gap-2 pb-3 border-b border-gray-100 dark:border-white/5">
                         <DollarSign className="h-5 w-5 text-emerald-500" />
                         <h2 className="text-base font-bold text-gray-900 dark:text-white">
                             Pricing & Billing Validity
@@ -153,7 +156,7 @@ const CreatePlanPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
                         {/* Amount */}
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
                                 Recurring Price ($)
                             </label>
                             <input
@@ -164,13 +167,13 @@ const CreatePlanPage = () => {
                                 value={formData.amount}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-[#12131a] text-xs sm:text-sm font-mono font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                         </div>
 
                         {/* Setup Fees */}
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
                                 Setup Fees ($)
                             </label>
                             <input
@@ -180,34 +183,33 @@ const CreatePlanPage = () => {
                                 name="setup_fees"
                                 value={formData.setup_fees}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-[#12131a] text-xs sm:text-sm font-mono font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                         </div>
 
                         {/* Currency */}
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
                                 Currency
                             </label>
                             <select
                                 name="currency"
                                 value={formData.currency}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-[#12131a] text-xs sm:text-sm font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
                             >
                                 <option value="usd">USD ($)</option>
                                 <option value="eur">EUR (€)</option>
                                 <option value="gbp">GBP (£)</option>
                             </select>
                         </div>
-
                     </div>
                     <PlanValidityFields formData={formData} onChange={handleChange} />
                 </div>
 
                 {/* Section 3: Resource Limits & Allocation */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-gray-200/80 dark:border-slate-800 space-y-5">
-                    <div className="flex items-center gap-2 pb-3 border-b border-gray-100 dark:border-slate-800">
+                <div className="platform-panel-dark rounded-2xl p-6 border border-gray-200/80 dark:border-white/10 shadow-xs space-y-5">
+                    <div className="flex items-center gap-2 pb-3 border-b border-gray-100 dark:border-white/5">
                         <CreditCard className="h-5 w-5 text-indigo-500" />
                         <h2 className="text-base font-bold text-gray-900 dark:text-white">
                             Included Resources & Limits
@@ -217,7 +219,7 @@ const CreatePlanPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
                         {/* Extensions */}
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
                                 <Users className="h-3.5 w-3.5 text-indigo-500" />
                                 Included Extensions
                             </label>
@@ -227,15 +229,15 @@ const CreatePlanPage = () => {
                                 name="extensions"
                                 value={formData.extensions}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-[#12131a] text-xs sm:text-sm font-mono font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                         </div>
 
                         {/* Pooled Numbers */}
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
                                 <Phone className="h-3.5 w-3.5 text-emerald-500" />
-                                Numbers (TFN + DID pooled)
+                                Numbers (TFN + DID Pooled)
                             </label>
                             <input
                                 type="number"
@@ -243,13 +245,13 @@ const CreatePlanPage = () => {
                                 name="numbers"
                                 value={formData.numbers}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-[#12131a] text-xs sm:text-sm font-mono font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                         </div>
 
                         {/* Monitoring Seats */}
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
                                 <Activity className="h-3.5 w-3.5 text-amber-500" />
                                 Monitoring Extensions
                             </label>
@@ -259,18 +261,18 @@ const CreatePlanPage = () => {
                                 name="monitoring_extensions"
                                 value={formData.monitoring_extensions}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-[#12131a] text-xs sm:text-sm font-mono font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                         </div>
                     </div>
                 </div>
 
                 {/* Form Actions */}
-                <div className="flex items-center justify-end gap-4 pt-2">
+                <div className="flex items-center justify-end gap-3 pt-2">
                     <button
                         type="button"
                         onClick={() => navigate('/subscriptions')}
-                        className="rounded-xl bg-white dark:bg-slate-900 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all"
+                        className="rounded-xl bg-white dark:bg-[#12131a] px-4 py-2.5 text-xs font-bold text-gray-700 dark:text-gray-200 border border-gray-200/80 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-all cursor-pointer"
                     >
                         Cancel
                     </button>
@@ -278,7 +280,7 @@ const CreatePlanPage = () => {
                     <button
                         type="submit"
                         disabled={submitting}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all disabled:opacity-50"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 hover:bg-primary-700 px-5 py-2.5 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                     >
                         {submitting ? (
                             <>
@@ -293,7 +295,6 @@ const CreatePlanPage = () => {
                         )}
                     </button>
                 </div>
-
             </form>
         </div>
     );

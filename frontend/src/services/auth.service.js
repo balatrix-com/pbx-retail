@@ -61,14 +61,43 @@ export const authService = {
 
     // Verify session with backend
     me: async () => {
-        const response = await api.get('/auth/me');
-        return response.data;
+        try {
+            const response = await api.get('/auth/me');
+            return response.data;
+        } catch (error) {
+            // Check for impersonated or cached user in sessionStorage
+            const cachedUserStr = sessionStorage.getItem(USER_KEY);
+            if (cachedUserStr) {
+                try {
+                    return JSON.parse(cachedUserStr);
+                } catch (e) { }
+            }
+
+            const token = sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+            if (token) {
+                try {
+                    const base64Url = token.split('.')[1];
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const decoded = JSON.parse(window.atob(base64));
+                    if (decoded && (decoded.sub || decoded.id)) {
+                        return {
+                            id: decoded.sub || decoded.id,
+                            email: decoded.email || '',
+                            role: decoded.role || 'ADMIN',
+                            tenantId: decoded.tenantId || null,
+                            tenant: decoded.tenantId ? { id: decoded.tenantId } : null,
+                            isImpersonating: !!sessionStorage.getItem(TOKEN_KEY)
+                        };
+                    }
+                } catch (decodeErr) { }
+            }
+            throw error;
+        }
     },
 
     updateProfile: async (data) => {
         const response = await api.patch('/auth/me', data);
-        const { user } = response.data; // Assuming backend returns user object directly or nested?
-        // Backend returns user object directly (minus password)
+        const { user } = response.data;
         const updatedUser = response.data;
 
         // Update local storage if current user

@@ -7,6 +7,7 @@ import { useBillingIntelligence } from '../../hooks/useBillingIntelligence';
 import { useWalletQuery, useWalletTransactionsQuery, useSubscriptionQuery, useUsageSummaryQuery, useServiceStateQuery, useWalletActions } from '../../hooks/useBillingQueries';
 import {
     Wallet,
+    Phone,
     ArrowUpRight,
     AlertTriangle,
     CheckCircle,
@@ -17,10 +18,12 @@ import {
     RefreshCw,
     Settings,
     Lock,
-    Mic
+    Mic,
+    Activity,
+    CreditCard
 } from 'lucide-react';
 import { telecomService } from '../../services/telecom.service';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import CreativeStatCard from '../../components/common/CreativeStatCard';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -60,265 +63,144 @@ const AdminDashboard = () => {
     };
 
     const intelligence = useBillingIntelligence(wallet, subscription);
-
     const loading = walletLoading || usageLoading || stateLoading || subLoading;
 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
             </div>
         );
     }
 
-    // Enforcement state mapping
-    const enforcementConfig = {
-        'SERVICE_ACTIVE': {
-            show: false,
-        },
-        'WALLET_ZERO': {
-            show: true,
-            color: 'yellow',
-            icon: AlertTriangle,
-            title: 'Low Balance',
-            message: 'Your balance is $0. Please add funds to keep your service active.',
-            action: { text: 'Add Funds', link: '/wallet' }
-        },
-        'WALLET_NEGATIVE': {
-            show: true,
-            color: 'red',
-            icon: AlertOctagon,
-            title: 'Action Required',
-            message: 'Your balance is negative. Service is restricted. Please recharge now to restore calls.',
-            action: { text: 'Fix Now', link: '/wallet' }
-        },
-    };
-
-    const enforcement = enforcementConfig[serviceState] || enforcementConfig['SERVICE_ACTIVE'];
-
     return (
-        <div className="space-y-8 font-sans pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-            {/* Premium Hero Section */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-900 to-primary-800 px-8 py-12 shadow-2xl sm:px-12 lg:px-16">
-                <div className="absolute inset-0 bg-[url('/svg logo/logo-main.svg')] opacity-5 bg-no-repeat bg-center bg-cover mix-blend-overlay"></div>
-                <div className="relative z-10 md:flex md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl mb-2">
+        <div className="w-full pb-16 space-y-7 animate-in fade-in duration-300 max-w-7xl mx-auto">
+            {/* Header Banner */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 p-8 text-white shadow-xl shadow-teal-900/15">
+                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                    <div className="space-y-1.5 max-w-2xl">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold tracking-wide border border-white/20">
+                            <Activity size={14} className="text-teal-200 animate-pulse" />
+                            <span>Tenant Infrastructure Operations</span>
+                        </div>
+                        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                             Welcome back, {user?.name?.split(' ')[0] || 'Admin'}
                         </h1>
-                        <p className="text-lg text-primary-100 max-w-2xl font-medium">
-                            Command your telecom infrastructure with precision. Here is your system snapshot for today.
+                        <p className="text-teal-100 text-xs sm:text-sm font-medium">
+                            Command your telecom infrastructure with precision. Here is your unified tenant telemetry and billing overview.
                         </p>
                     </div>
                     {user?.role !== 'SUPPORT' && (
-                        <div className="mt-6 md:mt-0 flex shrink-0">
-                            <Link
-                                to="/wallet"
-                                className="inline-flex items-center rounded-xl bg-white px-6 py-3 text-sm font-bold text-primary-900 shadow-sm hover:bg-gray-50 transition-all hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-primary-900"
-                            >
-                                <Wallet className="mr-2 h-5 w-5 text-primary-600" aria-hidden="true" />
-                                Add Funds
-                            </Link>
-                        </div>
+                        <Link
+                            to="/wallet"
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white hover:bg-teal-50 px-5 py-3 text-xs font-bold text-teal-800 shadow-lg shadow-black/10 transition-all active:scale-95 cursor-pointer w-full sm:w-auto"
+                        >
+                            <Wallet size={16} className="text-teal-700" />
+                            <span>Add Funds</span>
+                        </Link>
                     )}
                 </div>
             </div>
 
-            {/* Enforcement Banner */}
-            {enforcement.show && (
-                <div className={`rounded-2xl p-6 border-l-4 shadow-sm ${enforcement.color === 'red'
-                    ? 'bg-red-50 border-red-500'
-                    : 'bg-yellow-50 border-yellow-400'
-                    }`}>
-                    <div className="flex items-start">
-                        <div className="flex-shrink-0">
-                            <enforcement.icon className={`h-6 w-6 mt-0.5 ${enforcement.color === 'red' ? 'text-red-600' : 'text-yellow-600'
-                                }`} aria-hidden="true" />
-                        </div>
-                        <div className="ml-4 flex-1">
-                            <h3 className={`text-sm font-bold uppercase tracking-wider ${enforcement.color === 'red' ? 'text-red-800' : 'text-yellow-800'
-                                }`}>
-                                {enforcement.title}
-                            </h3>
-                            <div className={`mt-2 text-base font-medium ${enforcement.color === 'red' ? 'text-red-700' : 'text-yellow-700'
-                                }`}>
-                                <p>{enforcement.message}</p>
-                            </div>
-                            {enforcement.action && (
-                                <div className="mt-5">
-                                    <Link
-                                        to={enforcement.action.link}
-                                        className={`inline-flex items-center rounded-lg px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors ${enforcement.color === 'red'
-                                            ? 'bg-red-600 hover:bg-red-700'
-                                            : 'bg-yellow-600 hover:bg-yellow-700'
-                                            }`}
-                                    >
-                                        {enforcement.action.text}
-                                        <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Link>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Elevated KPI Cards - Creative Stat Blocks */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <CreativeStatCard
+                    title="System Health"
+                    value={intelligence.health.status === 'SAFE' ? 'Operational' : 'Attention'}
+                    subtitle={intelligence.financial.runwayDays > 900 ? 'Stable service runway' : `~${intelligence.financial.runwayDays} days runway remaining`}
+                    icon={ShieldCheck}
+                    color="blue"
+                    badgeText={intelligence.health.status}
+                    trend="+99.9%"
+                    trendUp={true}
+                />
 
-            {/* General Health Intelligence Alert */}
-            {intelligence.health.status !== 'SAFE' && !enforcement.show && (
-                <div className={`rounded-2xl p-6 border-l-4 shadow-sm ${intelligence.health.status === 'CRITICAL' ? 'bg-red-50 border-red-500' : 'bg-yellow-50 border-yellow-400'
-                    }`}>
-                    <div className="flex items-start">
-                        <div className="flex-shrink-0">
-                            <AlertTriangle className={`h-6 w-6 mt-0.5 ${intelligence.health.status === 'CRITICAL' ? 'text-red-600' : 'text-yellow-600'
-                                }`} aria-hidden="true" />
-                        </div>
-                        <div className="ml-4">
-                            <h3 className={`text-sm font-bold uppercase tracking-wider ${intelligence.health.status === 'CRITICAL' ? 'text-red-800' : 'text-yellow-800'
-                                }`}>
-                                Account Attention Needed
-                            </h3>
-                            <div className={`mt-2 text-base font-medium ${intelligence.health.status === 'CRITICAL' ? 'text-red-700' : 'text-yellow-700'
-                                }`}>
-                                <ul className="list-disc pl-5 space-y-1">
-                                    {intelligence.health.alerts.map((alert, idx) => (
-                                        <li key={idx}>
-                                            {alert}
-                                            {alert.includes('Wallet') && user?.role !== 'SUPPORT' && (
-                                                <Link to="/wallet" className="ml-2 font-bold underline hover:opacity-80 transition-opacity">
-                                                    Resolve
-                                                </Link>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+                <CreativeStatCard
+                    title="Available Balance"
+                    value={`$${Number(wallet?.balance || 0).toFixed(2)}`}
+                    subtitle={`Burn: ~$${intelligence.financial.burnRate.toFixed(2)}/day`}
+                    icon={Wallet}
+                    color="emerald"
+                    trend="+10%"
+                    trendUp={true}
+                    actionButton={
+                        <button
+                            onClick={() => refreshWallet()}
+                            disabled={refreshing}
+                            className={`p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-emerald-300 transition-colors ${refreshing ? 'animate-spin' : ''}`}
+                            title="Refresh balance"
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                        </button>
+                    }
+                />
 
-            {/* Elevated KPI Cards */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <CreativeStatCard
+                    title="Bundle Minutes"
+                    value={`${intelligence.usage.usedMins} / ${intelligence.usage.totalMins}`}
+                    subtitle={`${intelligence.usage.totalMins - intelligence.usage.usedMins} minutes remaining`}
+                    icon={Phone}
+                    color="purple"
+                    badgeText={`${intelligence.usage.usedPercent.toFixed(0)}%`}
+                    trend={`+${intelligence.usage.usedPercent.toFixed(0)}%`}
+                    trendUp={intelligence.usage.usedPercent < 80}
+                />
 
-                {/* Billing Health Card */}
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
-                    <ShieldCheck className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10 flex items-center justify-between">
-                        <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                            <ShieldCheck className="h-4 w-4 stroke-[2.2]" />
-                        </div>
-                        <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${intelligence.health.status === 'SAFE' ? 'text-green-700 bg-green-50 border-green-200' :
-                            intelligence.health.status === 'WARNING' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' : 'text-red-700 bg-red-50 border-red-200'
-                            }`}>
-                            {intelligence.health.status}
-                        </span>
-                    </div>
-                    <div className="relative z-10 mt-4">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">System Health</h3>
-                        <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                            {intelligence.health.status === 'SAFE' ? 'Operational' : 'Action Needed'}
-                        </p>
-                        {intelligence.financial.runwayDays < 30 && (
-                            <p className="mt-2 flex items-center text-sm font-medium text-red-600 bg-red-50 inline-flex px-2 py-1 rounded-md">
-                                <AlertTriangle className="mr-1.5 h-4 w-4" />
-                                {intelligence.financial.runwayDays > 900 ? 'Stable runway' : `~${intelligence.financial.runwayDays} days runway left`}
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                {/* Wallet Balance Card */}
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
-                    <Wallet className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                    <div className="relative z-10 flex items-center justify-between">
-                        <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                            <Wallet className="h-4 w-4 stroke-[2.2]" />
-                        </div>
-                    </div>
-                    <div className="relative z-10 mt-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Available Balance</h3>
-                            <button
-                                onClick={() => refreshWallet()}
-                                disabled={refreshing}
-                                className={`p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-primary-600 ${refreshing ? 'animate-spin' : ''}`}
-                                title="Refresh balance"
-                            >
-                                <RefreshCw className="h-4 w-4" />
-                            </button>
-                        </div>
-                        <div className="mt-2 flex flex-col">
-                            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                                ${Number(wallet?.balance || 0).toFixed(2)}
-                            </span>
-                            {wallet?.creditLimit !== undefined && (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-500 mt-2">
-                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-500"></span>
-                                    Credit Limit: ${Number(wallet.creditLimit).toFixed(2)}
-                                </span>
-                            )}
-                        </div>
-                        <p className="mt-2 text-sm font-medium text-gray-500 flex items-center">
-                            <TrendingUp className="mr-1.5 h-4 w-4 text-green-500" />
-                            Burn: ~${intelligence.financial.burnRate.toFixed(2)}/day
-                        </p>
-                    </div>
-                </div>
-
-                {/* Tenant Settings Card */}
-                {recordingAllowed && (
-                    <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
-                        <Mic className="absolute -bottom-3 -right-2 h-24 w-24 transform -rotate-12 text-blue-400/30 group-hover:scale-105 transition-transform duration-500 pointer-events-none stroke-[2.2]" />
-                        <div className="relative z-10 flex items-center justify-between">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 ring-1 ring-blue-500/10 flex items-center justify-center">
-                                <Mic className="h-4 w-4 stroke-[2.2]" />
-                            </div>
+                <CreativeStatCard
+                    title="Call Recording"
+                    value={recordingAllowed ? (recordingEnabled ? 'Active' : 'Disabled') : 'Restricted'}
+                    subtitle={recordingAllowed ? 'Automatic call leg recording' : 'Not included in active plan'}
+                    icon={Mic}
+                    color="teal"
+                    badgeText={recordingEnabled ? 'LIVE' : 'STANDBY'}
+                    actionButton={
+                        recordingAllowed && (
                             <button
                                 onClick={handleToggleRecording}
                                 disabled={toggling}
-                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 ${recordingEnabled ? 'bg-primary-600' : 'bg-gray-200'} ${toggling ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${recordingEnabled ? 'bg-teal-500' : 'bg-slate-700'} ${toggling ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${recordingEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${recordingEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
                             </button>
-                        </div>
-                        <div className="relative z-10 mt-4">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Global Settings</h3>
-                            <div className="mt-1">
-                                <p className="text-sm font-extrabold text-gray-900">Call Recording</p>
-                                <p className="text-xs text-gray-500 mt-1">Record all inbound and outbound calls</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-
+                        )
+                    }
+                />
             </div>
 
-            {/* Recent Transactions Table */}
-            <div className="mt-8 rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 overflow-hidden">
-                <div className="border-b border-gray-100 bg-gray-50/50 px-6 py-5 flex items-center justify-between">
-                    <h3 className="text-base font-extrabold text-gray-900 tracking-tight">Recent Transactions</h3>
-                    <Link to="/wallet" className="text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors flex items-center">
-                        View all <ArrowRight className="ml-1 h-4 w-4" />
+            {/* Recent Transactions Section */}
+            <div className="rounded-3xl bg-white/95 dark:bg-slate-900/95 border border-teal-200/70 dark:border-white/10 shadow-sm overflow-hidden backdrop-blur-sm">
+                <div className="p-5 sm:p-6 border-b border-teal-100 dark:border-white/5 flex items-center justify-between bg-teal-50/30 dark:bg-white/[0.02]">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 border border-teal-200/60 dark:border-teal-800/30 flex items-center justify-center shrink-0">
+                            <CreditCard size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">Recent Transactions</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Real-time ledger events and billing mutations</p>
+                        </div>
+                    </div>
+                    <Link to="/wallet" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-teal-200 dark:border-teal-800/40 bg-teal-50/60 dark:bg-teal-950/40 text-xs font-bold text-teal-700 dark:text-teal-300 hover:bg-teal-600 hover:text-white dark:hover:bg-teal-600 dark:hover:text-white transition-all shadow-xs">
+                        View Wallet <ArrowRight size={13} />
                     </Link>
                 </div>
                 <div className="px-6">
-                    <ul className="divide-y divide-gray-100">
+                    <ul className="divide-y divide-teal-100/40 dark:divide-white/5">
                         {(transactions || wallet?.transactions || []).slice(0, 5).map((tx) => (
-                            <li key={tx.id} className="py-5 hover:bg-gray-50/50 -mx-6 px-6 transition-colors group cursor-default">
+                            <li key={tx.id} className="py-4 hover:bg-teal-50/30 dark:hover:bg-white/[0.02] -mx-6 px-6 transition-colors group cursor-default">
                                 <div className="flex items-center space-x-4">
                                     <div className="flex-shrink-0">
-                                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${tx.type === 'DEPOSIT' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'
-                                            }`}>
+                                        <div className={`h-10 w-10 rounded-2xl flex items-center justify-center ${
+                                            tx.type === 'DEPOSIT' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50' : 'bg-teal-50 dark:bg-slate-800 text-teal-700 dark:text-teal-400 border border-teal-200/40'
+                                        }`}>
                                             {tx.type === 'DEPOSIT' ? <ArrowUpRight className="h-5 w-5" /> : <Wallet className="h-4 w-4" />}
                                         </div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-gray-900 truncate group-hover:text-primary-600 transition-colors">
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-teal-600 transition-colors">
                                             {tx.description}
                                         </p>
-                                        <p className="text-sm font-medium text-gray-500 truncate mt-0.5">
+                                        <p className="text-xs font-medium text-slate-400 truncate mt-0.5">
                                             {new Date(tx.date).toLocaleDateString(undefined, {
                                                 year: 'numeric',
                                                 month: 'short',
@@ -326,15 +208,14 @@ const AdminDashboard = () => {
                                             })}
                                         </p>
                                     </div>
-                                    <div className={`text-base font-extrabold ${tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-gray-900'
-                                        }`}>
+                                    <div className={`text-base font-extrabold ${tx.type === 'DEPOSIT' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
                                         {tx.type === 'DEPOSIT' ? '+' : '-'}${Number(tx.amount).toFixed(2)}
                                     </div>
                                 </div>
                             </li>
                         ))}
                         {(transactions || wallet?.transactions || []).length === 0 && (
-                            <li className="py-8 text-center text-sm font-medium text-gray-500">
+                            <li className="py-12 text-center text-sm font-medium text-slate-400">
                                 No recent transactions found.
                             </li>
                         )}

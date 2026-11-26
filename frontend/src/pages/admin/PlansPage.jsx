@@ -124,89 +124,90 @@ const PlansPage = () => {
     };
 
     return (
-        <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+        <div className="w-full pb-16 space-y-7 animate-in fade-in duration-300 max-w-7xl mx-auto">
+            {/* Header Banner */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 p-8 text-white shadow-xl shadow-teal-900/15">
+                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+                    <div className="space-y-1.5 max-w-2xl">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold tracking-wide border border-white/20">
+                            <Sparkles size={14} className="text-teal-200" />
+                            <span>Billing & Subscription Engine</span>
+                        </div>
+                        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                            Plan Catalog & Capacity Engine
+                        </h1>
+                        <p className="text-teal-100 text-xs sm:text-sm font-medium">
+                            Manage base tier packages, quota limits, extensions capacity, and subscription allocations.
+                        </p>
+                    </div>
 
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white flex items-center gap-2.5">
-                        <CreditCard className="h-8 w-8 text-primary-600" />
-                        Plans & Add-ons Engine
-                    </h1>
-                    <p className="text-gray-500 dark:text-slate-400 mt-1 font-medium text-sm md:text-base">
-                        Manage base and capacity plan catalog. Assign plans from Subscriptions.
-                    </p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleRefreshAll}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/20 px-4 py-2.5 text-xs font-bold text-white transition-all shadow-sm active:scale-95 cursor-pointer"
+                        >
+                            <RefreshCw size={14} className="text-teal-200" />
+                            <span>Refresh</span>
+                        </button>
+                        {canManagePlans && (
+                            <button
+                                onClick={() => setShowModal(true)}
+                                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white hover:bg-teal-50 px-5 py-2.5 text-xs font-bold text-teal-800 shadow-lg shadow-black/10 transition-all active:scale-95 cursor-pointer"
+                            >
+                                <Plus size={16} className="text-teal-700" />
+                                <span>Add New Plan</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleRefreshAll}
-                        className="inline-flex items-center gap-2 rounded-xl bg-white dark:bg-slate-900 px-4 py-2.5 text-sm font-bold text-gray-700 dark:text-slate-200 shadow-xs ring-1 ring-inset ring-gray-300 dark:ring-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all"
-                    >
-                        <RefreshCw size={16} />
-                        Refresh Overview
-                    </button>
-                </div>
-            </div>
-
-            {/* Tabs Navigation */}
-            <div className="flex border-b border-gray-200 dark:border-slate-800 gap-6">
-                <button
-                    onClick={() => handleTabChange('plans')}
-                    className={`pb-3 text-sm font-extrabold flex items-center gap-2 border-b-2 transition-colors relative ${activeTab === 'plans'
-                        ? 'border-primary-600 text-primary-600 dark:text-primary-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
-                        }`}
-                >
-                    <ShieldCheck className="h-4 w-4" />
-                    Plans
-                </button>
             </div>
 
             {/* Tab 1: Plans & Active Subscription */}
             {activeTab === 'plans' && (
-                <div className="space-y-8">
+                <div className="space-y-6">
                     {/* Active Subscription & Purchasing Power Banner */}
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-gray-200/80 dark:border-slate-800">
+                    <div className="rounded-3xl bg-white/95 dark:bg-slate-900/95 border border-teal-200/70 dark:border-white/10 shadow-sm p-6 sm:p-7 backdrop-blur-sm">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                             <div className="space-y-2">
-                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 tracking-wider">
-                                    <CheckCircle2 className="h-3.5 w-3.5" /> Active Subscription
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-[11px] font-extrabold uppercase text-teal-700 dark:text-teal-400 tracking-wider">
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-teal-600" /> Active Subscription
                                 </div>
-                                <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-                                    {subscription?.plan_name || 'No active plan'}
+                                <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">
+                                    {subscription?.plan_name || 'No active plan assigned'}
                                 </h2>
-                                <p className="text-xs font-medium text-gray-500 dark:text-slate-400">
-                                    Status: <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase">{subscription?.status || 'NONE'}</span>
+                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                    Status: <span className="text-teal-600 dark:text-teal-400 font-bold uppercase">{subscription?.status || 'NONE'}</span>
                                     {subscription?.next_billing && (
-                                        <span className="ml-3">Next Billing: <span className="font-bold text-gray-900 dark:text-white">{new Date(subscription.next_billing).toLocaleDateString()}</span></span>
+                                        <span className="ml-3">Next Renewal: <span className="font-bold text-slate-800 dark:text-white">{new Date(subscription.next_billing).toLocaleDateString()}</span></span>
                                     )}
                                 </p>
                             </div>
 
-                            <div className="flex flex-wrap gap-4 items-center">
-                                <div className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-800 min-w-[120px]">
-                                    <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider block">Extensions</span>
-                                    <span className="text-lg font-extrabold text-gray-900 dark:text-white font-mono">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-center">
+                                <div className="px-4 py-3 rounded-2xl bg-teal-50/40 dark:bg-slate-800/50 border border-teal-200/60 dark:border-white/5">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">SIP Extensions</span>
+                                    <span className="text-xl font-black text-slate-800 dark:text-white font-mono">
                                         {subscription?.limits?.extensions ?? subscription?.limits?.maxExtensions ?? 0}
                                     </span>
                                 </div>
-                                <div className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-800 min-w-[120px]">
-                                    <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider block">Numbers</span>
-                                    <span className="text-lg font-extrabold text-gray-900 dark:text-white font-mono">
+                                <div className="px-4 py-3 rounded-2xl bg-teal-50/40 dark:bg-slate-800/50 border border-teal-200/60 dark:border-white/5">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">DID Numbers</span>
+                                    <span className="text-xl font-black text-slate-800 dark:text-white font-mono">
                                         {subscription?.limits?.numbers ?? subscription?.limits?.maxNumbers ?? 0}
                                     </span>
                                 </div>
-                                <div className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-800 min-w-[150px]">
-                                    <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider block">Monitoring Extensions</span>
-                                    <span className="text-lg font-extrabold text-gray-900 dark:text-white font-mono">
+                                <div className="px-4 py-3 rounded-2xl bg-teal-50/40 dark:bg-slate-800/50 border border-teal-200/60 dark:border-white/5">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Monitoring Seats</span>
+                                    <span className="text-xl font-black text-slate-800 dark:text-white font-mono">
                                         {subscription?.limits?.monitoring_extensions ?? subscription?.limits?.maxMonitoringExtensions ?? 0}
                                     </span>
                                 </div>
-                                <div className="px-4.5 py-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 min-w-[180px]">
-                                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block flex items-center gap-1">
-                                        <WalletIcon className="h-3.5 w-3.5" /> Purchasing Power
+                                <div className="px-4.5 py-3 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-950/60 dark:to-emerald-950/60 border border-teal-200 dark:border-teal-800">
+                                    <span className="text-[10px] font-extrabold text-teal-800 dark:text-teal-300 uppercase tracking-wider block flex items-center gap-1">
+                                        <WalletIcon className="h-3.5 w-3.5 text-teal-600" /> Purchasing Power
                                     </span>
-                                    <span className="text-xl font-extrabold text-emerald-700 dark:text-emerald-300 font-mono">
+                                    <span className="text-xl font-black text-teal-700 dark:text-teal-300 font-mono">
                                         ${availablePurchasingPower.toFixed(2)}
                                     </span>
                                 </div>
@@ -216,33 +217,27 @@ const PlansPage = () => {
 
                     {/* Plans List Section */}
                     <div className="space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-2">
-                                <ShieldCheck className="h-5 w-5 text-primary-600" />
-                                <h3 className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-                                    Available Billing Plans
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <ShieldCheck className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                                <h3 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight">
+                                    Available Plan Catalog
                                 </h3>
+                                <span className="text-xs font-bold text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950 px-2.5 py-0.5 rounded-full border border-teal-200 dark:border-teal-800">
+                                    {plans.length} Packages
+                                </span>
                             </div>
-                            {canManagePlans && (
-                                <button
-                                    onClick={() => setShowModal(true)}
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-primary-600/20 hover:bg-primary-700 transition-all w-full sm:w-auto"
-                                >
-                                    <Plus size={20} />
-                                    Add New Plans
-                                </button>
-                            )}
                         </div>
 
                         {plansLoading ? (
-                            <div className="flex justify-center py-12">
-                                <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+                            <div className="flex justify-center py-16">
+                                <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
                             </div>
                         ) : plans.length === 0 ? (
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-gray-200/80 dark:border-slate-800">
-                                <ShieldCheck className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white">No Plans Found</h4>
-                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                            <div className="rounded-3xl bg-white/95 dark:bg-slate-900/95 p-12 text-center border border-teal-200/70 dark:border-white/10">
+                                <ShieldCheck className="h-10 w-10 text-teal-500 mx-auto mb-3" />
+                                <h4 className="text-base font-bold text-slate-800 dark:text-white">No Plans Found</h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                                     Create a new plan to make it available for customer subscriptions.
                                 </p>
                             </div>
@@ -257,36 +252,36 @@ const PlansPage = () => {
                                     return (
                                         <div
                                             key={p.plan_id || p.id || p.name}
-                                            className={`bg-white dark:bg-slate-900 rounded-2xl p-6 border transition-all flex flex-col justify-between relative group ${isCurrent
-                                                ? 'border-primary-500 ring-2 ring-primary-500/20 shadow-md'
-                                                : 'border-gray-200/80 dark:border-slate-800 shadow-sm hover:shadow-md'
+                                            className={`rounded-3xl p-6 sm:p-7 border transition-all flex flex-col justify-between relative group shadow-sm bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm ${isCurrent
+                                                ? 'border-teal-500 ring-2 ring-teal-500/20 shadow-md shadow-teal-500/10'
+                                                : 'border-teal-200/70 dark:border-white/10 hover:border-teal-400 dark:hover:border-teal-600'
                                                 }`}
                                         >
                                             <div>
                                                 <div className="flex justify-between items-start mb-3">
                                                     <div>
-                                                        <h4 className="text-base font-extrabold text-gray-900 dark:text-white">
+                                                        <h4 className="text-lg font-black text-slate-800 dark:text-white">
                                                             {p.name}
                                                         </h4>
-                                                        <span className="text-[11px] font-mono text-gray-400 dark:text-slate-500 block mt-0.5">
+                                                        <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500 block mt-0.5">
                                                             {p.plan_id || p.id}
                                                         </span>
                                                     </div>
 
                                                     <div className="flex items-center gap-1.5">
                                                         {isCurrent && (
-                                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800">
-                                                                CURRENT
+                                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                                                                ACTIVE TIER
                                                             </span>
                                                         )}
 
-                                                        {/* Delete Plan Button - Visible to ADMIN and SUPER_ADMIN */}
+                                                        {/* Delete Plan Button */}
                                                         {canManagePlans && (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setPlanToDelete(p)}
                                                                 title={`Delete ${p.name}`}
-                                                                className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50 transition-all"
+                                                                className="p-1.5 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-all"
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </button>
@@ -294,37 +289,41 @@ const PlansPage = () => {
                                                     </div>
                                                 </div>
 
-                                                <div className="text-2xl font-extrabold font-mono text-gray-900 dark:text-white mb-4">
+                                                <div className="text-3xl font-black font-mono text-teal-700 dark:text-teal-400 mb-5">
                                                     ${Number(p.amount || p.price || 0).toFixed(2)}
-                                                    <span className="text-xs text-gray-400 font-normal font-sans"> / {p.duration_count || p.validity_months || 1} {p.duration_unit || 'months'} · {p.plan_category || 'base'}</span>
+                                                    <span className="text-xs text-slate-400 font-semibold font-sans"> / {p.duration_count || p.validity_months || 1} {p.duration_unit || 'months'}</span>
                                                 </div>
 
-                                                <ul className="space-y-2 text-xs text-gray-600 dark:text-slate-300 font-medium">
-                                                    <li className="flex items-center gap-2">
-                                                        <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                                                <ul className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300 font-semibold">
+                                                    <li className="flex items-center gap-2 p-2 rounded-xl bg-teal-50/40 dark:bg-slate-800/40 border border-teal-100 dark:border-white/5">
+                                                        <CheckCircle2 className="h-4 w-4 text-teal-600 flex-shrink-0" />
                                                         <span><strong>{p.extensions ?? p.maxExtensions ?? 0}</strong> SIP Extensions</span>
                                                     </li>
-                                                    <li className="flex items-center gap-2">
-                                                        <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                                                        <span><strong>{p.numbers ?? p.maxNumbers ?? 0}</strong> Included Numbers</span>
+                                                    <li className="flex items-center gap-2 p-2 rounded-xl bg-teal-50/40 dark:bg-slate-800/40 border border-teal-100 dark:border-white/5">
+                                                        <CheckCircle2 className="h-4 w-4 text-teal-600 flex-shrink-0" />
+                                                        <span><strong>{p.numbers ?? p.maxNumbers ?? 0}</strong> Direct Numbers</span>
                                                     </li>
-                                                    <li className="flex items-center gap-2">
-                                                        <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                                                        <span><strong>{p.monitoring_extensions ?? p.maxMonitoringExtensions ?? 0}</strong> Monitoring Extensions</span>
+                                                    <li className="flex items-center gap-2 p-2 rounded-xl bg-teal-50/40 dark:bg-slate-800/40 border border-teal-100 dark:border-white/5">
+                                                        <CheckCircle2 className="h-4 w-4 text-teal-600 flex-shrink-0" />
+                                                        <span><strong>{p.monitoring_extensions ?? p.maxMonitoringExtensions ?? 0}</strong> Monitoring Seats</span>
                                                     </li>
                                                 </ul>
                                             </div>
 
-                                            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-slate-800">
+                                            <div className="mt-6 pt-4 border-t border-teal-100 dark:border-white/10">
                                                 <button
                                                     type="button"
                                                     onClick={() => handleInitiatePlanSwitch(p)}
                                                     disabled={isCurrent}
-                                                    className="w-full inline-flex justify-center items-center gap-1.5 rounded-xl bg-gray-900 dark:bg-slate-800 text-white px-4 py-2.5 text-xs font-bold shadow-sm hover:bg-gray-800 dark:hover:bg-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className={`w-full inline-flex justify-center items-center gap-1.5 rounded-2xl px-4 py-2.5 text-xs font-bold transition-all ${isCurrent
+                                                        ? 'bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-300 cursor-default'
+                                                        : 'bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-md shadow-teal-600/20 active:scale-95'
+                                                        }`}
                                                 >
                                                     {isCurrent ? 'Current Plan' : (
                                                         <>
-                                                            Manage subscriptions <ArrowUpRight className="h-4 w-4" />
+                                                            <span>Manage Subscription</span>
+                                                            <ArrowUpRight className="h-4 w-4" />
                                                         </>
                                                     )}
                                                 </button>

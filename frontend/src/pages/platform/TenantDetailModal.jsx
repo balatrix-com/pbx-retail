@@ -100,17 +100,15 @@ const OverviewTab = ({ details }) => (
 );
 
 const UsersTab = ({ details }) => {
-    const { impersonateUser } = useAuth();
-    const navigate = useNavigate();
-
     const handleImpersonate = async (userId, userName) => {
-        if (!window.confirm(`Impersonate ${userName}?`)) return;
+        if (!window.confirm(`Open impersonation session for "${userName}" in a new tab?`)) return;
         try {
-            await impersonateUser(userId);
-            navigate('/dashboard');
-            window.location.reload();
+            const response = await api.post(`/users/impersonate/${userId}`);
+            const { ticket } = response.data;
+            window.open(`/impersonate?ticket=${encodeURIComponent(ticket)}`, '_blank');
         } catch (error) {
-            alert('Impersonation failed');
+            console.error('Impersonation error:', error);
+            alert('Impersonation failed: ' + (error.response?.data?.message || error.message));
         }
     };
 
