@@ -65,7 +65,8 @@ const DashboardRedirect = () => {
 
 const MonitoringRoute = ({ children }) => {
     const { user } = useAuth();
-    if (user?.role !== 'SUPER_ADMIN' && !user?.monitoringEnabled) {
+    // Allow SUPER_ADMIN, ADMIN, or users with explicit monitoringEnabled flag
+    if (user?.role !== 'SUPER_ADMIN' && user?.role !== 'ADMIN' && user?.role !== 'SUPPORT' && !user?.monitoringEnabled) {
         return <Navigate to="/dashboard" replace />;
     }
     return children;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useBranding } from '../../context/BrandingContext';
+import { useBranding, applyBrandingColors } from '../../context/BrandingContext';
 import api from '../../services/api';
 import { getMediaUrl } from '../../utils/media.utils';
 import { 
@@ -138,6 +138,10 @@ const BrandingSettingsPage = () => {
         try {
             setSavingCurrent(true);
             setSaveSuccess(false);
+            
+            // Immediately apply all CSS shade variables to the document root for instant live feedback
+            applyBrandingColors(currentBranding.primaryColor, currentBranding.accentColor);
+
             await api.put('/admin/branding/current', currentBranding);
             // Refresh branding context & user context instantly to update UI colors & logos dynamically
             await Promise.all([

@@ -31,7 +31,8 @@ import {
     ListTree,
     Hash,
     History,
-    Radio
+    Radio,
+    Voicemail
 } from 'lucide-react';
 
 const TopNavbar = ({ inline = false }) => {
@@ -39,29 +40,29 @@ const TopNavbar = ({ inline = false }) => {
     const location = useLocation();
     const role = user?.role;
 
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [activeMenu, setActiveMenu] = useState(null);
     const dropdownRef = useRef(null);
     const closeTimeoutRef = useRef(null);
 
-    const handleMouseEnter = () => {
+    const handleMouseEnter = (catName) => {
         if (closeTimeoutRef.current) {
             clearTimeout(closeTimeoutRef.current);
             closeTimeoutRef.current = null;
         }
-        setIsMenuOpen(true);
+        setActiveMenu(catName);
     };
 
     const handleMouseLeave = () => {
         closeTimeoutRef.current = setTimeout(() => {
-            setIsMenuOpen(false);
-        }, 150);
+            setActiveMenu(null);
+        }, 200);
     };
 
     // Close open dropdown on outside click
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-                setIsMenuOpen(false);
+                setActiveMenu(null);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -73,11 +74,12 @@ const TopNavbar = ({ inline = false }) => {
 
     // Close open dropdown on route change
     useEffect(() => {
-        setIsMenuOpen(false);
+        setActiveMenu(null);
     }, [location.pathname]);
 
     const getNavItems = (role) => {
-        const canMonitor = user?.role === 'SUPER_ADMIN' || user?.monitoringEnabled;
+        // Allow Call Monitoring for Super Admins, explicit monitoringEnabled users, or admins by default
+        const canMonitor = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || Boolean(user?.monitoringEnabled);
 
         let items = [];
         switch (role) {
@@ -162,8 +164,8 @@ const TopNavbar = ({ inline = false }) => {
                             { name: 'Extension Status', href: '/extensions/status', icon: Radio },
                             { name: 'Ring Groups', href: '/telecom/ring-groups', icon: UserCheck },
                             { name: 'IVR Menus', href: '/telecom/ivrs', icon: ListTree },
+                            { name: 'Voicemail', href: '/telecom/voicemail', icon: Voicemail },
                             { name: 'Audio Library', href: '/telecom/audio', icon: Music },
-                            { name: 'Voicemail', href: '/telecom/voicemail', icon: Headphones },
                             { name: 'DID Forwards', href: '/telecom/did-forwards', icon: PhoneForwarded },
                             { name: 'Trunks & Carriers', href: '/telecom/trunks', icon: Server },
                             { name: 'Operational Schedules', href: '/telecom/schedules', icon: Clock },
@@ -203,8 +205,8 @@ const TopNavbar = ({ inline = false }) => {
                             { name: 'Extension Status', href: '/telecom/extensions/status', icon: Radio },
                             { name: 'Ring Groups', href: '/telecom/ring-groups', icon: UserCheck },
                             { name: 'IVR Menus', href: '/telecom/ivrs', icon: ListTree },
+                            { name: 'Voicemail', href: '/telecom/voicemail', icon: Voicemail },
                             { name: 'Audio Library', href: '/telecom/audio', icon: Music },
-                            { name: 'Voicemail', href: '/telecom/voicemail', icon: Headphones },
                             { name: 'DID Forwards', href: '/telecom/did-forwards', icon: PhoneForwarded },
                             { name: 'Operational Schedules', href: '/telecom/schedules', icon: Clock },
                         ]
@@ -273,7 +275,6 @@ const TopNavbar = ({ inline = false }) => {
                     ? "flex items-center"
                     : "w-full bg-white dark:bg-[#0c0d12] border-b border-gray-200/80 dark:border-white/10 px-4 md:px-6 z-30 sticky top-16 shadow-xs"
             )}
-            onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         >
             <div className={clsx("flex items-center gap-1 sm:gap-1.5 relative", !inline && "py-2")}>
@@ -282,15 +283,20 @@ const TopNavbar = ({ inline = false }) => {
 
                     if (item.hasSubmenu) {
                         const isSubActive = item.subItems.some(sub => location.pathname.startsWith(sub.href));
+                        const isThisOpen = activeMenu === item.name;
 
                         return (
-                            <div key={item.name} className="relative shrink-0">
+                            <div 
+                                key={item.name} 
+                                className="relative shrink-0"
+                                onMouseEnter={() => handleMouseEnter(item.name)}
+                            >
                                 <button
                                     type="button"
-                                    onClick={() => setIsMenuOpen(prev => !prev)}
+                                    onClick={() => setActiveMenu(prev => prev === item.name ? null : item.name)}
                                     className={clsx(
                                         "flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-extrabold transition-all duration-200 outline-none whitespace-nowrap cursor-pointer",
-                                        isSubActive || isMenuOpen
+                                        isSubActive || isThisOpen
                                             ? "bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200/80 dark:border-teal-800/40 shadow-xs"
                                             : "text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04] border border-transparent"
                                     )}
@@ -300,7 +306,7 @@ const TopNavbar = ({ inline = false }) => {
                                     <ChevronDown
                                         className={clsx(
                                             "h-3.5 w-3.5 transition-transform duration-200 text-slate-400",
-                                            isMenuOpen && "rotate-180 text-teal-600 dark:text-teal-400"
+                                            isThisOpen && "rotate-180 text-teal-600 dark:text-teal-400"
                                         )}
                                     />
                                 </button>
@@ -326,11 +332,11 @@ const TopNavbar = ({ inline = false }) => {
                     );
                 })}
 
-                {/* Unified Mega Menu Flyout Dropdown displaying all categories together */}
-                {isMenuOpen && (
+                {/* Dropdown Flyout Panel */}
+                {activeMenu && (
                     <div
                         className="fixed left-4 right-4 sm:left-6 sm:right-6 top-16 pt-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150"
-                        onMouseEnter={handleMouseEnter}
+                        onMouseEnter={() => handleMouseEnter(activeMenu)}
                         onMouseLeave={handleMouseLeave}
                     >
                         <div className="max-w-7xl mx-auto rounded-3xl bg-white/95 dark:bg-[#0f1118]/95 border border-gray-200/90 dark:border-white/15 shadow-2xl p-6 sm:p-7 backdrop-blur-2xl">
@@ -339,13 +345,15 @@ const TopNavbar = ({ inline = false }) => {
                                 {navItems.filter(item => item.hasSubmenu).map((cat, idx) => {
                                     const CatIcon = cat.icon;
                                     const isAnySubActive = cat.subItems.some(sub => location.pathname.startsWith(sub.href));
+                                    const isCurrentHighlighted = activeMenu === cat.name;
                                     const isWideColumn = cat.subItems.length > 6;
 
                                     return (
                                         <div
                                             key={cat.name}
                                             className={clsx(
-                                                "flex flex-col gap-3",
+                                                "flex flex-col gap-3 rounded-2xl transition-all",
+                                                isCurrentHighlighted && "bg-teal-50/40 dark:bg-teal-950/20 p-3 -m-3 sm:p-3.5 sm:-m-3.5",
                                                 isWideColumn ? "lg:col-span-4" : "lg:col-span-2",
                                                 idx > 0 && "sm:pl-7 pt-4 sm:pt-0"
                                             )}
@@ -354,14 +362,17 @@ const TopNavbar = ({ inline = false }) => {
                                             <div className="flex items-center gap-2.5 pb-2.5 border-b border-gray-100 dark:border-white/10">
                                                 <div className={clsx(
                                                     "h-8 w-8 rounded-xl flex items-center justify-center transition-colors shadow-2xs shrink-0",
-                                                    isAnySubActive
+                                                    isAnySubActive || isCurrentHighlighted
                                                         ? "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300"
                                                         : "bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400"
                                                 )}>
                                                     {CatIcon && <CatIcon className="h-4 w-4" />}
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
-                                                    <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-gray-900 dark:text-white truncate">
+                                                    <span className={clsx(
+                                                        "text-xs sm:text-[13px] font-black uppercase tracking-wider truncate",
+                                                        isCurrentHighlighted ? "text-teal-800 dark:text-teal-200" : "text-gray-900 dark:text-white"
+                                                    )}>
                                                         {cat.name}
                                                     </span>
                                                     <span className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-0.5">
@@ -383,7 +394,7 @@ const TopNavbar = ({ inline = false }) => {
                                                         <Link
                                                             key={sub.name}
                                                             to={sub.href}
-                                                            onClick={() => setIsMenuOpen(false)}
+                                                            onClick={() => setActiveMenu(null)}
                                                             className={clsx(
                                                                 "flex items-center justify-between px-2.5 py-2 rounded-xl text-xs sm:text-[12.5px] font-bold transition-all duration-150 group/item",
                                                                 isSubItemActive

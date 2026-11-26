@@ -33,23 +33,55 @@ function getShades(baseHex) {
         const base = hexToRgb(baseHex);
         const white = { r: 255, g: 255, b: 255 };
         const black = { r: 0, g: 0, b: 0 };
-        
+
+        const build = (rgb) => ({
+            hex: rgbToHex(rgb.r, rgb.g, rgb.b),
+            rgb: `${rgb.r} ${rgb.g} ${rgb.b}`,
+        });
+
         return {
-            50: rgbToHex(mix(base, white, 0.95).r, mix(base, white, 0.95).g, mix(base, white, 0.95).b),
-            100: rgbToHex(mix(base, white, 0.9).r, mix(base, white, 0.9).g, mix(base, white, 0.9).b),
-            200: rgbToHex(mix(base, white, 0.7).r, mix(base, white, 0.7).g, mix(base, white, 0.7).b),
-            300: rgbToHex(mix(base, white, 0.5).r, mix(base, white, 0.5).g, mix(base, white, 0.5).b),
-            400: rgbToHex(mix(base, white, 0.3).r, mix(base, white, 0.3).g, mix(base, white, 0.3).b),
-            500: baseHex,
-            600: rgbToHex(mix(base, black, 0.15).r, mix(base, black, 0.15).g, mix(base, black, 0.15).b),
-            700: rgbToHex(mix(base, black, 0.3).r, mix(base, black, 0.3).g, mix(base, black, 0.3).b),
-            800: rgbToHex(mix(base, black, 0.45).r, mix(base, black, 0.45).g, mix(base, black, 0.45).b),
-            900: rgbToHex(mix(base, black, 0.6).r, mix(base, black, 0.6).g, mix(base, black, 0.6).b),
-            950: rgbToHex(mix(base, black, 0.75).r, mix(base, black, 0.75).g, mix(base, black, 0.75).b),
+            50: build(mix(base, white, 0.95)),
+            100: build(mix(base, white, 0.9)),
+            200: build(mix(base, white, 0.7)),
+            300: build(mix(base, white, 0.5)),
+            400: build(mix(base, white, 0.3)),
+            500: build(base),
+            600: build(mix(base, black, 0.15)),
+            700: build(mix(base, black, 0.3)),
+            800: build(mix(base, black, 0.45)),
+            900: build(mix(base, black, 0.6)),
+            950: build(mix(base, black, 0.75)),
         };
     } catch (e) {
         console.error('Error generating shades for base color:', baseHex, e);
         return null;
+    }
+}
+
+export function applyBrandingColors(primaryColor, accentColor) {
+    const root = document.documentElement;
+    if (primaryColor) {
+        root.style.setProperty('--color-primary', primaryColor);
+        const shades = getShades(primaryColor);
+        if (shades) {
+            Object.entries(shades).forEach(([weight, { hex, rgb }]) => {
+                root.style.setProperty(`--color-primary-${weight}`, hex);
+                root.style.setProperty(`--color-primary-${weight}-rgb`, rgb);
+                root.style.setProperty(`--color-teal-${weight}`, hex);
+            });
+        }
+    }
+    if (accentColor) {
+        root.style.setProperty('--color-accent', accentColor);
+        root.style.setProperty('--color-secondary', accentColor);
+        const accentShades = getShades(accentColor);
+        if (accentShades) {
+            Object.entries(accentShades).forEach(([weight, { hex, rgb }]) => {
+                root.style.setProperty(`--color-accent-${weight}`, hex);
+                root.style.setProperty(`--color-accent-${weight}-rgb`, rgb);
+                root.style.setProperty(`--color-emerald-${weight}`, hex);
+            });
+        }
     }
 }
 
@@ -77,21 +109,7 @@ export const BrandingProvider = ({ children }) => {
                 setBranding(data);
 
                 // Inject CSS custom variables into root element
-                const root = document.documentElement;
-                if (data.primaryColor) {
-                    root.style.setProperty('--color-primary', data.primaryColor);
-                    const shades = getShades(data.primaryColor);
-                    if (shades) {
-                        Object.entries(shades).forEach(([weight, hex]) => {
-                            root.style.setProperty(`--color-primary-${weight}`, hex);
-                        });
-                    }
-                }
-                if (data.accentColor) {
-                    root.style.setProperty('--color-accent', data.accentColor);
-                    // Map secondary to accent for design compatibility
-                    root.style.setProperty('--color-secondary', data.accentColor);
-                }
+                applyBrandingColors(data.primaryColor, data.accentColor);
 
                 // Dynamically set title and favicon
                 if (data.name) {

@@ -299,11 +299,13 @@ export class VoicemailService implements OnModuleInit {
       await this.convertAudio(source, converted);
       await this.setPermissions(converted, 0o640);
       await fs.rename(converted, path);
-      await this.prisma.voicemailBox.update({ where: { id }, data: {
-        greetingPath: path,
-        greetingAudioFileId: librarySource?.audioFileId || null,
-        greetingAudioName: librarySource?.audioName || null,
-      } });
+      await this.prisma.voicemailBox.update({
+        where: { id }, data: {
+          greetingPath: path,
+          greetingAudioFileId: librarySource?.audioFileId || null,
+          greetingAudioName: librarySource?.audioName || null,
+        }
+      });
       await this.sync.syncVoicemailBox(id);
       return { uploaded: true };
     } catch (error) {
@@ -324,9 +326,11 @@ export class VoicemailService implements OnModuleInit {
   async removeGreeting(tenantId: string, id: string) {
     await this.assertEnabled(tenantId);
     await this.getBox(tenantId, id);
-    await this.prisma.voicemailBox.update({ where: { id }, data: {
-      greetingPath: null, greetingAudioFileId: null, greetingAudioName: null,
-    } });
+    await this.prisma.voicemailBox.update({
+      where: { id }, data: {
+        greetingPath: null, greetingAudioFileId: null, greetingAudioName: null,
+      }
+    });
     await this.sync.syncVoicemailBox(id);
     await fs.rm(this.greetingPath(tenantId, id), { force: true });
     return { defaultGreeting: true };

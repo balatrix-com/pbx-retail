@@ -51,17 +51,17 @@ const COLOR_VARIANTS = {
         dotGlow: 'shadow-[0_0_10px_rgba(16,185,129,0.6)] dark:shadow-[0_0_12px_#34d399]',
     },
     teal: {
-        // Teal / Cyan variant
-        hexBg: 'from-[#0d9488] via-[#14b8a6] to-[#2dd4bf]',
-        hexShadow: 'shadow-[0_10px_25px_-5px_rgba(20,184,166,0.45)] dark:shadow-[0_10px_25px_-5px_rgba(20,184,166,0.7)]',
-        glowAura: 'radial-gradient(ellipse at center, rgba(20,184,166,0.2) 0%, rgba(20,184,166,0) 70%)',
-        darkGlowAura: 'radial-gradient(ellipse at center, rgba(20,184,166,0.35) 0%, rgba(20,184,166,0) 70%)',
-        pillBg: 'bg-teal-50 dark:bg-[#134e4a]/85 border-teal-300 dark:border-[#2dd4bf]/50 text-teal-700 dark:text-[#5eead4]',
-        pillShadow: 'shadow-[0_4px_12px_rgba(45,212,191,0.2)] dark:shadow-[0_4px_16px_rgba(45,212,191,0.35)]',
-        pillArrow: 'text-teal-600 dark:text-[#5eead4]',
-        podBorder: 'border-teal-200/70 hover:border-teal-400 dark:border-white/[0.12] dark:hover:border-[#14b8a6]/50',
-        dotColor: 'bg-teal-500 dark:bg-[#2dd4bf]',
-        dotGlow: 'shadow-[0_0_10px_rgba(20,184,166,0.6)] dark:shadow-[0_0_12px_#2dd4bf]',
+        // Dynamic primary theme variant
+        hexBg: 'from-primary-600 via-primary-500 to-primary-400',
+        hexShadow: 'shadow-[0_10px_25px_-5px_rgb(var(--color-primary-500-rgb)/0.45)] dark:shadow-[0_10px_25px_-5px_rgb(var(--color-primary-500-rgb)/0.7)]',
+        glowAura: 'radial-gradient(ellipse at center, rgb(var(--color-primary-500-rgb) / 0.2) 0%, rgb(var(--color-primary-500-rgb) / 0) 70%)',
+        darkGlowAura: 'radial-gradient(ellipse at center, rgb(var(--color-primary-500-rgb) / 0.35) 0%, rgb(var(--color-primary-500-rgb) / 0) 70%)',
+        pillBg: 'bg-primary-50 dark:bg-primary-900/85 border-primary-300 dark:border-primary-400/50 text-primary-700 dark:text-primary-300',
+        pillShadow: 'shadow-[0_4px_12px_rgb(var(--color-primary-400-rgb)/0.2)] dark:shadow-[0_4px_16px_rgb(var(--color-primary-400-rgb)/0.35)]',
+        pillArrow: 'text-primary-600 dark:text-primary-300',
+        podBorder: 'border-primary-200/70 hover:border-primary-400 dark:border-white/[0.12] dark:hover:border-primary-500/50',
+        dotColor: 'bg-primary-500 dark:bg-primary-400',
+        dotGlow: 'shadow-[0_0_10px_rgb(var(--color-primary-500-rgb)/0.6)] dark:shadow-[0_0_12px_var(--color-primary-400)]',
     },
     amber: {
         // Warm gold/amber variant
