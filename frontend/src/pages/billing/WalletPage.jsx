@@ -158,40 +158,6 @@ const WalletPage = () => {
                                         <RotateCw size={15} className={addingFunds ? "animate-spin text-teal-700" : "text-teal-700"} />
                                         <span>Add Funds</span>
                                     </button>
-                            </div>
-                        </>
-                    )}
-                </div>
-            </header>
-
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                {/* Subscription Card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative group hover:shadow-md transition-all duration-300">
-                    <div className="p-5 relative z-10">
-                        <div className="flex items-center gap-2.5 mb-2">
-                            <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-400 ring-1 ring-blue-500/10 dark:ring-blue-400/20 flex items-center justify-center">
-                                <RefreshCw className="h-4 w-4 stroke-[2.2]" />
-                            </div>
-                            <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Plan</dt>
-                        </div>
-                        <dd className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-2 truncate">
-                            {subscription?.plan_name || 'No Active Plan'}
-                        </dd>
-                    </div>
-                    <div className="bg-purple-50/50 dark:bg-purple-950/40 px-6 py-3 border-t border-purple-100 dark:border-purple-900/40 relative z-10">
-                        <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
-                            <span>{subscription?.limits?.extensions || 0} Extensions</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Balance Card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative group hover:shadow-md transition-all duration-300">
-                    <div className="p-5 relative z-10">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5 mb-2">
-                                <div className="p-1.5 rounded-lg text-blue-500 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-400 ring-1 ring-blue-500/10 dark:ring-blue-400/20 flex items-center justify-center">
-                                    <Wallet className="h-4 w-4 stroke-[2.2]" />
                                 </div>
                             </>
                         )}

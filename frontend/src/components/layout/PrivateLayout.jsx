@@ -1,7 +1,6 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import Header from './Header';
-import TopNavbar from './TopNavbar';
 import { useAuth } from '../../context/AuthContext';
 import ProtectedRoute from './ProtectedRoute';
 import BlockedScreen from '../BlockedScreen';

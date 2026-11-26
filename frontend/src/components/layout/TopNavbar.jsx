@@ -163,6 +163,7 @@ const TopNavbar = ({ inline = false }) => {
                             { name: 'Ring Groups', href: '/telecom/ring-groups', icon: UserCheck },
                             { name: 'IVR Menus', href: '/telecom/ivrs', icon: ListTree },
                             { name: 'Audio Library', href: '/telecom/audio', icon: Music },
+                            { name: 'Voicemail', href: '/telecom/voicemail', icon: Headphones },
                             { name: 'DID Forwards', href: '/telecom/did-forwards', icon: PhoneForwarded },
                             { name: 'Trunks & Carriers', href: '/telecom/trunks', icon: Server },
                             { name: 'Operational Schedules', href: '/telecom/schedules', icon: Clock },
@@ -203,6 +204,7 @@ const TopNavbar = ({ inline = false }) => {
                             { name: 'Ring Groups', href: '/telecom/ring-groups', icon: UserCheck },
                             { name: 'IVR Menus', href: '/telecom/ivrs', icon: ListTree },
                             { name: 'Audio Library', href: '/telecom/audio', icon: Music },
+                            { name: 'Voicemail', href: '/telecom/voicemail', icon: Headphones },
                             { name: 'DID Forwards', href: '/telecom/did-forwards', icon: PhoneForwarded },
                             { name: 'Operational Schedules', href: '/telecom/schedules', icon: Clock },
                         ]
@@ -222,9 +224,15 @@ const TopNavbar = ({ inline = false }) => {
                 items = [];
         }
 
-        if (!canMonitor) {
-            items = items.filter(item => item.name !== 'Call Monitoring');
-        }
+        items = items.map(item => item.hasSubmenu
+            ? {
+                ...item,
+                subItems: item.subItems.filter(subItem => {
+                    if (!canMonitor && subItem.name === 'Call Monitoring') return false;
+                    return true;
+                })
+            }
+            : item).filter(item => !item.hasSubmenu || item.subItems.length > 0);
 
         if (role !== 'SUPER_ADMIN') {
             const features = user?.tenant?.tenantFeatures || {
@@ -235,21 +243,19 @@ const TopNavbar = ({ inline = false }) => {
                 monitorEnabled: true,
             };
 
-            if (!features.ivrEnabled) {
-                items = items.filter(item => item.name !== 'IVR Menus');
-            }
-            if (!features.ringGroupEnabled) {
-                items = items.filter(item => item.name !== 'Ring Groups');
-            }
-            if (!features.schedulerEnabled) {
-                items = items.filter(item => item.name !== 'Schedules' && item.name !== 'Operational Time');
-            }
-            if (!features.didForwardEnabled) {
-                items = items.filter(item => item.name !== 'DID Forwards');
-            }
-            if (!features.monitorEnabled) {
-                items = items.filter(item => item.name !== 'Call Monitoring');
-            }
+            items = items.map(item => item.hasSubmenu
+                ? {
+                    ...item,
+                    subItems: item.subItems.filter(subItem => {
+                        if (!features.ivrEnabled && subItem.name === 'IVR Menus') return false;
+                        if (!features.ringGroupEnabled && subItem.name === 'Ring Groups') return false;
+                        if (!features.schedulerEnabled && ['Schedules', 'Operational Schedules', 'Operational Time'].includes(subItem.name)) return false;
+                        if (!features.didForwardEnabled && subItem.name === 'DID Forwards') return false;
+                        if (!features.monitorEnabled && subItem.name === 'Call Monitoring') return false;
+                        return true;
+                    })
+                }
+                : item).filter(item => !item.hasSubmenu || item.subItems.length > 0);
         }
 
         return items;

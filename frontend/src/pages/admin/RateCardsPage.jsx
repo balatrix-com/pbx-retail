@@ -8,6 +8,12 @@ import {
     Edit2,
     Save,
     X,
+    Globe,
+    PhoneIncoming,
+    PhoneOutgoing,
+    Info,
+    CheckCircle,
+    AlertCircle,
     Loader2,
     Users,
     Sparkles,
@@ -22,6 +28,11 @@ import CreativeStatCard from '../../components/common/CreativeStatCard';
 
 const RateCardsPage = () => {
     const { isSuperAdmin } = useAuth();
+    const [activeTab, setActiveTab] = useState('standard'); // 'standard' or 'recording'
+
+    // Standard Rate Card States
+    const [rateCards, setRateCards] = useState([]);
+    const [mappings, setMappings] = useState([]);
 
     // Recording Rate Card States
     const [recRateCards, setRecRateCards] = useState([]);
@@ -55,16 +66,52 @@ const RateCardsPage = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [recRcRes, recMapRes] = await Promise.all([
+            const [rcRes, mapRes, recRcRes, recMapRes] = await Promise.all([
+                api.get('/admin/rate-cards'),
+                api.get('/admin/rate-cards/mappings'),
                 api.get('/admin/rec-rate-cards'),
                 api.get('/admin/rec-rate-cards/mappings')
             ]);
-            setRecRateCards(recRcRes.data?.data || (Array.isArray(recRcRes.data) ? recRcRes.data : []));
-            setRecMappings(recMapRes.data?.data || (Array.isArray(recMapRes.data) ? recMapRes.data : []));
+            setRateCards(rcRes.data.data || []);
+            setMappings(mapRes.data.data || []);
+            setRecRateCards(recRcRes.data.data || []);
+            setRecMappings(recMapRes.data.data || []);
         } catch (error) {
-            console.error('Failed to fetch recording rate cards data:', error);
+            console.error('Failed to fetch data:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSaveRateCard = async (formData) => {
+        try {
+            setModalLoading(true);
+            if (editingCard) {
+                await api.put(`/admin/rate-cards/${editingCard.ratecard_id}`, formData);
+            } else {
+                await api.post('/admin/rate-cards', formData);
+            }
+            setShowModal(false);
+            setEditingCard(null);
+            fetchData();
+        } catch (error) {
+            console.error('Failed to save rate card:', error);
+            alert('Error saving rate card: ' + (error.response?.data?.message || error.message));
+        } finally {
+            setModalLoading(false);
+        }
+    };
+
+    const handleUpdateMapping = async (customerId, ratecardId) => {
+        try {
+            await api.post('/admin/rate-cards/mappings', {
+                customer_id: customerId,
+                ratecard_id: parseInt(ratecardId)
+            });
+            fetchData();
+        } catch (error) {
+            console.error('Failed to update mapping:', error);
+            alert('Error updating mapping: ' + (error.response?.data?.message || error.message));
         }
     };
 
@@ -91,7 +138,7 @@ const RateCardsPage = () => {
     const handleUpdateRecMapping = async (customerId, recRcId) => {
         try {
             await api.put(`/admin/rec-rate-cards/customer/${customerId}`, {
-                rec_rc_id: parseInt(recRcId, 10)
+                rec_rc_id: parseInt(recRcId)
             });
             fetchData();
         } catch (error) {
@@ -104,12 +151,24 @@ const RateCardsPage = () => {
         return <div className="p-8 text-center text-red-600 font-bold">Access Denied</div>;
     }
 
+    // Filter calculations depending on activeTab
+    const filteredRateCards = rateCards.filter(card =>
+        card.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        card.country?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const filteredMappings = mappings.filter(m =>
+        m.customer_id.toLowerCase().includes(mappingSearchQuery.toLowerCase()) ||
+        m.customer_email.toLowerCase().includes(mappingSearchQuery.toLowerCase())
+    );
+
     const filteredRecRateCards = recRateCards.filter(card =>
-        card.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        ['7_days_standard', '15_days_standard', '30_days_standard'].includes(card.name.toLowerCase()) &&
+        card.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const filteredRecMappings = recMappings.filter(m =>
-        String(m.customer_id || '').toLowerCase().includes(mappingSearchQuery.toLowerCase()) ||
+        String(m.customer_id).toLowerCase().includes(mappingSearchQuery.toLowerCase()) ||
         String(m.customer_email || '').toLowerCase().includes(mappingSearchQuery.toLowerCase())
     );
 
@@ -678,172 +737,9 @@ const RateCardsPage = () => {
                     loading={modalLoading}
                 />
             )}
-        <div className="max-w-7xl mx-auto pb-12 space-y-8 animate-in fade-in duration-500">
-            {/* Header */}
-            <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 sm:px-0">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900 flex items-center gap-2 md:gap-3">
-                        <CreditCard className="text-primary-600 h-6 w-6 md:h-8 md:w-8" />
-                        Recording Rate Cards
-                    </h1>
-                    <p className="text-gray-500 mt-1 font-medium text-sm md:text-base">
-                        Configure recording storage and rates per minute, then assign to tenants
-                    </p>
-                </div>
-                <button
-                    onClick={() => {
-                        setEditingCard(null);
-                        setShowModal(true);
-                    }}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all w-full sm:w-auto"
-                >
-                    <Plus size={20} />
-                    Add Recording Rate Card
-                </button>
-            </header>
-
-            {/* Recording Rate Cards Table */}
-            <section className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                        Existing Recording Rate Cards
-                        <span className="text-sm font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{recRateCards.length}</span>
-                    </h2>
-                    <div className="relative max-w-xs w-full">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <input
-                            type="text"
-                            placeholder="Search recording cards..."
-                            className="w-full pl-9 pr-4 py-2 rounded-xl border-gray-200 focus:border-primary-500 focus:ring-primary-500 text-sm font-medium bg-gray-50/50"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-gray-50/50">
-                                <th className="px-4 md:px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 text-center">ID</th>
-                                <th className="px-4 md:px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">Name</th>
-                                <th className="px-4 md:px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 text-center">Currency</th>
-                                <th className="px-4 md:px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 text-center">Rate Per Min</th>
-                                <th className="px-4 md:px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 text-center">Retention Period (Days)</th>
-                                <th className="px-4 md:px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
-                                            <p className="text-sm font-medium text-gray-500">Loading recording rate cards...</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : filteredRecRateCards.length === 0 ? (
-                                <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500 font-medium">No recording rate cards found</td>
-                                </tr>
-                            ) : filteredRecRateCards.map(card => (
-                                <tr key={card.id} className="hover:bg-gray-50/50 transition-colors group">
-                                    <td className="px-4 md:px-6 py-4 text-center font-semibold text-gray-500 text-xs">{card.id}</td>
-                                    <td className="px-4 md:px-6 py-4">
-                                        <span className="font-bold text-gray-900 text-sm">{card.name}</span>
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-center">
-                                        <span className="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-700 ring-1 ring-inset ring-gray-500/10 uppercase">
-                                            {card.currency}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-center font-bold text-gray-900">
-                                        ${parseFloat(card.rate_per_min || 0).toFixed(4)}<span className="text-[10px] text-gray-400 font-normal">/min</span>
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-center font-bold text-gray-700">
-                                        {card.retention_period} Days
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => {
-                                                setEditingCard(card);
-                                                setShowModal(true);
-                                            }}
-                                            className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                                        >
-                                            <Edit2 size={18} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            {/* Recording Customer Mapping */}
-            <section className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                        <Users className="text-primary-600 h-6 w-6" />
-                        Tenant Recording Rate Card Assignments
-                    </h2>
-                    <div className="relative max-w-xs w-full">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <input
-                            type="text"
-                            placeholder="Search tenants..."
-                            className="w-full pl-9 pr-4 py-2 rounded-xl border-gray-200 focus:border-primary-500 focus:ring-primary-500 text-sm font-medium bg-gray-50/50"
-                            value={mappingSearchQuery}
-                            onChange={(e) => setMappingSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div className="max-h-[600px] overflow-y-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-0 bg-white z-10 shadow-sm">
-                            <tr className="bg-gray-50/50">
-                                <th className="px-4 md:px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">Customer ID</th>
-                                <th className="hidden md:table-cell px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">Email Address</th>
-                                <th className="px-4 md:px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">Recording Rate Card</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan="3" className="px-6 py-12 text-center text-gray-500 font-medium">Loading assignments...</td>
-                                </tr>
-                            ) : filteredRecMappings.length === 0 ? (
-                                <tr>
-                                    <td colSpan="3" className="px-6 py-12 text-center text-gray-500 font-medium">No tenants found</td>
-                                </tr>
-                            ) : filteredRecMappings.map(mapping => (
-                                <tr key={mapping.customer_id} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="px-4 md:px-6 py-4 font-bold text-gray-900 text-sm">{mapping.customer_id}</td>
-                                    <td className="hidden md:table-cell px-6 py-4 text-sm font-medium text-gray-600 truncate max-w-[200px]">{mapping.customer_email}</td>
-                                    <td className="px-4 md:px-6 py-4">
-                                        <select
-                                            className="w-full max-w-[150px] md:max-w-[200px] text-[10px] md:text-sm font-bold text-gray-700 rounded-xl border-gray-200 focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 py-1.5"
-                                            value={mapping.rec_rc_id || ""}
-                                            onChange={(e) => handleUpdateRecMapping(mapping.customer_id, e.target.value)}
-                                        >
-                                            <option value="" disabled>Select Recording Rate Card</option>
-                                            {recRateCards.map(rc => (
-                                                <option key={rc.id} value={rc.id}>{rc.name} ({rc.currency})</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
 
             {/* Recording Add/Edit Modal */}
-            {showModal && (
+            {showModal && activeTab === 'recording' && (
                 <AddEditRecRateCardModal
                     card={editingCard}
                     onClose={() => setShowModal(false)}
@@ -1050,13 +946,18 @@ const AddEditRecRateCardModal = ({ card, onClose, onSave, loading }) => {
         id: card?.id || '',
         name: card?.name || '',
         currency: card?.currency || 'USD',
-        rate_per_min: card?.rate_per_min || 0.001,
-        retention_period: card?.retention_period || 7
+        rate_per_min: card?.rate_per_min || 0,
+        retention_period: card?.retention_period || 7,
     });
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSave(formData);
+        onSave({
+            ...formData,
+            id: formData.id ? parseInt(formData.id) : undefined,
+            rate_per_min: parseFloat(formData.rate_per_min),
+            retention_period: parseInt(formData.retention_period)
+        });
     };
 
     return (
@@ -1134,7 +1035,7 @@ const AddEditRecRateCardModal = ({ card, onClose, onSave, loading }) => {
                                 disabled={!!card}
                                 className="w-full rounded-2xl border-gray-200 bg-gray-50/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent py-3 px-4 font-bold text-gray-900 disabled:opacity-60 disabled:bg-gray-100 disabled:cursor-not-allowed"
                                 value={formData.retention_period}
-                                onChange={e => setFormData({ ...formData, retention_period: parseInt(e.target.value, 10) })}
+                                onChange={e => setFormData({ ...formData, retention_period: parseInt(e.target.value) })}
                             >
                                 <option value={7}>7 Days</option>
                                 <option value={15}>15 Days</option>

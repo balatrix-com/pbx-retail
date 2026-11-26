@@ -496,20 +496,6 @@ const TenantsPage = () => {
                                         </td>
                                         <td className="py-3 px-4 whitespace-nowrap">
                                             {statusPill(tenant)}
-                                        <td className="px-6 py-5 whitespace-nowrap">
-                                            <span className={clsx(
-                                                "inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ring-1",
-                                                tenant.status === 'ARCHIVED' ? 'bg-slate-100 text-slate-700 ring-slate-500/20' : 
-                                                tenant.serviceBlocked || tenant.serviceStatus === 'BLOCKED' ? 'bg-red-50 text-red-700 ring-red-600/10' :
-                                                tenant.serviceStatus === 'DEACTIVATED' ? 'bg-amber-50 text-amber-700 ring-amber-600/20' :
-                                                'bg-emerald-50 text-emerald-700 ring-emerald-600/10'
-                                            )}>
-                                                {tenant.status === 'ARCHIVED' ? 'Archived' : 
-                                                 tenant.archiveJob ? tenant.archiveJob.state.replaceAll('_', ' ') : 
-                                                 tenant.serviceBlocked || tenant.serviceStatus === 'BLOCKED' ? 'Service Blocked' : 
-                                                 tenant.serviceStatus === 'DEACTIVATED' ? 'Deactivated' : 'Active'}
-                                            </span>
-                                            {tenant.archiveJob?.last_error && <p className="text-xs text-red-700 max-w-xs whitespace-normal mt-1">{tenant.archiveJob.last_error}</p>}
                                         </td>
                                         <td className="py-3 px-4 text-center">
                                             <span className="inline-flex px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/5 text-xs font-bold text-slate-700 dark:text-slate-300">
