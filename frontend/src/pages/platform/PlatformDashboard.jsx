@@ -236,32 +236,32 @@ const PlatformDashboard = () => {
             {/* Top Metric Cards: Revenue Highlight (Left) + 4 Stat Tiles Grid (Right) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
                 {/* Left Large Card: Monthly telecom revenue with decorative bar chart graphic */}
-                <div className="platform-card-blue lg:col-span-6 rounded-2xl p-6 sm:p-7 flex flex-col justify-between relative overflow-hidden group">
+                <div className="platform-card-blue bg-gradient-to-br from-primary-100/75 via-primary-50/90 to-emerald-50/70 dark:from-primary-800 dark:to-primary-950 border border-primary-400/40 dark:border-primary-500/25 lg:col-span-6 rounded-2xl p-6 sm:p-7 flex flex-col justify-between relative overflow-hidden group">
                     <div className="relative z-10">
-                        <div className="flex items-center gap-2 text-teal-700 dark:text-teal-300 text-xs sm:text-sm font-bold">
+                        <div className="flex items-center gap-2 text-primary-700 dark:text-primary-300 text-xs sm:text-sm font-bold">
                             <CreditCard className="h-4 w-4" />
                             <span>Monthly telecom revenue</span>
                         </div>
-                        <div className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-black text-teal-800 dark:text-teal-200 tracking-tight">
+                        <div className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-black text-primary-800 dark:text-primary-200 tracking-tight">
                             ${Number(stats.telecom.monthlyRevenue || 0).toFixed(2)}
                         </div>
-                        <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-teal-700/90 dark:text-teal-300">
-                            <span className="text-emerald-600 font-extrabold">↑ +12.5%</span> from last month
+                        <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-primary-700/90 dark:text-primary-300">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">↑ +12.5%</span> from last month
                         </div>
                     </div>
 
                     {/* Decorative Bar Chart Visualization on Revenue card matching screenshot */}
                     <div className="absolute right-4 bottom-3 flex items-end gap-1.5 h-24 pointer-events-none opacity-40 group-hover:opacity-75 transition-opacity">
-                        <div className="w-2.5 sm:w-3.5 bg-teal-400/60 rounded-t-md h-[25%]" />
-                        <div className="w-2.5 sm:w-3.5 bg-teal-400/70 rounded-t-md h-[40%]" />
-                        <div className="w-2.5 sm:w-3.5 bg-teal-400/60 rounded-t-md h-[30%]" />
-                        <div className="w-2.5 sm:w-3.5 bg-teal-500/70 rounded-t-md h-[55%]" />
-                        <div className="w-2.5 sm:w-3.5 bg-teal-500/80 rounded-t-md h-[70%]" />
-                        <div className="w-2.5 sm:w-3.5 bg-teal-600/80 rounded-t-md h-[85%]" />
-                        <div className="w-2.5 sm:w-3.5 bg-teal-600 rounded-t-md h-[100%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-primary-400/60 rounded-t-md h-[25%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-primary-400/70 rounded-t-md h-[40%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-primary-400/60 rounded-t-md h-[30%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-primary-500/70 rounded-t-md h-[55%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-primary-500/80 rounded-t-md h-[70%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-primary-600/80 rounded-t-md h-[85%]" />
+                        <div className="w-2.5 sm:w-3.5 bg-primary-600 rounded-t-md h-[100%]" />
                     </div>
 
-                    <p className="mt-4 text-xs sm:text-sm text-teal-700/80 dark:text-teal-300/80 font-medium relative z-10">
+                    <p className="mt-4 text-xs sm:text-sm text-primary-700/80 dark:text-primary-300/80 font-medium relative z-10">
                         from {stats.telecom.activeTenants || 0} active telecom tenants
                     </p>
                 </div>
@@ -530,7 +530,7 @@ const PlatformDashboard = () => {
                                     onClick={() => setFilterTab('all')}
                                     className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                                         filterTab === 'all'
-                                            ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                                            ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/20'
                                             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                                     }`}
                                 >
@@ -541,7 +541,7 @@ const PlatformDashboard = () => {
                                     onClick={() => setFilterTab('active')}
                                     className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                                         filterTab === 'active'
-                                            ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                                            ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/20'
                                             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                                     }`}
                                 >
@@ -561,7 +561,7 @@ const PlatformDashboard = () => {
                                             setSearch(e.target.value);
                                             setPage(1);
                                         }}
-                                        className="w-full pl-10 pr-4 py-2 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800 transition-all"
+                                        className="w-full pl-10 pr-4 py-2 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-800 transition-all"
                                     />
                                 </div>
                                 <button
@@ -600,7 +600,7 @@ const PlatformDashboard = () => {
                                         <tr>
                                             <td colSpan="4" className="text-center py-12 text-sm font-medium text-slate-400">
                                                 <div className="inline-flex items-center gap-2">
-                                                    <RefreshCcw className="h-4 w-4 animate-spin text-blue-500" />
+                                                    <RefreshCcw className="h-4 w-4 animate-spin text-primary-500" />
                                                     Loading directory...
                                                 </div>
                                             </td>
@@ -616,13 +616,13 @@ const PlatformDashboard = () => {
                                             const isExpanded = expandedRows.has(tenant.id);
                                             const balanceNum = Number(tenant.wallet?.balance || 0);
 
-                                            // Avatar initial and color palette cycling (blue, purple, pink/red)
+                                            // Avatar initial and theme-matched color palette
                                             const initial = (tenant.name || 'T').trim().charAt(0).toUpperCase();
                                             const avatarPalette = [
-                                                'bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400',
-                                                'bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400',
-                                                'bg-pink-100 text-pink-600 dark:bg-pink-950/60 dark:text-pink-400',
-                                                'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400',
+                                                'bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300',
+                                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
+                                                'bg-primary-50 text-primary-600 dark:bg-primary-900/60 dark:text-primary-200',
+                                                'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-200',
                                             ];
                                             const avatarClass = avatarPalette[idx % avatarPalette.length];
 
@@ -641,7 +641,7 @@ const PlatformDashboard = () => {
                                                         onClick={() => setSelectedTenant(tenant)}
                                                         className={`group transition-all cursor-pointer ${
                                                             isExpanded
-                                                                ? 'bg-blue-50/30 dark:bg-slate-800/40'
+                                                                ? 'bg-primary-50/30 dark:bg-slate-800/40'
                                                                 : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
                                                         }`}
                                                     >
@@ -654,7 +654,7 @@ const PlatformDashboard = () => {
                                                                     {initial}
                                                                 </div>
                                                                 <div className="min-w-0">
-                                                                    <div className="font-bold text-sm text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                                    <div className="font-bold text-sm text-slate-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                                                                         {tenant.name}
                                                                     </div>
                                                                     <div className="flex items-center gap-2 mt-0.5">

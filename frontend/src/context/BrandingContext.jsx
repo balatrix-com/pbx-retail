@@ -91,8 +91,8 @@ export const BrandingProvider = ({ children }) => {
         logoMain: '/svg logo/logo-main.svg',
         logoSidebar: '/svg logo/logo-main.svg',
         favicon: '/svg logo/favicon.svg',
-        primaryColor: '#0d9488',
-        accentColor: '#14b8a6',
+        primaryColor: '#8b5cf6',
+        accentColor: '#c084fc',
         supportEmail: 'support@telecom-platform.com',
         supportPhone: '+1-800-555-0199',
     });
@@ -101,11 +101,18 @@ export const BrandingProvider = ({ children }) => {
     const fetchBranding = async (isInitial = false) => {
         try {
             if (isInitial) setLoading(true);
+            // Apply light Lavender & Soft Lilac platform theme
+            applyBrandingColors('#8b5cf6', '#c084fc');
+
             const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
             const response = await axios.get(`${apiBaseUrl}/branding`);
 
             if (response.data) {
-                const data = response.data;
+                const data = {
+                    ...response.data,
+                    primaryColor: '#8b5cf6',
+                    accentColor: '#c084fc',
+                };
                 setBranding(data);
 
                 // Inject CSS custom variables into root element

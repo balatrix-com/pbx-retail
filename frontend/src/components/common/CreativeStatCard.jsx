@@ -10,98 +10,27 @@ import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
  *   with crisp dark typography (`text-slate-900`), soft translucent tinting, and color-matched vibrant floating elements.
  */
 
+const THEME_VARIANT = {
+    hexBg: 'from-primary-600 via-primary-500 to-emerald-400',
+    hexShadow: 'shadow-[0_10px_25px_-5px_rgb(var(--color-primary-500-rgb)/0.45)] dark:shadow-[0_10px_25px_-5px_rgb(var(--color-primary-500-rgb)/0.7)]',
+    glowAura: 'radial-gradient(ellipse at center, rgb(var(--color-primary-500-rgb) / 0.2) 0%, rgb(var(--color-primary-500-rgb) / 0) 70%)',
+    darkGlowAura: 'radial-gradient(ellipse at center, rgb(var(--color-primary-500-rgb) / 0.35) 0%, rgb(var(--color-primary-500-rgb) / 0) 70%)',
+    pillBg: 'bg-primary-50 dark:bg-primary-900/85 border-primary-300 dark:border-primary-400/50 text-primary-700 dark:text-primary-300',
+    pillShadow: 'shadow-[0_4px_12px_rgb(var(--color-primary-400-rgb)/0.2)] dark:shadow-[0_4px_16px_rgb(var(--color-primary-400-rgb)/0.35)]',
+    pillArrow: 'text-primary-600 dark:text-primary-300',
+    podBorder: 'border-primary-200/70 hover:border-primary-400 dark:border-white/[0.12] dark:hover:border-primary-500/50',
+    dotColor: 'bg-primary-500 dark:bg-primary-400',
+    dotGlow: 'shadow-[0_0_10px_rgb(var(--color-primary-500-rgb)/0.6)] dark:shadow-[0_0_12px_var(--color-primary-400)]',
+};
+
 const COLOR_VARIANTS = {
-    blue: {
-        // Vibrant bright blue matching "Organizations 7"
-        hexBg: 'from-[#2563eb] via-[#3b82f6] to-[#60a5fa]',
-        hexShadow: 'shadow-[0_10px_25px_-5px_rgba(37,99,235,0.45)] dark:shadow-[0_10px_25px_-5px_rgba(37,99,235,0.7)]',
-        glowAura: 'radial-gradient(ellipse at center, rgba(37,99,235,0.2) 0%, rgba(37,99,235,0) 70%)',
-        darkGlowAura: 'radial-gradient(ellipse at center, rgba(37,99,235,0.35) 0%, rgba(37,99,235,0) 70%)',
-        pillBg: 'bg-emerald-50 dark:bg-[#064e3b]/85 border-emerald-300 dark:border-[#10b981]/50 text-emerald-700 dark:text-[#34d399]',
-        pillShadow: 'shadow-[0_4px_12px_rgba(16,185,129,0.2)] dark:shadow-[0_4px_16px_rgba(16,185,129,0.35)]',
-        pillArrow: 'text-emerald-600 dark:text-[#34d399]',
-        podBorder: 'border-blue-200/70 hover:border-blue-400 dark:border-white/[0.12] dark:hover:border-[#3b82f6]/50',
-        dotColor: 'bg-blue-500 dark:bg-[#60a5fa]',
-        dotGlow: 'shadow-[0_0_10px_rgba(59,130,246,0.6)] dark:shadow-[0_0_12px_#38bdf8]',
-    },
-    purple: {
-        // Deep electric purple/magenta matching "Users 8"
-        hexBg: 'from-[#7c3aed] via-[#9333ea] to-[#c084fc]',
-        hexShadow: 'shadow-[0_10px_25px_-5px_rgba(147,51,234,0.45)] dark:shadow-[0_10px_25px_-5px_rgba(147,51,234,0.7)]',
-        glowAura: 'radial-gradient(ellipse at center, rgba(147,51,234,0.2) 0%, rgba(147,51,234,0) 70%)',
-        darkGlowAura: 'radial-gradient(ellipse at center, rgba(147,51,234,0.35) 0%, rgba(147,51,234,0) 70%)',
-        pillBg: 'bg-purple-50 dark:bg-[#3b0764]/85 border-purple-300 dark:border-[#a855f7]/50 text-purple-700 dark:text-[#d8b4fe]',
-        pillShadow: 'shadow-[0_4px_12px_rgba(168,85,247,0.2)] dark:shadow-[0_4px_16px_rgba(168,85,247,0.35)]',
-        pillArrow: 'text-purple-600 dark:text-[#d8b4fe]',
-        podBorder: 'border-purple-200/70 hover:border-purple-400 dark:border-white/[0.12] dark:hover:border-[#a855f7]/50',
-        dotColor: 'bg-purple-500 dark:bg-[#c084fc]',
-        dotGlow: 'shadow-[0_0_10px_rgba(168,85,247,0.6)] dark:shadow-[0_0_12px_#c084fc]',
-    },
-    emerald: {
-        // Bright emerald/mint matching "Float Balance $4729.94"
-        hexBg: 'from-[#059669] via-[#10b981] to-[#34d399]',
-        hexShadow: 'shadow-[0_10px_25px_-5px_rgba(16,185,129,0.45)] dark:shadow-[0_10px_25px_-5px_rgba(16,185,129,0.7)]',
-        glowAura: 'radial-gradient(ellipse at center, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0) 70%)',
-        darkGlowAura: 'radial-gradient(ellipse at center, rgba(16,185,129,0.35) 0%, rgba(16,185,129,0) 70%)',
-        pillBg: 'bg-emerald-50 dark:bg-[#064e3b]/85 border-emerald-300 dark:border-[#10b981]/50 text-emerald-700 dark:text-[#34d399]',
-        pillShadow: 'shadow-[0_4px_12px_rgba(16,185,129,0.2)] dark:shadow-[0_4px_16px_rgba(16,185,129,0.35)]',
-        pillArrow: 'text-emerald-600 dark:text-[#34d399]',
-        podBorder: 'border-emerald-200/70 hover:border-emerald-400 dark:border-white/[0.12] dark:hover:border-[#10b981]/50',
-        dotColor: 'bg-emerald-500 dark:bg-[#34d399]',
-        dotGlow: 'shadow-[0_0_10px_rgba(16,185,129,0.6)] dark:shadow-[0_0_12px_#34d399]',
-    },
-    teal: {
-        // Dynamic primary theme variant
-        hexBg: 'from-primary-600 via-primary-500 to-primary-400',
-        hexShadow: 'shadow-[0_10px_25px_-5px_rgb(var(--color-primary-500-rgb)/0.45)] dark:shadow-[0_10px_25px_-5px_rgb(var(--color-primary-500-rgb)/0.7)]',
-        glowAura: 'radial-gradient(ellipse at center, rgb(var(--color-primary-500-rgb) / 0.2) 0%, rgb(var(--color-primary-500-rgb) / 0) 70%)',
-        darkGlowAura: 'radial-gradient(ellipse at center, rgb(var(--color-primary-500-rgb) / 0.35) 0%, rgb(var(--color-primary-500-rgb) / 0) 70%)',
-        pillBg: 'bg-primary-50 dark:bg-primary-900/85 border-primary-300 dark:border-primary-400/50 text-primary-700 dark:text-primary-300',
-        pillShadow: 'shadow-[0_4px_12px_rgb(var(--color-primary-400-rgb)/0.2)] dark:shadow-[0_4px_16px_rgb(var(--color-primary-400-rgb)/0.35)]',
-        pillArrow: 'text-primary-600 dark:text-primary-300',
-        podBorder: 'border-primary-200/70 hover:border-primary-400 dark:border-white/[0.12] dark:hover:border-primary-500/50',
-        dotColor: 'bg-primary-500 dark:bg-primary-400',
-        dotGlow: 'shadow-[0_0_10px_rgb(var(--color-primary-500-rgb)/0.6)] dark:shadow-[0_0_12px_var(--color-primary-400)]',
-    },
-    amber: {
-        // Warm gold/amber variant
-        hexBg: 'from-[#d97706] via-[#f59e0b] to-[#fbbf24]',
-        hexShadow: 'shadow-[0_10px_25px_-5px_rgba(245,158,11,0.45)] dark:shadow-[0_10px_25px_-5px_rgba(245,158,11,0.7)]',
-        glowAura: 'radial-gradient(ellipse at center, rgba(245,158,11,0.2) 0%, rgba(245,158,11,0) 70%)',
-        darkGlowAura: 'radial-gradient(ellipse at center, rgba(245,158,11,0.35) 0%, rgba(245,158,11,0) 70%)',
-        pillBg: 'bg-amber-50 dark:bg-[#78350f]/85 border-amber-300 dark:border-[#fbbf24]/50 text-amber-700 dark:text-[#fde68a]',
-        pillShadow: 'shadow-[0_4px_12px_rgba(245,158,11,0.2)] dark:shadow-[0_4px_16px_rgba(245,158,11,0.35)]',
-        pillArrow: 'text-amber-600 dark:text-[#fde68a]',
-        podBorder: 'border-amber-200/70 hover:border-amber-400 dark:border-white/[0.12] dark:hover:border-[#f59e0b]/50',
-        dotColor: 'bg-amber-500 dark:bg-[#fbbf24]',
-        dotGlow: 'shadow-[0_0_10px_rgba(245,158,11,0.6)] dark:shadow-[0_0_12px_#fbbf24]',
-    },
-    rose: {
-        // Rose/crimson variant
-        hexBg: 'from-[#e11d48] via-[#f43f5e] to-[#fb7185]',
-        hexShadow: 'shadow-[0_10px_25px_-5px_rgba(244,63,94,0.45)] dark:shadow-[0_10px_25px_-5px_rgba(244,63,94,0.7)]',
-        glowAura: 'radial-gradient(ellipse at center, rgba(244,63,94,0.2) 0%, rgba(244,63,94,0) 70%)',
-        darkGlowAura: 'radial-gradient(ellipse at center, rgba(244,63,94,0.35) 0%, rgba(244,63,94,0) 70%)',
-        pillBg: 'bg-rose-50 dark:bg-[#881337]/85 border-rose-300 dark:border-[#fb7185]/50 text-rose-700 dark:text-[#fecdd3]',
-        pillShadow: 'shadow-[0_4px_12px_rgba(244,63,94,0.2)] dark:shadow-[0_4px_16px_rgba(244,63,94,0.35)]',
-        pillArrow: 'text-rose-600 dark:text-[#fecdd3]',
-        podBorder: 'border-rose-200/70 hover:border-rose-400 dark:border-white/[0.12] dark:hover:border-[#f43f5e]/50',
-        dotColor: 'bg-rose-500 dark:bg-[#fb7185]',
-        dotGlow: 'shadow-[0_0_10px_rgba(244,63,94,0.6)] dark:shadow-[0_0_12px_#fb7185]',
-    },
-    cyan: {
-        // Electric neon cyan variant
-        hexBg: 'from-[#0891b2] via-[#06b6d4] to-[#67e8f9]',
-        hexShadow: 'shadow-[0_10px_25px_-5px_rgba(6,182,212,0.45)] dark:shadow-[0_10px_25px_-5px_rgba(6,182,212,0.7)]',
-        glowAura: 'radial-gradient(ellipse at center, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0) 70%)',
-        darkGlowAura: 'radial-gradient(ellipse at center, rgba(6,182,212,0.35) 0%, rgba(6,182,212,0) 70%)',
-        pillBg: 'bg-cyan-50 dark:bg-[#164e63]/85 border-cyan-300 dark:border-[#67e8f9]/50 text-cyan-700 dark:text-[#a5f3fc]',
-        pillShadow: 'shadow-[0_4px_12px_rgba(6,182,212,0.2)] dark:shadow-[0_4px_16px_rgba(6,182,212,0.35)]',
-        pillArrow: 'text-cyan-600 dark:text-[#a5f3fc]',
-        podBorder: 'border-cyan-200/70 hover:border-cyan-400 dark:border-white/[0.12] dark:hover:border-[#06b6d4]/50',
-        dotColor: 'bg-cyan-500 dark:bg-[#67e8f9]',
-        dotGlow: 'shadow-[0_0_10px_rgba(6,182,212,0.6)] dark:shadow-[0_0_12px_#67e8f9]',
-    }
+    blue: THEME_VARIANT,
+    purple: THEME_VARIANT,
+    emerald: THEME_VARIANT,
+    teal: THEME_VARIANT,
+    amber: THEME_VARIANT,
+    rose: THEME_VARIANT,
+    cyan: THEME_VARIANT,
 };
 
 const CreativeStatCard = ({
@@ -154,36 +83,29 @@ const CreativeStatCard = ({
                 {/* Internal top glass specular highlight */}
                 <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-slate-300/40 dark:via-white/20 to-transparent pointer-events-none" />
 
-                {/* Left Floating Hexagonal 3D Gem Badge */}
+                {/* Left Floating 3D Teardrop / Petal Badge */}
                 <div className="relative -ml-8 sm:-ml-9 shrink-0 flex items-center justify-center z-10">
-                    {/* Atmospheric glow behind badge */}
+                    {/* Atmospheric glow behind petal */}
                     <div
-                        className="absolute inset-0 rounded-2xl blur-lg opacity-70 dark:opacity-80 group-hover:opacity-100 transition-opacity"
+                        className="absolute inset-0 rounded-[50%_50%_50%_18%] blur-lg opacity-65 dark:opacity-80 group-hover:opacity-100 transition-opacity"
                         style={{ background: variant.darkGlowAura }}
                     />
 
-                    {/* Hexagon Gem Body with crisp inset bevels */}
+                    {/* Teardrop / Petal Body with glossy 3D highlight */}
                     <div
                         className={clsx(
-                            "relative w-[68px] h-[76px] sm:w-[74px] sm:h-[82px] flex items-center justify-center text-white transition-transform duration-300 group-hover:scale-105 group-hover:-translate-y-0.5",
-                            "bg-gradient-to-br border border-white/40",
+                            "relative w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[50%_50%_50%_18%] flex items-center justify-center text-white transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-0.5 overflow-hidden",
+                            "bg-gradient-to-br border border-white/50 ring-1 ring-inset ring-white/30",
                             variant.hexBg,
                             variant.hexShadow
                         )}
-                        style={{
-                            clipPath: 'polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%)',
-                        }}
                     >
-                        {/* Internal specular facet shine */}
-                        <div
-                            className="absolute inset-0 bg-gradient-to-b from-white/45 via-transparent to-black/20 pointer-events-none"
-                            style={{
-                                clipPath: 'polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%)',
-                            }}
-                        />
+                        {/* Internal glossy sheen */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-black/15 pointer-events-none" />
+                        <div className="absolute top-1.5 left-3 w-6 h-3 rounded-full bg-white/45 blur-[1px] -rotate-12 pointer-events-none" />
 
                         {Icon && (
-                            <Icon className="relative z-10 w-7 h-7 sm:w-8 sm:h-8 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] stroke-[2.2]" />
+                            <Icon className="relative z-10 w-7 h-7 sm:w-8 sm:h-8 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] stroke-[2.2]" />
                         )}
                     </div>
                 </div>

@@ -40,6 +40,7 @@ const TenantWizard = ({ onClose, onSuccess }) => {
     const [customerCode, setCustomerCode] = useState(null);
     const [showWarning, setShowWarning] = useState(false);
     const [isValidationError, setIsValidationError] = useState(false);
+    const contentRef = React.useRef(null);
 
     // Step 1: Basic Info
     const [basicInfo, setBasicInfo] = useState({
@@ -148,7 +149,7 @@ const TenantWizard = ({ onClose, onSuccess }) => {
     // --- Step Validations & Navigation (Client-side Only) ---
 
     const isStep1Valid = () => {
-        if (!basicInfo.firstName || !basicInfo.lastName || !basicInfo.adminEmail || !basicInfo.adminPassword || !basicInfo.confirmPassword || !basicInfo.phone || !basicInfo.address || basicInfo.address.length < 10 || !basicInfo.city || !basicInfo.state || !basicInfo.country) {
+        if (!basicInfo.firstName || !basicInfo.lastName || !basicInfo.adminEmail || !basicInfo.adminPassword || !basicInfo.confirmPassword || !/^\d{10}$/.test(basicInfo.phone || '') || !basicInfo.address || basicInfo.address.length < 10 || !basicInfo.city || !basicInfo.state || !basicInfo.country) {
             return false;
         }
         if (basicInfo.customerType === 'company') {
@@ -162,7 +163,19 @@ const TenantWizard = ({ onClose, onSuccess }) => {
     const validateStep1 = () => {
         const missingFields = [];
 
-        // Password match check (show immediately, not as a "missing field")
+        // Email format check
+        if (basicInfo.adminEmail?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(basicInfo.adminEmail.trim())) {
+            setError('Please enter a valid administrator email address.');
+            setIsValidationError(true);
+            return false;
+        }
+
+        // Password length & match check
+        if (basicInfo.adminPassword && basicInfo.adminPassword.length < 6) {
+            setError('Password must be at least 6 characters long.');
+            setIsValidationError(true);
+            return false;
+        }
         if (basicInfo.adminPassword && basicInfo.confirmPassword && basicInfo.adminPassword !== basicInfo.confirmPassword) {
             setError('Passwords do not match. Please ensure both passwords are identical.');
             setIsValidationError(true);
@@ -181,7 +194,7 @@ const TenantWizard = ({ onClose, onSuccess }) => {
         if (!basicInfo.adminEmail?.trim()) missingFields.push('Email');
         if (!basicInfo.adminPassword) missingFields.push('Password');
         if (!basicInfo.confirmPassword) missingFields.push('Confirm Password');
-        if (!basicInfo.phone?.trim()) missingFields.push('Phone');
+        if (!/^\d{10}$/.test(basicInfo.phone?.trim() || '')) missingFields.push('Phone Number (10 digits)');
 
         // Address validation
         if (!basicInfo.address || basicInfo.address.trim().length < 10) {
@@ -209,9 +222,10 @@ const TenantWizard = ({ onClose, onSuccess }) => {
     const handleStep1Next = (e) => {
         if (e) e.preventDefault();
         if (!validateStep1()) {
-            // Trigger shake animation
+            // Trigger shake animation and scroll warning into view
             setShowWarning(true);
             setTimeout(() => setShowWarning(false), 500);
+            contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
         setError(null);
@@ -223,9 +237,14 @@ const TenantWizard = ({ onClose, onSuccess }) => {
         if (e) e.preventDefault();
         if (walletAmount !== '' && Number(walletAmount) < 0) {
             setError('Wallet funding amount cannot be negative');
+            setIsValidationError(true);
+            setShowWarning(true);
+            setTimeout(() => setShowWarning(false), 500);
+            contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
         setError(null);
+        setIsValidationError(false);
         setCurrentStep(3);
     };
 
@@ -534,10 +553,14 @@ const TenantWizard = ({ onClose, onSuccess }) => {
                                     type="tel"
                                     name="tenant_phone"
                                     autoComplete="off"
+                                    maxLength={10}
                                     className={`${inputClass} font-mono`}
                                     value={basicInfo.phone}
-                                    onChange={e => setBasicInfo({ ...basicInfo, phone: e.target.value })}
-                                    placeholder="e.g. +1 555 123 4567"
+                                    onChange={e => {
+                                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                        setBasicInfo({ ...basicInfo, phone: digits });
+                                    }}
+                                    placeholder="e.g. 9876543210"
                                 />
                             </div>
                             <div className="sm:col-span-2">
@@ -1001,8 +1024,8 @@ const TenantWizard = ({ onClose, onSuccess }) => {
                 </div>
 
                 {/* Content Canvas (Scrollable area) */}
-                <div className="p-5 sm:p-6 flex-1 min-h-0 overflow-y-auto bg-[#f8fafc] dark:bg-[#06080d]">
-                    {error && !(currentStep === 1 && isValidationError) && (
+                <div ref={contentRef} className="p-5 sm:p-6 flex-1 min-h-0 overflow-y-auto bg-[#f8fafc] dark:bg-[#06080d]">
+                    {error && (
                         <div
                             className={`mb-4 p-3 rounded-2xl border text-xs font-semibold flex justify-between items-start transition-all ${isValidationError
                                 ? `bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40 ${showWarning ? 'animate-shake' : ''}`

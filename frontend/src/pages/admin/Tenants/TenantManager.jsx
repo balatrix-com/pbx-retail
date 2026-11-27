@@ -115,33 +115,34 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
             
             <div className="relative bg-[#f8fafc] dark:bg-[#07090e] rounded-3xl shadow-2xl w-[1080px] max-w-[95vw] h-[720px] max-h-[90vh] overflow-hidden flex flex-col border border-slate-200/80 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/5 transition-all">
                 
-                {/* Header Banner - Matching Main Page Header Standard */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 dark:from-[#081816] dark:via-[#0c2621] dark:to-[#081816] px-6 py-4.5 text-white border-b border-teal-500/30 dark:border-teal-500/20 shrink-0">
-                    <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 rounded-full bg-white/10 dark:bg-teal-500/10 blur-3xl pointer-events-none" />
+                {/* Header Banner - Spacious with smooth multi-stop color fade */}
+                <div className="relative overflow-hidden bg-gradient-to-r from-primary-600 via-primary-400 to-emerald-400 dark:from-primary-950 dark:via-primary-800 dark:to-emerald-900 px-7 py-6 sm:px-8 sm:py-7 text-white border-b border-primary-300/30 dark:border-primary-500/20 shrink-0">
+                    <div className="absolute -top-12 -right-12 w-80 h-80 rounded-full bg-white/20 dark:bg-primary-400/15 blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-16 left-1/3 w-72 h-72 rounded-full bg-emerald-200/25 dark:bg-emerald-500/10 blur-3xl pointer-events-none" />
                     
                     <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3.5">
-                            <div className="h-11 w-11 rounded-2xl bg-white/15 dark:bg-teal-500/20 backdrop-blur-md border border-white/20 dark:border-teal-400/30 flex items-center justify-center shadow-lg text-white shrink-0">
-                                <Building2 className="h-5 w-5 text-white" />
+                        <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-2xl bg-white/20 dark:bg-primary-500/20 backdrop-blur-md border border-white/30 dark:border-primary-400/30 flex items-center justify-center shadow-lg text-white shrink-0">
+                                <Building2 className="h-6 w-6 text-white" />
                             </div>
                             <div>
-                                <div className="flex items-center gap-2 flex-wrap">
+                                <div className="flex items-center gap-2.5 flex-wrap">
                                     <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white font-display">
                                         {tenant.name}
                                     </h2>
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold font-mono tracking-wider bg-white/20 text-white border border-white/25 shadow-xs">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold font-mono tracking-wider bg-white/20 text-white border border-white/30 shadow-xs">
                                         {formatCustomerId(tenant.customerCode) || tenant.id}
                                     </span>
                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold font-mono uppercase tracking-wider border shadow-xs ${
                                         tenant.serviceBlocked 
-                                            ? 'bg-rose-500/20 text-rose-200 border-rose-400/30' 
-                                            : 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30'
+                                            ? 'bg-rose-500/25 text-rose-100 border-rose-300/40' 
+                                            : 'bg-white/20 text-white border-white/30'
                                     }`}>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${tenant.serviceBlocked ? 'bg-rose-400' : 'bg-emerald-400 animate-pulse'}`} />
+                                        <span className={`w-1.5 h-1.5 rounded-full ${tenant.serviceBlocked ? 'bg-rose-300' : 'bg-emerald-200 animate-pulse'}`} />
                                         {tenant.serviceBlocked ? 'Blocked' : 'Active Tenant'}
                                     </span>
                                 </div>
-                                <p className="text-teal-100/90 dark:text-teal-200/80 text-xs font-medium font-sans mt-0.5">
+                                <p className="text-white/85 text-xs sm:text-sm font-medium font-sans mt-1">
                                     Tenant Control Panel • Internal account management, limits & telephony services
                                 </p>
                             </div>
@@ -177,7 +178,7 @@ const TenantManager = ({ tenantId, initialTenant, onClose }) => {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer select-none ${isActive
-                                        ? 'bg-teal-600 text-white shadow-md shadow-teal-600/25'
+                                        ? 'bg-gradient-to-r from-primary-600 to-emerald-500 text-white shadow-md shadow-primary-500/25'
                                         : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10'
                                         }`}
                                 >

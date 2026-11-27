@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useBranding, applyBrandingColors } from '../../context/BrandingContext';
+import { useBranding } from '../../context/BrandingContext';
 import api from '../../services/api';
 import { getMediaUrl } from '../../utils/media.utils';
 import { 
-    Palette, 
     Mail, 
     Phone, 
     Save, 
@@ -19,7 +18,6 @@ import {
     ShieldCheck,
     CheckCircle2,
     Sparkles,
-    Eye,
     Layers,
     Sliders
 } from 'lucide-react';
@@ -35,8 +33,6 @@ const BrandingSettingsPage = () => {
     const [currentBranding, setCurrentBranding] = useState({
         name: '',
         domain: '',
-        primaryColor: '#0d9488',
-        accentColor: '#14b8a6',
         logoMain: '',
         logoSidebar: '',
         favicon: '',
@@ -56,11 +52,6 @@ const BrandingSettingsPage = () => {
     
     // Upload state tracking
     const [uploadingField, setUploadingField] = useState(null); // 'logoMain' | 'logoSidebar' | 'favicon'
-    const [previewLogoError, setPreviewLogoError] = useState(false);
-
-    useEffect(() => {
-        setPreviewLogoError(false);
-    }, [currentBranding.logoSidebar, currentBranding.logoMain]);
 
     useEffect(() => {
         if (isSuperAdmin) {
@@ -76,8 +67,6 @@ const BrandingSettingsPage = () => {
                 setCurrentBranding({
                     name: response.data.name || '',
                     domain: response.data.domain || '',
-                    primaryColor: response.data.primaryColor || '#0d9488',
-                    accentColor: response.data.accentColor || '#14b8a6',
                     logoMain: response.data.logoMain || '',
                     logoSidebar: response.data.logoSidebar || '',
                     favicon: response.data.favicon || '',
@@ -138,12 +127,9 @@ const BrandingSettingsPage = () => {
         try {
             setSavingCurrent(true);
             setSaveSuccess(false);
-            
-            // Immediately apply all CSS shade variables to the document root for instant live feedback
-            applyBrandingColors(currentBranding.primaryColor, currentBranding.accentColor);
 
             await api.put('/admin/branding/current', currentBranding);
-            // Refresh branding context & user context instantly to update UI colors & logos dynamically
+            // Refresh branding context & user context to update logos & settings
             await Promise.all([
                 refreshBranding(),
                 refreshUser ? refreshUser() : Promise.resolve()
@@ -164,16 +150,8 @@ const BrandingSettingsPage = () => {
 
     const tabs = [
         { id: 'brand', label: 'Platform & Assets', icon: Layers, desc: 'Name, Domain, Logos' },
-        { id: 'colors', label: 'Theme & Styling', icon: Palette, desc: 'Primary & Accent palette' },
         { id: 'smtp', label: 'SMTP Mail Server', icon: Server, desc: 'Email delivery settings' },
         { id: 'support', label: 'Support & Helpdesk', icon: HelpCircle, desc: 'Contact details' },
-    ];
-
-    const presetTealPalettes = [
-        { name: 'Balatrix Teal', primary: '#0d9488', accent: '#14b8a6' },
-        { name: 'Emerald Ocean', primary: '#0f766e', accent: '#2dd4bf' },
-        { name: 'Aqua Cyan', primary: '#0891b2', accent: '#06b6d4' },
-        { name: 'Deep Spruce', primary: '#115e59', accent: '#5eead4' },
     ];
 
     return (
@@ -193,7 +171,7 @@ const BrandingSettingsPage = () => {
                             Platform Customization & Branding
                         </h1>
                         <p className="text-teal-100 text-sm sm:text-base font-medium leading-relaxed">
-                            Configure unified visual identity, teal color palette, custom domain paths, and outbound SMTP transactional mail routing across the platform.
+                            Configure unified visual identity, custom domain paths, and outbound SMTP transactional mail routing across the platform.
                         </p>
                     </div>
 
@@ -223,11 +201,11 @@ const BrandingSettingsPage = () => {
                     <span className="text-sm font-semibold text-slate-500">Loading platform settings...</span>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
-                    {/* Left Column: Form with Segmented Tabs (8 cols) */}
-                    <div className="lg:col-span-8 space-y-6">
+                <div className="max-w-5xl mx-auto space-y-6">
+                    {/* Form with Segmented Tabs */}
+                    <div className="space-y-6">
                         {/* Segmented Navigation Bar */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-1.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-teal-200/70 dark:border-white/10 shadow-sm backdrop-blur-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-1.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-teal-200/70 dark:border-white/10 shadow-sm backdrop-blur-sm">
                             {tabs.map((tab) => {
                                 const Icon = tab.icon;
                                 const isActive = activeTab === tab.id;
@@ -432,98 +410,7 @@ const BrandingSettingsPage = () => {
                                 </div>
                             )}
 
-                            {/* TAB 2: Theme & Styling */}
-                            {activeTab === 'colors' && (
-                                <div className="rounded-3xl bg-white/95 dark:bg-slate-900/95 border border-teal-200/70 dark:border-white/10 shadow-sm p-6 sm:p-8 space-y-6 backdrop-blur-sm animate-in fade-in duration-300">
-                                    <div className="flex items-center justify-between border-b border-teal-100 dark:border-white/10 pb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/40 flex items-center justify-center text-teal-700 dark:text-teal-400">
-                                                <Palette className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <h2 className="text-base font-bold text-slate-800 dark:text-white">Color Palette & Brand Accents</h2>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">Manage primary theme shades and interactive highlights</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Presets */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Recommended Teal Presets</label>
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                            {presetTealPalettes.map((preset) => (
-                                                <button
-                                                    key={preset.name}
-                                                    type="button"
-                                                    onClick={() => setCurrentBranding({
-                                                        ...currentBranding,
-                                                        primaryColor: preset.primary,
-                                                        accentColor: preset.accent,
-                                                    })}
-                                                    className="p-3 rounded-2xl border border-teal-200/80 dark:border-white/10 bg-teal-50/40 dark:bg-slate-800/50 hover:border-teal-400 dark:hover:border-teal-500 hover:shadow-md transition-all text-left flex flex-col gap-2"
-                                                >
-                                                    <div className="flex items-center gap-1.5">
-                                                        <div className="w-5 h-5 rounded-lg shadow-sm" style={{ backgroundColor: preset.primary }} />
-                                                        <div className="w-5 h-5 rounded-lg shadow-sm" style={{ backgroundColor: preset.accent }} />
-                                                    </div>
-                                                    <span className="text-xs font-bold text-slate-800 dark:text-white">{preset.name}</span>
-                                                    <span className="text-[10px] font-mono text-slate-500">{preset.primary}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                                        {/* Primary Color */}
-                                        <div className="space-y-2.5 p-4 rounded-2xl bg-teal-50/30 dark:bg-slate-800/40 border border-teal-200/60 dark:border-white/10">
-                                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Primary Theme Color</label>
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Controls navigation headers, active states, and primary action buttons</p>
-                                            <div className="flex items-center gap-3">
-                                                <div className="relative">
-                                                    <input
-                                                        type="color"
-                                                        value={currentBranding.primaryColor}
-                                                        onChange={(e) => setCurrentBranding({...currentBranding, primaryColor: e.target.value})}
-                                                        className="h-12 w-12 border-2 border-white dark:border-slate-700 rounded-2xl cursor-pointer p-0.5 shadow-md"
-                                                    />
-                                                </div>
-                                                <input
-                                                    type="text"
-                                                    value={currentBranding.primaryColor}
-                                                    onChange={(e) => setCurrentBranding({...currentBranding, primaryColor: e.target.value})}
-                                                    className="flex-1 rounded-xl border border-teal-200/80 dark:border-white/10 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 text-sm font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-white uppercase px-3 py-2.5"
-                                                    maxLength={7}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Accent Color */}
-                                        <div className="space-y-2.5 p-4 rounded-2xl bg-teal-50/30 dark:bg-slate-800/40 border border-teal-200/60 dark:border-white/10">
-                                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Accent / Highlight Color</label>
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Applied to hover states, badges, secondary indicators and gradients</p>
-                                            <div className="flex items-center gap-3">
-                                                <div className="relative">
-                                                    <input
-                                                        type="color"
-                                                        value={currentBranding.accentColor}
-                                                        onChange={(e) => setCurrentBranding({...currentBranding, accentColor: e.target.value})}
-                                                        className="h-12 w-12 border-2 border-white dark:border-slate-700 rounded-2xl cursor-pointer p-0.5 shadow-md"
-                                                    />
-                                                </div>
-                                                <input
-                                                    type="text"
-                                                    value={currentBranding.accentColor}
-                                                    onChange={(e) => setCurrentBranding({...currentBranding, accentColor: e.target.value})}
-                                                    className="flex-1 rounded-xl border border-teal-200/80 dark:border-white/10 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 text-sm font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-white uppercase px-3 py-2.5"
-                                                    maxLength={7}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* TAB 3: SMTP Mail Server */}
+                            {/* TAB 2: SMTP Mail Server */}
                             {activeTab === 'smtp' && (
                                 <div className="rounded-3xl bg-white/95 dark:bg-slate-900/95 border border-teal-200/70 dark:border-white/10 shadow-sm p-6 sm:p-8 space-y-6 backdrop-blur-sm animate-in fade-in duration-300">
                                     <div className="flex items-center justify-between border-b border-teal-100 dark:border-white/10 pb-4">
@@ -701,107 +588,6 @@ const BrandingSettingsPage = () => {
                                 </button>
                             </div>
                         </form>
-                    </div>
-
-                    {/* Right Column: Live Simulated Preview (4 cols) */}
-                    <div className="lg:col-span-4 space-y-6">
-                        <div className="rounded-3xl bg-white/95 dark:bg-slate-900/95 border border-teal-200/70 dark:border-white/10 shadow-sm p-6 space-y-5 backdrop-blur-sm sticky top-6">
-                            <div className="flex items-center justify-between border-b border-teal-100 dark:border-white/10 pb-4">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="h-8 w-8 rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/40 flex items-center justify-center text-teal-700 dark:text-teal-400">
-                                        <Eye className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-bold text-slate-800 dark:text-white">Live System Preview</h3>
-                                        <p className="text-[11px] text-slate-400">Real-time simulation</p>
-                                    </div>
-                                </div>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950 text-[10px] font-extrabold text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-                                    LIVE
-                                </span>
-                            </div>
-
-                            {/* Simulated Navigation Bar Mockup */}
-                            <div className="rounded-2xl border border-teal-200/70 dark:border-white/10 bg-slate-50 dark:bg-slate-950 p-4 space-y-3.5 shadow-inner">
-                                <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Simulated Top Navbar</div>
-                                
-                                <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-teal-200/60 dark:border-white/10 shadow-sm">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-7 w-20 bg-teal-50 dark:bg-white/5 flex items-center justify-center text-[10px] font-bold text-teal-700 rounded-lg overflow-hidden p-0.5 border border-teal-200/60">
-                                            {(currentBranding.logoSidebar || currentBranding.logoMain) && !previewLogoError ? (
-                                                <img 
-                                                    src={getMediaUrl(currentBranding.logoSidebar || currentBranding.logoMain)} 
-                                                    alt="Brand Logo" 
-                                                    className="h-full w-full object-contain"
-                                                    onError={() => setPreviewLogoError(true)}
-                                                />
-                                            ) : (
-                                                <span className="truncate px-1 text-teal-800 dark:text-teal-200 font-extrabold">{currentBranding.name || 'Balatrix'}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <span 
-                                            className="px-2 py-1 rounded-lg text-[10px] font-extrabold text-white shadow-xs"
-                                            style={{ backgroundColor: currentBranding.primaryColor }}
-                                        >
-                                            Dashboard
-                                        </span>
-                                        <span 
-                                            className="px-2 py-1 rounded-lg text-[10px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-teal-50"
-                                        >
-                                            Telephony
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Active Component Preview */}
-                                <div className="space-y-2 pt-2">
-                                    <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Interactive Element Preview</div>
-                                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-teal-200/60 dark:border-white/10 space-y-2.5">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-bold text-slate-800 dark:text-white">Active Accent Card</span>
-                                            <span 
-                                                className="w-2.5 h-2.5 rounded-full"
-                                                style={{ backgroundColor: currentBranding.accentColor }}
-                                            />
-                                        </div>
-                                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                                            <div 
-                                                className="h-full rounded-full transition-all duration-300" 
-                                                style={{ width: '65%', backgroundColor: currentBranding.primaryColor }} 
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            className="w-full py-1.5 rounded-lg text-xs font-bold text-white shadow-xs transition-all"
-                                            style={{ backgroundColor: currentBranding.primaryColor }}
-                                        >
-                                            Sample Action Button
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Simulated Support Desk Info Card */}
-                            <div className="p-4 rounded-2xl bg-teal-50/50 dark:bg-slate-800/50 border border-teal-200/70 dark:border-white/10 text-xs space-y-2.5">
-                                <div className="font-extrabold text-teal-900 dark:text-teal-200 flex items-center gap-1.5">
-                                    <HelpCircle size={15} className="text-teal-600" />
-                                    <span>Active Helpdesk Info</span>
-                                </div>
-                                <div className="space-y-1 font-medium text-slate-600 dark:text-slate-300">
-                                    <p className="flex items-center gap-1.5">
-                                        <Mail size={13} className="text-teal-600" />
-                                        <span className="truncate">{currentBranding.supportEmail || 'support@balatrix.com'}</span>
-                                    </p>
-                                    <p className="flex items-center gap-1.5">
-                                        <Phone size={13} className="text-teal-600" />
-                                        <span>{currentBranding.supportPhone || '+1 (800) 555-0199'}</span>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             )}
